@@ -223,6 +223,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
+  <div class="title">当前版本1.0.1</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图</button>
   <button id="btnImportGltf">📥 导入 GLTF / GLB</button>
@@ -1200,7 +1201,22 @@ gltfInput.addEventListener('change', async e => {
 });
 
 window.addEventListener('beforeunload', () => {
-  autoSave();
+  // 退出时强制新建存档，不覆盖已有存档
+  const mapData = serializeMap();
+  const saves = getSaves();
+  const name = getNextAutoName(saves);
+  
+  const newSave = {
+    id: Date.now().toString(),
+    name: name,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    objectCount: mapData.objects.length,
+    data: mapData
+  };
+  
+  saves.push(newSave);
+  setSaves(saves);
 });
 
 function resize() {
