@@ -33,7 +33,7 @@
 
     #app { width: 100%; height: 100dvh; position: relative; }
     #viewport { position: absolute; inset: 0; z-index: 1; background: #8eabc3; }
-    #viewport canvas { display: block; width: 100%; height: 100%; }
+    #viewport canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
     #crosshair {
       position: absolute; left: 50%; top: 50%;
@@ -72,12 +72,23 @@
       display: flex; align-items: center; justify-content: center;
       backdrop-filter: blur(8px); background: rgba(22,28,36,.85);
     }
+    /* 顶部一键保存：显眼胶囊按钮 */
+    #topbar button.accent {
+      width: auto !important; height: clamp(34px, 7vw, 40px) !important;
+      padding: 0 clamp(12px, 4vw, 18px) !important;
+      border-radius: 20px !important; gap: 4px;
+      background: var(--accent) !important; border-color: var(--accent) !important;
+      color: #fff !important; font-size: clamp(12px, 3vw, 14px) !important;
+      font-weight: 600;
+    }
+    #topbar button.accent:active { background: #4d92e8 !important; }
 
     #propsBar {
       display: none; position: absolute; top: 55px; left: 3%; right: 3%; z-index: 50;
       padding: 8px 10px; border-radius: 12px;
       background: rgba(22,28,36,.92); backdrop-filter: blur(8px);
       border: 1px solid var(--line); gap: 6px; flex-wrap: wrap; align-items: center;
+      max-height: 42vh; overflow-y: auto; overscroll-behavior: contain;
     }
     #propsBar.show { display: flex; }
     #propsBar label { font-size: 10px; color: var(--muted); white-space: nowrap; }
@@ -95,8 +106,8 @@
     #bottomBar {
       display: flex; position: absolute;
       bottom: calc(max(6px, 1vh) + env(safe-area-inset-bottom, 0px));
-      right: 3%; z-index: 50; gap: 6px; pointer-events: none;
-      flex-wrap: wrap; justify-content: flex-end; max-width: 94%;
+      left: 3%; right: 3%; z-index: 50; gap: 6px; pointer-events: none;
+      flex-wrap: wrap; justify-content: center;
     }
     #bottomBar > * { pointer-events: auto; }
     #bottomBar button {
@@ -178,6 +189,61 @@
       border-radius: 6px !important;
       width: auto !important;
     }
+
+    body.desktop #dpadMove,
+    body.desktop #btnMulti { display: none; }
+    body.touch .desktopOnly { display: none; }
+
+    body.locked, body.preview { cursor: none; }
+    body.locked #crosshair, body.preview #crosshair { opacity: .9; }
+    body:not(.locked):not(.preview).desktop #crosshair { opacity: .3; }
+
+    body.preview #topbar,
+    body.preview #bottomBar,
+    body.preview #propsBar,
+    body.preview #selectBox { display: none !important; }
+    body.preview.touch #dpadMove { display: block; }
+
+    #previewHud {
+      display: none; position: absolute; left: 50%; bottom: 4%;
+      transform: translateX(-50%); z-index: 55; gap: 8px;
+      align-items: center; pointer-events: none;
+      padding: 8px 14px; border-radius: 12px; font-size: 12px;
+      background: rgba(18,24,32,.86); border: 1px solid var(--line);
+      color: var(--muted); white-space: nowrap;
+    }
+    body.preview #previewHud { display: flex; }
+    #previewHud b { color: var(--text); }
+    #previewExit { pointer-events: auto; padding: 5px 10px; font-size: 11px; border-radius: 7px; }
+
+    #hintBar {
+      display: none; position: absolute; left: 50%; top: 8px;
+      transform: translateX(-50%); z-index: 52; pointer-events: none;
+      padding: 6px 12px; border-radius: 9px; font-size: 11px;
+      background: rgba(18,24,32,.8); border: 1px solid var(--line); color: var(--muted);
+    }
+    body.desktop:not(.preview) #hintBar { display: block; }
+    body.locked #hintBar { display: none !important; }
+
+    #propsBar select {
+      border: 1px solid var(--line); background: #121821; color: var(--text);
+      border-radius: 6px; padding: 4px 6px; font-size: 11px; max-width: 110px;
+    }
+    #propsBar input[type="number"] {
+      width: 54px; border: 1px solid var(--line); background: #121821;
+      color: var(--text); border-radius: 6px; padding: 4px 6px; font-size: 11px;
+    }
+    #propsBar input[type="range"] { width: 78px; }
+
+    .keyList { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 12.5px; }
+    .keyList kbd {
+      display: inline-block; min-width: 20px; text-align: center;
+      padding: 2px 6px; border-radius: 5px; border: 1px solid var(--line);
+      background: #121821; font: 11px/1.4 ui-monospace, monospace; color: var(--text);
+    }
+    .keyList span { color: var(--muted); align-self: center; }
+    .keySec { grid-column: 1 / -1; margin-top: 10px; color: var(--accent);
+      font: 700 10px/1 ui-monospace, monospace; letter-spacing: .18em; text-transform: uppercase; }
   </style>
 </head>
 <body>
@@ -190,17 +256,31 @@
 
   <div id="topbar">
     <span class="title">RagdollBox 地图编辑器</span>
+    <button id="btnSaveQuick" class="accent">💾&nbsp;保存</button>
     <button id="btnMenu">☰</button>
   </div>
 
   <div id="propsBar">
     <label>名称</label><input id="propName" type="text" />
     <label>颜色</label><input id="propColor" type="color" value="#c5c9cf" />
+    <label>纹理</label><select id="propTex"></select>
+    <label>平铺</label><input id="propTexRep" type="number" min="0.1" max="64" step="0.5" value="1" />
+    <label>不透明</label><input id="propOpacity" type="range" min="0" max="1" step="0.05" value="1" />
     <span class="prop-info">位置:<b id="propPos">0,0,0</b></span>
     <span class="prop-info">缩放:<b id="propScale">1,1,1</b></span>
     <span class="prop-info">类型:<b id="propType">-</b></span>
+    <button id="btnRotate90">↻ 90°</button>
+    <button id="btnRotate90CCW">↺ 90°</button>
+    <button id="btnFocus">🎯 聚焦</button>
     <button id="btnDuplicate">📋复制</button>
     <button id="btnDelete" class="danger">🗑删除</button>
+  </div>
+
+  <div id="hintBar">右键拖动 = 视角 · 滚轮 = 前后 · Shift+左键 = 加选 · 空白拖动 = 框选 · F1 = 快捷键</div>
+
+  <div id="previewHud">
+    <span>预览中 · <b id="previewHint">WASD 移动 · 空格 跳 · Shift 跑</b></span>
+    <button id="previewExit">退出预览 (Esc)</button>
   </div>
 
   <div id="dpadMove"><canvas id="canvasMove"></canvas></div>
@@ -208,11 +288,12 @@
   <div id="bottomBar">
     <button id="btnSelect" class="active"><span class="icon">☝️</span>选中</button>
     <button id="btnMove"><span class="icon">✋</span>移动</button>
+    <button id="btnRotate"><span class="icon">🔄</span>旋转</button>
     <button id="btnScale"><span class="icon">🖐</span>缩放</button>
     <button id="btnMulti"><span class="icon">🔲</span>多选</button>
     <button id="btnPlace" class="accent"><span class="icon">➕</span>放置</button>
-    <button id="btnCamera"><span class="icon">🔒</span>视角</button>
-    <button id="btnSaves"><span class="icon">💾</span>存档</button>
+    <button id="btnPreview"><span class="icon">🎮</span>预览</button>
+    <button id="btnSaves"><span class="icon">📂</span>存档</button>
     <button id="btnUndo"><span class="icon">↩️</span>撤销</button>
   </div>
 </div>
@@ -223,12 +304,64 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title">当前版本1.0.1</div>
+  <div class="title">当前版本2.0.0</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图</button>
   <button id="btnImportGltf">📥 导入 GLTF / GLB</button>
+  <button id="btnImportFbx">📥 导入 FBX</button>
   <button id="btnRedo">↪️ 重做</button>
+  <button id="btnKeys">⌨️ 快捷键一览</button>
   <button id="btnCredits">🎬 制作人员</button>
+</div>
+
+<div id="panelKeys" class="sheet">
+  <div class="handle"></div>
+  <div class="title">快捷键 / 操作说明</div>
+  <div class="keyList">
+    <div class="keySec">手机端</div>
+    <kbd>空白处拖动</kbd><span>旋转视角（同时可点选编辑物体）</span>
+    <kbd>点按物体</kbd><span>选中 / 取消选中</span>
+    <kbd>拖动手柄</kbd><span>移动 / 旋转 / 缩放物体</span>
+    <kbd>上 / 下 / 左 / 右</kbd><span>移动视角前后左右</span>
+    <kbd>⇧ / ⇩</kbd><span>视角上升 / 下降</span>
+    <kbd>💾 顶部保存</kbd><span>一键保存地图（不弹窗）</span>
+    <kbd>🔲 多选</kbd><span>开启后可拖框多选</span>
+    <kbd>↻ / ↺ 90°</kbd><span>选中物体绕垂直轴旋转 90°</span>
+    <kbd>📥 导入贴图</kbd><span>纹理下拉选「导入贴图」选择图片</span>
+    <div class="keySec">预览（手机）</div>
+    <kbd>单指滑动</kbd><span>旋转视角</span>
+    <kbd>十字键</kbd><span>移动 · ⇧跳 · ⇩下落</span>
+    <div class="keySec">视角（桌面）</div>
+    <kbd>右键拖动</kbd><span>转视角（自动锁定鼠标，松开解锁）</span>
+    <kbd>W A S D</kbd><span>前后左右</span>
+    <kbd>空格</kbd> <span>上升</span>
+    <kbd>Ctrl</kbd><span>下降</span>
+    <kbd>Shift</kbd><span>加速</span>
+    <kbd>滚轮</kbd><span>沿视线前后</span>
+    <kbd>F</kbd><span>把视角对准选中的物体</span>
+    <div class="keySec">选择</div>
+    <kbd>左键</kbd><span>选中</span>
+    <kbd>Shift + 左键</kbd><span>加选 / 取消选中</span>
+    <kbd>空白处拖动</kbd><span>框选（按住 Shift 累加）</span>
+    <kbd>Ctrl + A</kbd><span>全选</span>
+    <kbd>Esc</kbd><span>取消选择</span>
+    <div class="keySec">编辑</div>
+    <kbd>1</kbd><span>选中工具</span>
+    <kbd>2</kbd><span>移动工具</span>
+    <kbd>3</kbd><span>旋转工具</span>
+    <kbd>4</kbd><span>缩放工具</span>
+    <kbd>Ctrl + Z</kbd><span>撤销</span>
+    <kbd>Ctrl + Shift + Z</kbd><span>重做</span>
+    <kbd>Ctrl + Y</kbd><span>重做</span>
+    <kbd>Ctrl + D</kbd><span>复制</span>
+    <kbd>Delete</kbd><span>删除</span>
+    <kbd>Shift + 拖轴</kbd><span>缩放时等比</span>
+    <div class="keySec">其他</div>
+    <kbd>Ctrl + S</kbd><span>立即存档</span>
+    <kbd>Ctrl + E</kbd><span>导出地图</span>
+    <kbd>P</kbd><span>进入 / 退出预览</span>
+    <kbd>F1</kbd><span>打开这一页</span>
+  </div>
 </div>
 
 <div id="panelCredits" class="sheet">
@@ -252,6 +385,12 @@
     <button data-add="ramp">📐 斜坡</button>
     <button data-add="triangle">🔽 三角体</button>
   </div>
+  <div style="margin-top:10px">
+    <button data-add="spawn" style="text-align:center">🚩 出生点（可放多个）</button>
+  </div>
+  <div style="margin-top:2px;color:var(--muted);font-size:11px;line-height:1.6">
+    出生点会写进地图文件的 spawns 字段，进游戏后玩家按编号轮流从这些点出生。
+  </div>
 </div>
 
 <div id="panelSaves" class="sheet">
@@ -274,6 +413,8 @@
 
 <input id="mapInput" type="file" accept=".json,.rbmap" hidden />
 <input id="gltfInput" type="file" accept=".gltf,.glb,.bin,image/*" multiple hidden />
+<input id="fbxInput" type="file" accept=".fbx" hidden />
+<input id="texInput" type="file" accept="image/*" hidden />
 
 <script type="importmap">
 {
@@ -287,6 +428,7 @@
 import * as THREE from 'three';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
@@ -339,7 +481,11 @@ scene.add(objectsRoot);
 
 const transformProxy = new THREE.Object3D();
 scene.add(transformProxy);
-const proxyStart = { pos: new THREE.Vector3(), scale: new THREE.Vector3(1,1,1) };
+const proxyStart = {
+  pos: new THREE.Vector3(),
+  scale: new THREE.Vector3(1, 1, 1),
+  quat: new THREE.Quaternion(),
+};
 const perObjectStart = new Map();
 
 const transform = new TransformControls(camera, renderer.domElement);
@@ -360,11 +506,25 @@ let historyLock = false;
 let history = [];
 let historyIndex = -1;
 let toastTimer = 0;
-let cameraLocked = true;
+
+const IS_TOUCH = navigator.maxTouchPoints > 0 && matchMedia('(pointer:coarse)').matches;
+const DESKTOP = !IS_TOUCH;
+document.body.classList.add(DESKTOP ? 'desktop' : 'touch');
+
+// 手机端加大变换手柄，方便触摸操作
+if (IS_TOUCH) transform.setSize(1.15);
+// 预览 HUD 按设备显示对应操作说明
+const previewHint = document.getElementById('previewHint');
+if (previewHint) previewHint.textContent = IS_TOUCH ? '单指拖动＝转视角 · 十字键移动 · ⇧跳 · ⇩下落' : 'WASD 移动 · 空格 跳 · Shift 跑';
+
+let lookLocked = false;
+let previewOn = false;
+let shiftHeld = false;
 
 const primitiveNames = {
   box: '方块', sphere: '球体', cylinder: '圆柱体', cone: '圆锥',
-  hex: '六边形体', ramp: '斜坡', triangle: '三角体', model: 'GLTF 模型'
+  hex: '六边形体', ramp: '斜坡', triangle: '三角体', model: '导入模型',
+  spawn: '出生点'
 };
 
 // ==================== 存档系统 ====================
@@ -422,25 +582,28 @@ function autoSave() {
   setSaves(saves);
 }
 
+// 快速保存：不弹窗，沿用当前关联存档名，否则自动命名
 function manualSave() {
-  const defaultName = currentSaveId ? 
-    (getSaves().find(s => s.id === currentSaveId)?.name || '') : '';
-  const name = prompt('请输入存档名称：', defaultName);
-  if (!name || !name.trim()) return;
-  
-  const trimmedName = name.trim();
+  const mapData = serializeMap();
   const saves = getSaves();
   
-  if (saves.some(s => s.name === trimmedName && s.id !== currentSaveId)) {
-    alert('已存在同名存档，请使用其他名称');
-    return;
+  if (currentSaveId) {
+    const save = saves.find(s => s.id === currentSaveId);
+    if (save) {
+      save.data = mapData;
+      save.updatedAt = new Date().toISOString();
+      save.objectCount = mapData.objects.length;
+      setSaves(saves);
+      toast(`已保存：${save.name}`);
+      refreshSavesList();
+      return;
+    }
   }
   
-  const mapData = serializeMap();
-  
+  const name = getNextAutoName(saves);
   const newSave = {
     id: Date.now().toString(),
-    name: trimmedName,
+    name: name,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     objectCount: mapData.objects.length,
@@ -450,7 +613,7 @@ function manualSave() {
   currentSaveId = newSave.id;
   saves.push(newSave);
   setSaves(saves);
-  toast(`已存档：${trimmedName}`);
+  toast(`已保存：${name}`);
   refreshSavesList();
 }
 
@@ -584,32 +747,317 @@ function toast(text) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
 }
 
-function makeRampGeometry() {
-  const p = [-.5,-.5,-.5, .5,-.5,-.5, .5,.5,-.5, -.5,-.5,.5, .5,-.5,.5, .5,.5,.5];
-  const i = [0,2,1, 3,4,5, 0,1,4,0,4,3, 1,2,5,1,5,4, 0,3,5,0,5,2];
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
-  g.setIndex(i); g.computeVertexNormals(); return g;
+const TEXTURES = [
+  { id: '', name: '无（纯色）' },
+  { id: '__import__', name: '📥 导入贴图…' },
+  { id: 'clear', name: '透明玻璃' },
+  { id: 'invisible', name: '隐形（有碰撞）' },
+  { id: 'ground', name: '地面' },
+  { id: 'grass', name: '草地' },
+  { id: 'stone', name: '石砖' },
+  { id: 'brick', name: '砖墙' },
+  { id: 'plaster', name: '涂料墙' },
+  { id: 'roof', name: '屋顶瓦' },
+  { id: 'wood', name: '木板' },
+  { id: 'metal', name: '金属' },
+  { id: 'tile', name: '瓷砖' },
+  { id: 'sand', name: '沙地' },
+];
+
+const texCache = new Map();
+
+function canvasTex(size, paint, tile) {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = size;
+  paint(cv.getContext('2d'), size);
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  if (tile) t.repeat.set(tile, tile);
+  return t;
 }
-function makeTriangleGeometry() {
-  const p = [-.5,-.5,-.5, .5,-.5,-.5, 0,.5,-.5, -.5,-.5,.5, .5,-.5,.5, 0,.5,.5];
-  const i = [0,2,1, 3,4,5, 0,1,4,0,4,3, 1,2,5,1,5,4, 2,0,3,2,3,5];
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
-  g.setIndex(i); g.computeVertexNormals(); return g;
+
+const TEX_PAINT = {
+  ground(g) {
+    g.fillStyle = '#a3a096'; g.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 10; i++) {
+      const x = Math.random() * 256, y = Math.random() * 256, r = 26 + Math.random() * 60;
+      const grad = g.createRadialGradient(x, y, 0, x, y, r);
+      const col = Math.random() < 0.5 ? '138,132,112' : '148,150,128';
+      grad.addColorStop(0, `rgba(${col},${0.12 + Math.random() * 0.14})`);
+      grad.addColorStop(1, `rgba(${col},0)`);
+      g.fillStyle = grad;
+      g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+    }
+    g.strokeStyle = '#908d84'; g.lineWidth = 2;
+    for (let i = 0; i <= 256; i += 64) {
+      g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 256); g.stroke();
+      g.beginPath(); g.moveTo(0, i); g.lineTo(256, i); g.stroke();
+    }
+    for (let i = 0; i < 160; i++) {
+      g.fillStyle = `rgba(60,60,55,${Math.random() * 0.08})`;
+      g.fillRect(Math.random() * 256, Math.random() * 256, 3 + Math.random() * 6, 3 + Math.random() * 6);
+    }
+  },
+  grass(g) {
+    g.fillStyle = '#5f8a41'; g.fillRect(0, 0, 128, 128);
+    for (let i = 0; i < 900; i++) {
+      const x = Math.random() * 128, y = Math.random() * 128;
+      const l = 2 + Math.random() * 5;
+      const shade = 60 + ((Math.random() * 70) | 0);
+      g.strokeStyle = `rgba(${Math.round(shade * 0.62)},${shade + 46},${Math.round(shade * 0.5)},0.75)`;
+      g.lineWidth = 1;
+      g.beginPath(); g.moveTo(x, y);
+      g.lineTo(x + (Math.random() - 0.5) * 2.4, y - l); g.stroke();
+    }
+    for (let i = 0; i < 22; i++) {
+      const x = Math.random() * 128, y = Math.random() * 128, r = 8 + Math.random() * 20;
+      const grad = g.createRadialGradient(x, y, 0, x, y, r);
+      grad.addColorStop(0, `rgba(${Math.random() < 0.5 ? '40,66,28' : '116,150,72'},0.16)`);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = grad;
+      g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+    }
+  },
+  stone(g) {
+    g.fillStyle = '#b5b5b5'; g.fillRect(0, 0, 128, 128);
+    const rowH = 32, bw = 64;
+    for (let r = 0; r < 4; r++) {
+      const off = (r % 2) * (bw / 2);
+      for (let c = -1; c < 3; c++) {
+        const x = c * bw + off;
+        const shade = 165 + ((Math.random() * 42) | 0);
+        g.fillStyle = `rgb(${shade},${shade},${shade})`;
+        g.fillRect(x + 2, r * rowH + 2, bw - 4, rowH - 4);
+        for (let i = 0; i < 10; i++) {
+          const v = Math.random() < 0.5 ? 255 : 70;
+          g.fillStyle = `rgba(${v},${v},${v},${0.04 + Math.random() * 0.07})`;
+          g.fillRect(x + 3 + Math.random() * (bw - 10), r * rowH + 3 + Math.random() * (rowH - 9), 2 + Math.random() * 5, 1 + Math.random() * 3);
+        }
+      }
+      g.fillStyle = 'rgba(72,72,72,0.75)';
+      g.fillRect(0, r * rowH, 128, 2);
+      for (let c = 0; c < 2; c++) g.fillRect((c * bw + off + 128) % 128, r * rowH, 2, rowH);
+    }
+  },
+  brick(g) {
+    g.fillStyle = '#9c9c9c'; g.fillRect(0, 0, 128, 128);
+    const rowH = 16, bw = 32;
+    for (let r = 0; r < 8; r++) {
+      const off = (r % 2) * (bw / 2);
+      for (let c = -1; c < 5; c++) {
+        const x = c * bw + off;
+        const shade = 160 + ((Math.random() * 60) | 0);
+        g.fillStyle = `rgb(${shade},${Math.round(shade * 0.96)},${Math.round(shade * 0.92)})`;
+        g.fillRect(x + 1, r * rowH + 1, bw - 2, rowH - 2);
+      }
+      g.fillStyle = 'rgba(80,78,76,0.8)';
+      g.fillRect(0, r * rowH, 128, 1.5);
+      for (let c = 0; c < 4; c++) g.fillRect((c * bw + off + 128) % 128, r * rowH, 1.5, rowH);
+    }
+  },
+  plaster(g) {
+    g.fillStyle = '#cfcfcf'; g.fillRect(0, 0, 128, 128);
+    for (let i = 0; i < 260; i++) {
+      const v = Math.random() < 0.5 ? 255 : 105;
+      g.fillStyle = `rgba(${v},${v},${v},${0.03 + Math.random() * 0.05})`;
+      g.fillRect(Math.random() * 128, Math.random() * 128, 2 + Math.random() * 5, 2 + Math.random() * 4);
+    }
+    for (let i = 0; i < 3; i++) {
+      g.strokeStyle = 'rgba(88,88,88,0.35)';
+      g.lineWidth = 0.8;
+      const x0 = Math.random() * 128, y0 = Math.random() * 60;
+      g.beginPath(); g.moveTo(x0, y0);
+      g.bezierCurveTo(x0 + (Math.random() - 0.5) * 20, y0 + 25, x0 + (Math.random() - 0.5) * 20, y0 + 45, x0 + (Math.random() - 0.5) * 12, y0 + 66);
+      g.stroke();
+    }
+    const grad = g.createLinearGradient(0, 0, 0, 128);
+    grad.addColorStop(0.7, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(70,70,70,0.16)');
+    g.fillStyle = grad; g.fillRect(0, 0, 128, 128);
+  },
+  roof(g) {
+    g.fillStyle = '#ababab'; g.fillRect(0, 0, 128, 128);
+    const rowH = 32;
+    for (let r = 0; r < 4; r++) {
+      const off = (r % 2) * 16;
+      for (let c = -1; c < 5; c++) {
+        const x = c * 32 + off;
+        const shade = 150 + ((Math.random() * 55) | 0);
+        g.fillStyle = `rgb(${shade},${shade},${shade})`;
+        g.fillRect(x + 1, r * rowH, 30, rowH - 3);
+      }
+      g.fillStyle = 'rgba(50,50,50,0.7)';
+      g.fillRect(0, r * rowH + rowH - 3, 128, 3);
+      g.fillStyle = 'rgba(255,255,255,0.14)';
+      g.fillRect(0, r * rowH, 128, 2);
+    }
+  },
+  wood(g) {
+    g.fillStyle = '#8a5f34'; g.fillRect(0, 0, 128, 128);
+    for (let p = 0; p < 4; p++) {
+      const x0 = p * 32;
+      const shade = 0.86 + Math.random() * 0.22;
+      g.fillStyle = `rgba(${Math.round(138 * shade)},${Math.round(95 * shade)},${Math.round(52 * shade)},1)`;
+      g.fillRect(x0 + 1, 0, 30, 128);
+      for (let i = 0; i < 8; i++) {
+        g.strokeStyle = `rgba(60,38,18,${0.10 + Math.random() * 0.14})`;
+        g.lineWidth = 1;
+        g.beginPath();
+        const gx = x0 + 3 + Math.random() * 26;
+        g.moveTo(gx, 0);
+        g.bezierCurveTo(gx + (Math.random() - 0.5) * 6, 43, gx + (Math.random() - 0.5) * 6, 85, gx, 128);
+        g.stroke();
+      }
+      g.fillStyle = 'rgba(40,24,10,0.55)';
+      g.fillRect(x0, 0, 2, 128);
+    }
+    g.fillStyle = 'rgba(30,20,10,0.6)';
+    for (let p = 0; p < 4; p++) for (const yy of [8, 120]) g.fillRect(p * 32 + 14, yy, 3, 3);
+  },
+  metal(g) {
+    g.fillStyle = '#e6e6e6'; g.fillRect(0, 0, 128, 128);
+    for (let i = 0; i < 60; i++) {
+      const x = Math.random() * 128;
+      g.strokeStyle = `rgba(${Math.random() < 0.5 ? 255 : 90},${Math.random() < 0.5 ? 255 : 90},${Math.random() < 0.5 ? 255 : 90},${0.05 + Math.random() * 0.12})`;
+      g.lineWidth = 0.6 + Math.random();
+      g.beginPath(); g.moveTo(x, 0); g.lineTo(x + (Math.random() - 0.5) * 4, 128); g.stroke();
+    }
+    const grad = g.createLinearGradient(0, 0, 0, 128);
+    grad.addColorStop(0, 'rgba(255,255,255,0.18)');
+    grad.addColorStop(0.5, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.22)');
+    g.fillStyle = grad; g.fillRect(0, 0, 128, 128);
+  },
+  tile(g) {
+    g.fillStyle = '#dfeef2'; g.fillRect(0, 0, 128, 128);
+    const sz = 32;
+    for (let r = 0; r < 4; r++) {
+      for (let c = 0; c < 4; c++) {
+        const v = 224 + ((Math.random() * 26) | 0);
+        g.fillStyle = `rgb(${Math.round(v * 0.92)},${v},${v})`;
+        g.fillRect(c * sz + 1.5, r * sz + 1.5, sz - 3, sz - 3);
+        g.fillStyle = 'rgba(255,255,255,0.22)';
+        g.fillRect(c * sz + 2, r * sz + 2, sz - 4, 3);
+      }
+    }
+    g.strokeStyle = 'rgba(120,150,158,0.65)'; g.lineWidth = 1.5;
+    for (let i = 0; i <= 128; i += sz) {
+      g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 128); g.stroke();
+      g.beginPath(); g.moveTo(0, i); g.lineTo(128, i); g.stroke();
+    }
+  },
+  sand(g) {
+    g.fillStyle = '#d8c49a'; g.fillRect(0, 0, 128, 128);
+    for (let i = 0; i < 2600; i++) {
+      const v = Math.random() < 0.5 ? 255 : 120;
+      g.fillStyle = `rgba(${v},${Math.round(v * 0.94)},${Math.round(v * 0.78)},${0.05 + Math.random() * 0.12})`;
+      g.fillRect(Math.random() * 128, Math.random() * 128, 1.4, 1.4);
+    }
+    for (let i = 0; i < 14; i++) {
+      const y = Math.random() * 128;
+      g.strokeStyle = 'rgba(160,140,104,0.18)'; g.lineWidth = 1 + Math.random();
+      g.beginPath(); g.moveTo(0, y);
+      g.bezierCurveTo(42, y + 8, 86, y - 8, 128, y);
+      g.stroke();
+    }
+  },
+};
+
+function namedTexture(name, repeat) {
+  if (!name || !TEX_PAINT[name]) return null;
+  const rep = Math.max(0.1, Math.min(64, +repeat || 1));
+  const key = name + '|' + rep;
+  let t = texCache.get(key);
+  if (t) return t;
+  t = canvasTex(name === 'ground' ? 256 : 128, TEX_PAINT[name], rep);
+  texCache.set(key, t);
+  return t;
 }
+
+function makePrismGeometry(profile) {
+  const pos = [];
+  const uv = [];
+  const n = profile.length;
+  const push = (x, y, z, u, v) => { pos.push(x, y, z); uv.push(u, v); };
+
+  for (let k = 1; k < n - 1; k++) {
+    const a = profile[0], b = profile[k], c = profile[k + 1];
+    push(c[0], c[1], -0.5, c[0] + 0.5, c[1] + 0.5);
+    push(b[0], b[1], -0.5, b[0] + 0.5, b[1] + 0.5);
+    push(a[0], a[1], -0.5, a[0] + 0.5, a[1] + 0.5);
+    push(a[0], a[1], 0.5, a[0] + 0.5, a[1] + 0.5);
+    push(b[0], b[1], 0.5, b[0] + 0.5, b[1] + 0.5);
+    push(c[0], c[1], 0.5, c[0] + 0.5, c[1] + 0.5);
+  }
+
+  for (let k = 0; k < n; k++) {
+    const a = profile[k], b = profile[(k + 1) % n];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    push(a[0], a[1], -0.5, 0, 0);
+    push(b[0], b[1], -0.5, len, 0);
+    push(b[0], b[1], 0.5, len, 1);
+    push(a[0], a[1], -0.5, 0, 0);
+    push(b[0], b[1], 0.5, len, 1);
+    push(a[0], a[1], 0.5, 0, 1);
+  }
+
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.computeVertexNormals();
+  return g;
+}
+
+const SPAWN_BODY_LIFT = 0.87;
+const SPAWN_HALF = 0.55;
+const SPAWN_RADIUS = 0.3;
+const PLAYER_EYE = 0.72;
+
+function makeSpawnMarker() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.CapsuleGeometry(SPAWN_RADIUS, SPAWN_HALF * 2, 6, 14),
+    new THREE.MeshStandardMaterial({
+      color: '#49e08a', transparent: true, opacity: 0.34,
+      roughness: 0.6, depthWrite: false,
+    })
+  );
+  g.add(body);
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(0.42, 0.035, 8, 26),
+    new THREE.MeshStandardMaterial({ color: '#49e08a', emissive: '#1f6b41', roughness: 0.5 })
+  );
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = -SPAWN_BODY_LIFT + 0.04;
+  g.add(ring);
+  const flag = new THREE.Mesh(
+    new THREE.ConeGeometry(0.16, 0.34, 4),
+    new THREE.MeshStandardMaterial({ color: '#8dffc0', emissive: '#2e8a58', roughness: 0.5 })
+  );
+  flag.position.y = SPAWN_HALF + SPAWN_RADIUS + 0.24;
+  g.add(flag);
+  return g;
+}
+
 function geometryFor(type) {
-  if (type === 'box') return new THREE.BoxGeometry(1,1,1);
-  if (type === 'sphere') return new THREE.SphereGeometry(.5,24,16);
-  if (type === 'cylinder') return new THREE.CylinderGeometry(.5,.5,1,24);
-  if (type === 'cone') return new THREE.ConeGeometry(.5,1,24);
-  if (type === 'hex') return new THREE.CylinderGeometry(.5,.5,1,6);
-  if (type === 'ramp') return makeRampGeometry();
-  if (type === 'triangle') return makeTriangleGeometry();
-  return new THREE.BoxGeometry(1,1,1);
+  if (type === 'box') return new THREE.BoxGeometry(1, 1, 1);
+  if (type === 'sphere') return new THREE.SphereGeometry(.5, 24, 16);
+  if (type === 'cylinder') return new THREE.CylinderGeometry(.5, .5, 1, 24);
+  if (type === 'cone') return new THREE.ConeGeometry(.5, 1, 24);
+  if (type === 'hex') return new THREE.CylinderGeometry(.5, .5, 1, 6);
+  if (type === 'ramp') return makePrismGeometry([[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5]]);
+  if (type === 'triangle') return makePrismGeometry([[-0.5, -0.5], [0.5, -0.5], [0, 0.5]]);
+  return new THREE.BoxGeometry(1, 1, 1);
 }
+
 function applyObjectColor(root, hex) {
   root.userData.mapColor = hex;
+  if (root.userData.mapType === 'spawn') return;
+  if (root.userData.mapType !== 'model' && root.userData.mapTex) {
+    applyObjectSurface(root);
+    return;
+  }
   root.traverse(o => {
     if (!o.isMesh || !o.material) return;
     const mats = Array.isArray(o.material) ? o.material : [o.material];
@@ -619,7 +1067,73 @@ function applyObjectColor(root, hex) {
     }
   });
 }
+
+function applyObjectSurface(root) {
+  if (!root || !root.isMesh) return;
+  if (root.userData.mapType === 'model' || root.userData.mapType === 'spawn') return;
+  const tex = root.userData.mapTex || '';
+  const rep = root.userData.mapTexRepeat || 1;
+  const opacity = root.userData.mapOpacity === undefined ? 1 : root.userData.mapOpacity;
+  const custom = root.userData.mapCustom; // 自定义导入贴图 (dataURL)
+  const m = root.material;
+  if (!m) return;
+
+  if (custom) {
+    const key = 'custom|' + custom + '|' + rep;
+    let t = texCache.get(key);
+    if (!t) {
+      t = new THREE.TextureLoader().load(custom);
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.repeat.set(rep, rep);
+      texCache.set(key, t);
+    }
+    m.map = t;
+    m.transparent = opacity < 1;
+    m.opacity = opacity;
+    m.depthWrite = opacity > 0.02;
+    m.side = m.transparent ? THREE.DoubleSide : THREE.FrontSide;
+    m.color.set('#ffffff');
+  } else if (tex === 'invisible') {
+    m.map = null;
+    m.transparent = true;
+    m.opacity = 0.1;
+    m.depthWrite = false;
+    m.side = THREE.DoubleSide;
+    m.color.set(root.userData.mapColor || '#c5c9cf');
+  } else if (tex === 'clear') {
+    m.map = null;
+    m.transparent = true;
+    m.opacity = Math.min(opacity, 0.3);
+    m.depthWrite = false;
+    m.side = THREE.DoubleSide;
+    m.color.set(root.userData.mapColor || '#c5c9cf');
+  } else {
+    m.map = namedTexture(tex, rep);
+    m.transparent = opacity < 1;
+    m.opacity = opacity;
+    m.depthWrite = opacity > 0.02;
+    m.side = m.transparent ? THREE.DoubleSide : THREE.FrontSide;
+    m.color.set(m.map ? '#ffffff' : (root.userData.mapColor || '#c5c9cf'));
+  }
+  m.needsUpdate = true;
+}
+
+function createSpawn(data = {}) {
+  const g = makeSpawnMarker();
+  g.userData.mapObject = true;
+  g.userData.mapType = 'spawn';
+  g.userData.mapName = data.name || primitiveNames.spawn;
+  g.userData.mapColor = '#49e08a';
+  g.position.fromArray(data.position || placementPoint('spawn'));
+  g.rotation.fromArray(data.rotation || [0, 0, 0]);
+  g.scale.set(1, 1, 1);
+  objectsRoot.add(g);
+  return g;
+}
+
 function createPrimitive(type, data = {}) {
+  if (type === 'spawn') return createSpawn(data);
   const mat = new THREE.MeshStandardMaterial({ color: data.color || '#c5c9cf', roughness: .82, metalness: .04 });
   const mesh = new THREE.Mesh(geometryFor(type), mat);
   mesh.castShadow = mesh.receiveShadow = true;
@@ -627,22 +1141,35 @@ function createPrimitive(type, data = {}) {
   mesh.userData.mapType = type;
   mesh.userData.mapName = data.name || primitiveNames[type];
   mesh.userData.mapColor = data.color || '#c5c9cf';
-  mesh.position.fromArray(data.position || placementPoint());
-  mesh.rotation.fromArray(data.rotation || [0,0,0]);
-  mesh.scale.fromArray(data.scale || [1,1,1]);
+  mesh.userData.mapTex = data.tex || '';
+  mesh.userData.mapTexRepeat = Number.isFinite(+data.texRepeat) ? +data.texRepeat : 1;
+  mesh.userData.mapOpacity = Number.isFinite(+data.opacity) ? +data.opacity : 1;
+  mesh.userData.mapCustom = data.customTex || null;
+  mesh.position.fromArray(data.position || placementPoint(type));
+  mesh.rotation.fromArray(data.rotation || [0, 0, 0]);
+  mesh.scale.fromArray(data.scale || [1, 1, 1]);
+  applyObjectSurface(mesh);
   objectsRoot.add(mesh);
   return mesh;
 }
-function placementPoint() {
-  const dir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
-  let p;
-  if (dir.y < -0.02) {
-    const t = (0.5 - camera.position.y) / dir.y;
-    p = t > 1 && t < 80 ? camera.position.clone().addScaledVector(dir, t) : null;
+
+function placementPoint(type) {
+  const lift = type === 'spawn' ? SPAWN_BODY_LIFT : 0.5;
+  const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  let p = null;
+  raycaster.set(camera.position, dir);
+  const hits = raycaster.intersectObjects(objectsRoot.children, true);
+  if (hits.length && hits[0].distance < 90) {
+    p = hits[0].point.clone();
+    p.y += lift;
   }
-  if (!p) { p = camera.position.clone().addScaledVector(dir, 6); p.y = 0.5; }
-  p.x = Math.round(p.x*2)/2; p.z = Math.round(p.z*2)/2;
-  p.y = Math.max(.5, Math.round(p.y*2)/2);
+  if (!p && dir.y < -0.02) {
+    const t = (lift - camera.position.y) / dir.y;
+    if (t > 1 && t < 80) p = camera.position.clone().addScaledVector(dir, t);
+  }
+  if (!p) { p = camera.position.clone().addScaledVector(dir, 6); p.y = lift; }
+  p.x = Math.round(p.x * 2) / 2; p.z = Math.round(p.z * 2) / 2;
+  if (type !== 'spawn') p.y = Math.max(lift, Math.round(p.y * 2) / 2);
   return p.toArray();
 }
 
@@ -698,18 +1225,23 @@ function selectObject(obj) {
   setSelection(obj ? [obj] : []);
 }
 
+const TOOL_BUTTONS = { select: 'btnSelect', translate: 'btnMove', rotate: 'btnRotate', scale: 'btnScale' };
+
 function setTool(tool) {
   currentTool = tool;
-  ['btnSelect','btnMove','btnScale'].forEach(id => document.getElementById(id).classList.remove('active'));
-  const map = { select: 'btnSelect', translate: 'btnMove', scale: 'btnScale' };
-  document.getElementById(map[tool]).classList.add('active');
-  if (tool === 'translate') transform.setMode('translate');
-  if (tool === 'scale') transform.setMode('scale');
+  for (const id of Object.values(TOOL_BUTTONS)) {
+    const b = document.getElementById(id);
+    if (b) b.classList.remove('active');
+  }
+  const active = document.getElementById(TOOL_BUTTONS[tool]);
+  if (active) active.classList.add('active');
+  if (tool !== 'select') transform.setMode(tool);
   transform.visible = selection.length > 0 && tool !== 'select';
 }
 
 document.getElementById('btnSelect').onclick = () => setTool('select');
 document.getElementById('btnMove').onclick = () => setTool('translate');
+document.getElementById('btnRotate').onclick = () => setTool('rotate');
 document.getElementById('btnScale').onclick = () => setTool('scale');
 
 const btnMulti = document.getElementById('btnMulti');
@@ -722,20 +1254,35 @@ btnMulti.onclick = () => {
   toast(multiSelectMode ? '多选模式已开启：点选或框选多个物体' : '多选模式已关闭');
 };
 
-// ==================== 视角锁定按钮 ====================
-const btnCamera = document.getElementById('btnCamera');
-btnCamera.onclick = () => {
-  cameraLocked = !cameraLocked;
-  btnCamera.classList.toggle('active', !cameraLocked);
-  btnCamera.querySelector('.icon').textContent = cameraLocked ? '🔒' : '🔓';
-  toast(cameraLocked ? '视角已锁定，可操作物体' : '视角已解锁，可旋转视角');
-};
-btnCamera.classList.remove('active');
+const propTex = document.getElementById('propTex');
+const propTexRep = document.getElementById('propTexRep');
+const propOpacity = document.getElementById('propOpacity');
+propTex.innerHTML = TEXTURES.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+
+function surfaceEditable(obj) {
+  const t = obj && obj.userData.mapType;
+  return !!t && t !== 'model' && t !== 'spawn';
+}
 
 function refreshProps() {
   const bar = document.getElementById('propsBar');
   if (!selection.length) { bar.classList.remove('show'); return; }
   bar.classList.add('show');
+
+  const surf = selection.filter(surfaceEditable);
+  const canSurface = surf.length > 0;
+  for (const el of [propTex, propTexRep, propOpacity]) el.disabled = !canSurface;
+  if (canSurface) {
+    const s0 = surf[0];
+    if (s0.userData.mapCustom) {
+      propTex.value = '__import__';
+    } else {
+      propTex.value = s0.userData.mapTex || '';
+    }
+    propTexRep.value = s0.userData.mapTexRepeat || 1;
+    propOpacity.value = s0.userData.mapOpacity === undefined ? 1 : s0.userData.mapOpacity;
+  }
+
   if (selection.length === 1) {
     const selected = selection[0];
     document.getElementById('propName').value = selected.userData.mapName || '';
@@ -753,6 +1300,91 @@ function refreshProps() {
   }
 }
 
+function suggestRepeat(obj) {
+  const s = obj.scale;
+  const span = Math.max(Math.abs(s.x), Math.abs(s.z), Math.abs(s.y));
+  if (span <= 2.5) return 1;
+  return Math.max(1, Math.round(span / 2.5));
+}
+
+propTex.addEventListener('change', () => {
+  const name = propTex.value;
+  if (name === '__import__') {
+    // 恢复下拉为当前状态，然后打开文件选择器
+    const s0 = selection.find(surfaceEditable);
+    propTex.value = s0 && s0.userData.mapCustom ? '__import__' : (s0 ? (s0.userData.mapTex || '') : '');
+    document.getElementById('texInput').click();
+    return;
+  }
+  for (const o of selection) {
+    if (!surfaceEditable(o)) continue;
+    o.userData.mapCustom = null;
+    o.userData.mapTex = name;
+    if (name && name !== 'clear' && name !== 'invisible' && (o.userData.mapTexRepeat || 1) === 1) {
+      o.userData.mapTexRepeat = suggestRepeat(o);
+    }
+    applyObjectSurface(o);
+  }
+  refreshProps();
+  pushHistory();
+});
+
+propTexRep.addEventListener('change', () => {
+  const rep = Math.max(0.1, Math.min(64, +propTexRep.value || 1));
+  for (const o of selection) {
+    if (!surfaceEditable(o)) continue;
+    o.userData.mapTexRepeat = rep;
+    applyObjectSurface(o);
+  }
+  pushHistory();
+});
+
+propOpacity.addEventListener('input', () => {
+  const v = Math.max(0, Math.min(1, +propOpacity.value));
+  for (const o of selection) {
+    if (!surfaceEditable(o)) continue;
+    o.userData.mapOpacity = v;
+    applyObjectSurface(o);
+  }
+});
+propOpacity.addEventListener('change', pushHistory);
+
+// ==================== 导入自定义贴图 ====================
+const texInput = document.getElementById('texInput');
+texInput.addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const url = reader.result;
+    for (const o of selection) {
+      if (!surfaceEditable(o)) continue;
+      o.userData.mapCustom = url;
+      o.userData.mapTex = '';
+      applyObjectSurface(o);
+    }
+    refreshProps();
+    pushHistory();
+    toast('已导入贴图');
+  };
+  reader.readAsDataURL(f);
+  e.target.value = '';
+});
+
+// ==================== 90° 伪旋转 ====================
+function rotateSelected(deg) {
+  if (!selection.length) { toast('先选中一个物体'); return; }
+  const rad = deg * Math.PI / 180;
+  for (const o of selection) {
+    if (o.userData.mapType === 'spawn') continue;
+    o.rotation.y += rad; // 只绕垂直轴，每次 90°，导出的 rotation 保持整齐
+  }
+  refreshProps();
+  pushHistory();
+}
+document.getElementById('btnRotate90').onclick = () => rotateSelected(90);
+document.getElementById('btnRotate90CCW').onclick = () => rotateSelected(-90);
+
 document.getElementById('propName').addEventListener('change', e => {
   if (selection.length !== 1) return;
   selection[0].userData.mapName = e.target.value.trim() || primitiveNames[selection[0].userData.mapType] || '物体';
@@ -763,6 +1395,7 @@ document.getElementById('propColor').addEventListener('input', e => {
   for (const o of selection) applyObjectColor(o, e.target.value);
 });
 document.getElementById('propColor').addEventListener('change', pushHistory);
+document.getElementById('btnFocus').onclick = () => { closeSheet(); focusSelection(); };
 document.getElementById('btnDuplicate').onclick = duplicateSelected;
 document.getElementById('btnDelete').onclick = removeSelected;
 
@@ -771,6 +1404,7 @@ const panelMenu = document.getElementById('panelMenu');
 const panelPlace = document.getElementById('panelPlace');
 const panelCredits = document.getElementById('panelCredits');
 const panelSaves = document.getElementById('panelSaves');
+const panelKeys = document.getElementById('panelKeys');
 let activeSheet = null;
 
 function openSheet(sheet) {
@@ -791,7 +1425,9 @@ overlay.onclick = closeSheet;
 document.getElementById('btnMenu').onclick = () => openSheet(panelMenu);
 document.getElementById('btnPlace').onclick = () => openSheet(panelPlace);
 document.getElementById('btnCredits').onclick = () => openSheet(panelCredits);
+document.getElementById('btnKeys').onclick = () => openSheet(panelKeys);
 document.getElementById('btnSaves').onclick = () => openSheet(panelSaves);
+document.getElementById('btnSaveQuick').onclick = manualSave;
 
 document.getElementById('saveSearch').addEventListener('input', () => {
   refreshSavesList();
@@ -815,9 +1451,14 @@ document.querySelectorAll('[data-add]').forEach(btn => {
 transform.addEventListener('mouseDown', () => {
   proxyStart.pos.copy(transformProxy.position);
   proxyStart.scale.copy(transformProxy.scale);
+  proxyStart.quat.copy(transformProxy.quaternion);
   perObjectStart.clear();
   for (const o of selection) {
-    perObjectStart.set(o, { pos: o.position.clone(), scale: o.scale.clone() });
+    perObjectStart.set(o, {
+      pos: o.position.clone(),
+      scale: o.scale.clone(),
+      quat: o.quaternion.clone(),
+    });
   }
   if (currentTool === 'scale') scaleStart = transformProxy.scale.clone();
 });
@@ -839,6 +1480,16 @@ transform.addEventListener('objectChange', () => {
       if (!st) continue;
       o.position.copy(st.pos).add(delta);
     }
+  } else if (currentTool === 'rotate') {
+    const spin = transformProxy.quaternion.clone().multiply(proxyStart.quat.clone().invert());
+    const arm = new THREE.Vector3();
+    for (const o of selection) {
+      const st = perObjectStart.get(o);
+      if (!st) continue;
+      o.quaternion.copy(spin).multiply(st.quat);
+      arm.subVectors(st.pos, proxyStart.pos).applyQuaternion(spin);
+      o.position.copy(proxyStart.pos).add(arm);
+    }
   } else if (currentTool === 'scale') {
     const ratio = new THREE.Vector3(
       transformProxy.scale.x / Math.max(.0001, proxyStart.scale.x),
@@ -848,6 +1499,7 @@ transform.addEventListener('objectChange', () => {
     for (const o of selection) {
       const st = perObjectStart.get(o);
       if (!st) continue;
+      if (o.userData.mapType === 'spawn') continue;
       o.scale.set(
         Math.max(.05, st.scale.x * ratio.x),
         Math.max(.05, st.scale.y * ratio.y),
@@ -892,10 +1544,62 @@ function getCanvasCoords(e) {
   };
 }
 
+function pickAt(e) {
+  const coords = getCanvasCoords(e);
+  raycaster.setFromCamera(new THREE.Vector2(coords.x, coords.y), camera);
+  const hits = raycaster.intersectObjects(objectsRoot.children, true);
+  return hits.length ? objectFromHit(hits[0].object) : null;
+}
+
+function beginLook() {
+  if (lookLocked) return;
+  lookLocked = true;
+  document.body.classList.add('locked');
+  const el = renderer.domElement;
+  if (el.requestPointerLock) {
+    try { el.requestPointerLock(); } catch (_e) { }
+  }
+}
+
+function endLook() {
+  if (!lookLocked) return;
+  lookLocked = false;
+  document.body.classList.remove('locked');
+  if (document.pointerLockElement && document.exitPointerLock) {
+    try { document.exitPointerLock(); } catch (_e) { }
+  }
+}
+
+function turnCamera(dx, dy) {
+  yaw -= dx * 0.0028;
+  pitch -= dy * 0.0028;
+  pitch = Math.max(-Math.PI / 2 + 0.02, Math.min(Math.PI / 2 - 0.02, pitch));
+}
+
+document.addEventListener('pointerlockchange', () => {
+  if (!document.pointerLockElement && lookLocked && !previewOn) endLook();
+  if (!document.pointerLockElement && previewOn) previewPointerLost();
+});
+
 renderer.domElement.addEventListener('pointerdown', e => {
+  if (previewOn) {
+    // 预览时：手机上单指拖动转视角
+    pointerIsDown = true;
+    lastPointer = { x: e.clientX, y: e.clientY };
+    renderer.domElement.setPointerCapture(e.pointerId);
+    return;
+  }
+
+  if (DESKTOP && e.button === 2) {
+    e.preventDefault();
+    beginLook();
+    return;
+  }
+
   if (e.button !== 0) return;
   if (ctrlDragging) return;
 
+  shiftHeld = e.shiftKey;
   pointerIsDown = true;
   pointerDownPos = { x: e.clientX, y: e.clientY };
   lastPointer = { x: e.clientX, y: e.clientY };
@@ -906,24 +1610,39 @@ renderer.domElement.addEventListener('pointerdown', e => {
 });
 
 renderer.domElement.addEventListener('pointermove', e => {
+  if (previewOn) {
+    if (document.pointerLockElement) turnCamera(e.movementX || 0, e.movementY || 0);
+    else if (pointerIsDown && IS_TOUCH) {
+      const dx = e.clientX - lastPointer.x;
+      const dy = e.clientY - lastPointer.y;
+      lastPointer = { x: e.clientX, y: e.clientY };
+      turnCamera(dx * 0.6, dy * 0.6); // 0.6 是手感系数，觉得慢可改大
+    }
+    return;
+  }
+
+  if (lookLocked) {
+    if (document.pointerLockElement) turnCamera(e.movementX || 0, e.movementY || 0);
+    else turnCamera(e.clientX - lastPointer.x, e.clientY - lastPointer.y);
+    lastPointer = { x: e.clientX, y: e.clientY };
+    return;
+  }
+
   if (!pointerIsDown || ctrlDragging) return;
 
   const totalDx = e.clientX - pointerDownPos.x;
   const totalDy = e.clientY - pointerDownPos.y;
   const movedEnough = Math.hypot(totalDx, totalDy) > DRAG_THRESHOLD;
 
-  // 视角解锁：拖动就旋转
-  if (!cameraLocked && !isRotating && movedEnough) {
+  // 手机上默认：空白处拖动 = 旋转视角，点按/拖手柄 = 编辑，两者共存
+  if (!DESKTOP && !isRotating && movedEnough) {
     isRotating = true;
   }
 
-  // 视角锁定 + 多选模式：按空白处拖动才框选
-  if (cameraLocked && multiSelectMode && !isRotating && !isBoxSelecting && movedEnough) {
-    const coords = getCanvasCoords(e);
-    raycaster.setFromCamera(new THREE.Vector2(coords.x, coords.y), camera);
-    const hits = raycaster.intersectObjects(objectsRoot.children, true);
-    const hitObj = hits.length ? objectFromHit(hits[0].object) : null;
-    if (!hitObj) {
+  // 手机上只有开多选模式才能框选；桌面上空白处一拖就是框选
+  const boxAllowed = DESKTOP || multiSelectMode;
+  if (boxAllowed && !isRotating && !isBoxSelecting && movedEnough) {
+    if (!pickAt({ clientX: pointerDownPos.x, clientY: pointerDownPos.y })) {
       isBoxSelecting = true;
       boxStart = { x: pointerDownPos.x, y: pointerDownPos.y };
       selectBoxEl.style.display = 'block';
@@ -942,17 +1661,15 @@ renderer.domElement.addEventListener('pointermove', e => {
     return;
   }
 
-  if (isRotating && !cameraLocked) {
+  if (isRotating && !DESKTOP) {
     const dx = e.clientX - lastPointer.x;
     const dy = e.clientY - lastPointer.y;
     lastPointer = { x: e.clientX, y: e.clientY };
-    yaw -= dx * 0.005;
-    pitch -= dy * 0.005;
-    pitch = Math.max(-Math.PI/2 + 0.02, Math.min(Math.PI/2 - 0.02, pitch));
+    turnCamera(dx * 1.8, dy * 1.8);
   }
 });
 
-function finishBoxSelect(e) {
+function finishBoxSelect(e, additive) {
   selectBoxEl.style.display = 'none';
   const x0 = Math.min(boxStart.x, e.clientX), x1 = Math.max(boxStart.x, e.clientX);
   const y0 = Math.min(boxStart.y, e.clientY), y1 = Math.max(boxStart.y, e.clientY);
@@ -966,42 +1683,59 @@ function finishBoxSelect(e) {
     const sy = r.top + (-v.y * .5 + .5) * r.height;
     if (v.z < 1 && sx >= x0 && sx <= x1 && sy >= y0 && sy <= y1) picked.push(obj);
   }
-  if (picked.length) {
-    const merged = new Set([...selection, ...picked]);
-    setSelection([...merged]);
-    toast(`已选中 ${merged.size} 个物体`);
+  if (!picked.length) {
+    if (!additive) clearSelection();
+    return;
   }
+  const merged = additive ? new Set([...selection, ...picked]) : new Set(picked);
+  setSelection([...merged]);
+  toast(`已选中 ${merged.size} 个物体`);
 }
 
 renderer.domElement.addEventListener('pointerup', e => {
+  if (previewOn) {
+    pointerIsDown = false;
+    return;
+  }
+
+  if (DESKTOP && e.button === 2) { endLook(); return; }
   if (ctrlDragging) { pointerIsDown = false; return; }
 
-  if (isBoxSelecting) {
-    finishBoxSelect(e);
-  } else if (!isRotating && pointerIsDown && cameraLocked) {
-    // 视角锁定时，没有拖动才算点击选中
-    const coords = getCanvasCoords(e);
-    raycaster.setFromCamera(new THREE.Vector2(coords.x, coords.y), camera);
-    const hits = raycaster.intersectObjects(objectsRoot.children, true);
-    const hitObj = hits.length ? objectFromHit(hits[0].object) : null;
+  const additive = e.shiftKey || shiftHeld || multiSelectMode;
 
+  if (isBoxSelecting) {
+    finishBoxSelect(e, additive);
+  } else if (!isRotating && pointerIsDown) {
+    // 不管桌面还是手机：短按（没拖动）即可点选物体，拖动过了阈值就转视角/框选
+    const hitObj = pickAt(e);
     if (hitObj) {
-      if (multiSelectMode) toggleInSelection(hitObj);
+      if (additive) toggleInSelection(hitObj);
       else selectObject(hitObj);
-    } else {
-      if (!multiSelectMode) selectObject(null);
+    } else if (!additive) {
+      selectObject(null);
     }
   }
 
   pointerIsDown = false;
   isRotating = false;
   isBoxSelecting = false;
+  shiftHeld = false;
 });
+
 renderer.domElement.addEventListener('pointerleave', () => {
   if (isBoxSelecting) selectBoxEl.style.display = 'none';
   pointerIsDown = false; isRotating = false; isBoxSelecting = false;
 });
+
 renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+
+renderer.domElement.addEventListener('wheel', e => {
+  if (previewOn) return;
+  e.preventDefault();
+  const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  const step = Math.max(0.4, camera.position.y * 0.12 + 0.6);
+  camera.position.addScaledVector(dir, e.deltaY > 0 ? -step : step);
+}, { passive: false });
 
 // ==================== 十字键 ====================
 const canvasMove = document.getElementById('canvasMove');
@@ -1099,22 +1833,73 @@ resizeDpad();
 window.addEventListener('resize', resizeDpad);
 
 // ==================== 键盘 ====================
+function typingInField(e) {
+  const t = e.target;
+  return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT');
+}
+
+function focusSelection() {
+  if (!selection.length) { toast('先选中一个物体'); return; }
+  const box = new THREE.Box3();
+  const one = new THREE.Box3();
+  for (const o of selection) { one.setFromObject(o); box.union(one); }
+  if (box.isEmpty()) return;
+  const center = box.getCenter(new THREE.Vector3());
+  const radius = Math.max(1, box.getSize(new THREE.Vector3()).length() * 0.5);
+  const dist = radius / Math.tan((camera.fov * Math.PI / 180) / 2) + radius * 0.6;
+  const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  camera.position.copy(center).addScaledVector(dir, -dist);
+  toast('已对准 ' + selection.length + ' 个物体');
+}
+
+function selectAll() {
+  if (!objectsRoot.children.length) return;
+  setSelection([...objectsRoot.children]);
+  toast(`已选中 ${selection.length} 个物体`);
+}
+
 window.addEventListener('keydown', e => {
-  if (['Space','ControlLeft','ControlRight'].includes(e.code) ||
-      ((e.ctrlKey || keys.has('ControlLeft')||keys.has('ControlRight')) && ['KeyW','KeyA','KeyS','KeyD'].includes(e.code))) {
+  if (typingInField(e)) return;
+
+  if (['Space', 'ControlLeft', 'ControlRight'].includes(e.code) ||
+    ((e.ctrlKey || keys.has('ControlLeft') || keys.has('ControlRight')) && ['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code))) {
     e.preventDefault();
   }
   keys.add(e.code);
-  if (e.code === 'Delete') removeSelected();
-  if ((e.ctrlKey||e.metaKey) && e.code==='KeyD') { e.preventDefault(); duplicateSelected(); }
-  if ((e.ctrlKey||e.metaKey) && e.code==='KeyZ') { e.preventDefault(); undo(); }
-  if ((e.ctrlKey||e.metaKey) && e.code==='KeyY') { e.preventDefault(); redo(); }
-  if (e.code==='KeyW' && !e.repeat && e.altKey) setTool('translate');
-  if (e.code==='KeyR' && !e.repeat && e.altKey) setTool('scale');
-  if (e.code==='KeyQ' && !e.repeat && e.altKey) setTool('select');
-  if (e.code==='Escape') clearSelection();
+
+  if (previewOn) {
+    if (e.code === 'Escape' || e.code === 'KeyP') { e.preventDefault(); exitPreview(); }
+    return;
+  }
+
+  const mod = e.ctrlKey || e.metaKey;
+
+  if (e.code === 'Delete' || e.code === 'Backspace') { e.preventDefault(); removeSelected(); return; }
+  if (mod && e.code === 'KeyD') { e.preventDefault(); duplicateSelected(); return; }
+  if (mod && e.shiftKey && e.code === 'KeyZ') { e.preventDefault(); redo(); return; }
+  if (mod && e.code === 'KeyZ') { e.preventDefault(); undo(); return; }
+  if (mod && e.code === 'KeyY') { e.preventDefault(); redo(); return; }
+  if (mod && e.code === 'KeyA') { e.preventDefault(); selectAll(); return; }
+  if (mod && e.code === 'KeyS') { e.preventDefault(); manualSave(); return; }
+  if (mod && e.code === 'KeyE') { e.preventDefault(); exportMap(); return; }
+  if (mod) return;
+
+  if (e.code === 'Digit1') setTool('select');
+  if (e.code === 'Digit2') setTool('translate');
+  if (e.code === 'Digit3') setTool('rotate');
+  if (e.code === 'Digit4') setTool('scale');
+  if (e.code === 'KeyW' && !e.repeat && e.altKey) setTool('translate');
+  if (e.code === 'KeyR' && !e.repeat && e.altKey) setTool('scale');
+  if (e.code === 'KeyQ' && !e.repeat && e.altKey) setTool('select');
+  if (e.code === 'KeyF' && !e.repeat) focusSelection();
+  if (e.code === 'KeyP' && !e.repeat) { e.preventDefault(); enterPreview(); }
+  if (e.code === 'F1') { e.preventDefault(); openSheet(panelKeys); }
+  if (e.code === 'Escape') { if (activeSheet) closeSheet(); else clearSelection(); }
 });
+
 window.addEventListener('keyup', e => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+
 
 document.getElementById('btnUndo').onclick = undo;
 document.getElementById('btnRedo').onclick = () => { redo(); closeSheet(); };
@@ -1149,23 +1934,103 @@ function roundArray(a,n=5){return Array.from(a,v=>+Number(v).toFixed(n));}
 function imageToDataURL(img){if(!img||!img.width)return null;try{const c=document.createElement('canvas');c.width=img.width;c.height=img.height;c.getContext('2d').drawImage(img,0,0);return c.toDataURL('image/png');}catch(_){return null;}}
 function serializeMaterial(m){return{color:m?.color?'#'+m.color.getHexString():'#ffffff',roughness:Number.isFinite(m?.roughness)?m.roughness:.8,metalness:Number.isFinite(m?.metalness)?m.metalness:0,emissive:m?.emissive?'#'+m.emissive.getHexString():'#000000',emissiveIntensity:Number.isFinite(m?.emissiveIntensity)?m.emissiveIntensity:1,transparent:!!m?.transparent,opacity:Number.isFinite(m?.opacity)?m.opacity:1,side:m?.side===THREE.DoubleSide?2:m?.side===THREE.BackSide?1:0,map:m?.map?.image?imageToDataURL(m.map.image):null};}
 function serializeModel(root){root.updateMatrixWorld(true);const inv=new THREE.Matrix4().copy(root.matrixWorld).invert();const meshes=[];const lb=new THREE.Box3();root.traverse(o=>{if(!o.isMesh||!o.geometry?.attributes?.position)return;if(o.userData.isOutline)return;const g=o.geometry.clone();g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv,o.matrixWorld));if(!g.attributes.normal)g.computeVertexNormals();g.computeBoundingBox();if(g.boundingBox)lb.union(g.boundingBox);const ml=Array.isArray(o.material)?o.material:[o.material];meshes.push({positions:roundArray(g.attributes.position.array),normals:roundArray(g.attributes.normal.array),uvs:g.attributes.uv?roundArray(g.attributes.uv.array):null,indices:g.index?Array.from(g.index.array):null,materials:ml.map(serializeMaterial),groups:g.groups.map(v=>({start:v.start,count:v.count,materialIndex:v.materialIndex||0}))});g.dispose();});const c=lb.isEmpty()?new THREE.Vector3():lb.getCenter(new THREE.Vector3());const s=lb.isEmpty()?new THREE.Vector3(1,1,1):lb.getSize(new THREE.Vector3());return{meshes,bounds:{center:roundArray(c.toArray()),size:roundArray(s.toArray())}};}
-function serializeObject(o){const b={type:o.userData.mapType,name:o.userData.mapName||'物体',color:o.userData.mapColor||'#ffffff',position:roundArray(o.position.toArray()),rotation:roundArray([o.rotation.x,o.rotation.y,o.rotation.z]),scale:roundArray(o.scale.toArray())};if(b.type==='model')Object.assign(b,serializeModel(o));return b;}
-function serializeMap(){return{format:'RagdollBoxMap',version:1,name:'自定义地图',spawn:[0,.87,9],exportedAt:new Date().toISOString(),objects:objectsRoot.children.map(serializeObject)};}
-function download(n,t){const b=new Blob([t],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+function serializeObject(o) {
+  const b = {
+    type: o.userData.mapType,
+    name: o.userData.mapName || '物体',
+    color: o.userData.mapColor || '#ffffff',
+    position: roundArray(o.position.toArray()),
+    rotation: roundArray([o.rotation.x, o.rotation.y, o.rotation.z]),
+    scale: roundArray(o.scale.toArray()),
+  };
+  if (b.type === 'model') { Object.assign(b, serializeModel(o)); return b; }
+  const tex = o.userData.mapTex || '';
+  const opacity = o.userData.mapOpacity === undefined ? 1 : o.userData.mapOpacity;
+  const custom = o.userData.mapCustom;
+  if (custom) {
+    b.customTex = custom;
+    b.texRepeat = [o.userData.mapTexRepeat || 1, o.userData.mapTexRepeat || 1];
+    if (opacity < 1) { b.transparent = true; b.opacity = opacity; }
+  }
+  else if (tex === 'clear') { b.transparent = true; b.opacity = Math.min(opacity, 0.3); }
+  else if (tex === 'invisible') { b.transparent = true; b.opacity = 0; }
+  else if (tex) {
+    b.tex = tex;
+    b.texRepeat = [o.userData.mapTexRepeat || 1, o.userData.mapTexRepeat || 1];
+    if (opacity < 1) { b.transparent = true; b.opacity = opacity; }
+  } else if (opacity < 1) { b.transparent = true; b.opacity = opacity; }
+  return b;
+}
 
-document.getElementById('btnExportMap').onclick = () => { closeSheet(); const d=serializeMap(); download('custom-map.rbmap',JSON.stringify(d)); toast(`已导出 ${d.objects.length} 个物体`); };
+function spawnMarkers() {
+  return objectsRoot.children.filter(o => o.userData.mapType === 'spawn');
+}
+
+function serializeMap() {
+  const marks = spawnMarkers();
+  const spawns = marks.map(o => roundArray(o.position.toArray()));
+  return {
+    format: 'RagdollBoxMap',
+    version: 1,
+    name: '自定义地图',
+    spawn: spawns[0] || [0, .87, 9],
+    spawns: spawns.length ? spawns : undefined,
+    exportedAt: new Date().toISOString(),
+    objects: objectsRoot.children
+      .filter(o => o.userData.mapType !== 'spawn')
+      .map(serializeObject),
+  };
+}
+
+function download(n, t) {
+  const b = new Blob([t], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(b);
+  a.download = n;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function exportMap() {
+  closeSheet();
+  const d = serializeMap();
+  download('custom-map.rbmap', JSON.stringify(d));
+  const n = d.spawns ? d.spawns.length : 0;
+  toast(`已导出 ${d.objects.length} 个物体` + (n ? ` · ${n} 个出生点` : ' · 没有出生点，进游戏用默认位置'));
+}
+
+document.getElementById('btnExportMap').onclick = exportMap;
 document.getElementById('btnOpenMap').onclick = () => { closeSheet(); document.getElementById('mapInput').click(); };
 document.getElementById('mapInput').addEventListener('change', async e => {
-  const f=e.target.files[0]; if(!f)return;
-  try{const d=JSON.parse(await f.text());loadMapData(d);toast('地图已打开');}catch(err){alert('地图文件无效：'+err.message);}
-  e.target.value='';
+  const f = e.target.files[0]; if (!f) return;
+  try { const d = JSON.parse(await f.text()); loadMapData(d); toast('地图已打开'); }
+  catch (err) { alert('地图文件无效：' + err.message); }
+  e.target.value = '';
 });
 
 function clearObjects(){clearSelection();for(const o of[...objectsRoot.children]){objectsRoot.remove(o);disposeObject(o);}}
 function materialFromData(d={}){const m=new THREE.MeshStandardMaterial({color:d.color||'#ffffff',roughness:d.roughness??.8,metalness:d.metalness??0,emissive:d.emissive||'#000000',emissiveIntensity:d.emissiveIntensity??1,transparent:!!d.transparent,opacity:d.opacity??1,side:d.side===2?THREE.DoubleSide:d.side===1?THREE.BackSide:THREE.FrontSide});if(d.map){m.map=new THREE.TextureLoader().load(d.map);m.map.colorSpace=THREE.SRGBColorSpace;}return m;}
-function restoreModel(d){const r=new THREE.Group();r.userData.mapObject=true;r.userData.mapType='model';r.userData.mapName=d.name||'GLTF模型';r.userData.mapColor=d.color||'#ffffff';r.userData.serializedBounds=d.bounds;for(const md of d.meshes||[]){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(md.positions,3));if(md.normals)g.setAttribute('normal',new THREE.Float32BufferAttribute(md.normals,3));if(md.uvs)g.setAttribute('uv',new THREE.Float32BufferAttribute(md.uvs,2));if(md.indices)g.setIndex(md.indices);if(!md.normals)g.computeVertexNormals();const mats=(md.materials||[{}]).map(materialFromData);g.clearGroups();for(const gr of md.groups||[])g.addGroup(gr.start,gr.count,gr.materialIndex||0);const mesh=new THREE.Mesh(g,mats.length===1?mats[0]:mats);mesh.castShadow=mesh.receiveShadow=true;r.add(mesh);}r.position.fromArray(d.position||[0,0,0]);r.rotation.fromArray(d.rotation||[0,0,0]);r.scale.fromArray(d.scale||[1,1,1]);objectsRoot.add(r);return r;}
+function restoreModel(d){const r=new THREE.Group();r.userData.mapObject=true;r.userData.mapType='model';r.userData.mapName=d.name||'导入模型';r.userData.mapColor=d.color||'#ffffff';r.userData.serializedBounds=d.bounds;for(const md of d.meshes||[]){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(md.positions,3));if(md.normals)g.setAttribute('normal',new THREE.Float32BufferAttribute(md.normals,3));if(md.uvs)g.setAttribute('uv',new THREE.Float32BufferAttribute(md.uvs,2));if(md.indices)g.setIndex(md.indices);if(!md.normals)g.computeVertexNormals();const mats=(md.materials||[{}]).map(materialFromData);g.clearGroups();for(const gr of md.groups||[])g.addGroup(gr.start,gr.count,gr.materialIndex||0);const mesh=new THREE.Mesh(g,mats.length===1?mats[0]:mats);mesh.castShadow=mesh.receiveShadow=true;r.add(mesh);}r.position.fromArray(d.position||[0,0,0]);r.rotation.fromArray(d.rotation||[0,0,0]);r.scale.fromArray(d.scale||[1,1,1]);objectsRoot.add(r);return r;}
 function restoreObject(d){if(d.type==='model')return restoreModel(d);return createPrimitive(d.type,d);}
-function loadMapData(d,rh=true){if(!d||d.format!=='RagdollBoxMap'||!Array.isArray(d.objects))throw new Error('不是RagdollBoxMap文件');historyLock=true;clearObjects();for(const o of d.objects)restoreObject(o);historyLock=false;if(rh)pushHistory(true);}
+function loadMapData(d, rh = true) {
+  if (!d || d.format !== 'RagdollBoxMap') throw new Error('不是RagdollBoxMap文件');
+  const objs = Array.isArray(d.objects) ? d.objects : [];
+  const spawns = Array.isArray(d.spawns) && d.spawns.length
+    ? d.spawns
+    : (Array.isArray(d.spawn) ? [d.spawn] : []);
+  historyLock = true;
+  clearObjects();
+  for (const o of objs) {
+    if (!o || o.type === 'spawn') continue;
+    restoreObject(o);
+  }
+  for (const p of spawns) {
+    if (!Array.isArray(p) || p.length < 3) continue;
+    createSpawn({ position: [+p[0] || 0, +p[1] || 0, +p[2] || 0] });
+  }
+  historyLock = false;
+  if (rh) pushHistory(true);
+}
 function snapshot(){return JSON.stringify(serializeMap());}
 function pushHistory(r=false){
   if(historyLock)return;
@@ -1193,7 +2058,7 @@ gltfInput.addEventListener('change', async e => {
     const gltf=await new GLTFLoader(mgr).loadAsync(urls.get(rf.name));
     const root=gltf.scene;root.userData.mapObject=true;root.userData.mapType='model';
     root.userData.mapName=rf.name.replace(/\.(gltf|glb)$/i,'');root.userData.mapColor='#ffffff';
-    root.position.fromArray(placementPoint());
+    root.position.fromArray(placementPoint('model'));
     root.traverse(o=>{if(!o.isMesh)return;o.castShadow=o.receiveShadow=true;const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>{if(m?.color)m.userData.originalColor='#'+m.color.getHexString();});});
     objectsRoot.add(root);selectObject(root);setTool('translate');pushHistory();toast('GLTF已导入');
   }catch(err){console.error(err);alert('导入失败：'+err.message);}
@@ -1228,17 +2093,241 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-let last=performance.now();
-function frame(now){
+// ==================== FBX 导入 ====================
+const fbxInput = document.getElementById('fbxInput');
+document.getElementById('btnImportFbx').onclick = () => { closeSheet(); fbxInput.click(); };
+
+function fitImportedScale(root) {
+  const box = new THREE.Box3().setFromObject(root);
+  if (box.isEmpty()) return 1;
+  const span = box.getSize(new THREE.Vector3()).length();
+  if (span > 60) return 0.01;
+  if (span > 6) return 0.1;
+  return 1;
+}
+
+fbxInput.addEventListener('change', async e => {
+  const f = e.target.files[0];
+  if (!f) { e.target.value = ''; return; }
+  const url = URL.createObjectURL(f);
+  try {
+    const root = await new FBXLoader().loadAsync(url);
+    root.updateMatrixWorld(true);
+    const k = fitImportedScale(root);
+    root.userData.mapObject = true;
+    root.userData.mapType = 'model';
+    root.userData.mapName = f.name.replace(/\.fbx$/i, '');
+    root.userData.mapColor = '#ffffff';
+    root.scale.multiplyScalar(k);
+    root.rotation.set(0, 0, 0);
+    root.position.fromArray(placementPoint('model'));
+    root.traverse(o => {
+      if (!o.isMesh) return;
+      o.castShadow = o.receiveShadow = true;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach(m => { if (m && m.color) m.userData.originalColor = '#' + m.color.getHexString(); });
+    });
+    objectsRoot.add(root);
+    selectObject(root);
+    setTool('translate');
+    pushHistory();
+    toast(k === 1 ? 'FBX 已导入' : `FBX 已导入（原始单位偏大，自动缩到 ${k}）`);
+  } catch (err) {
+    console.error(err);
+    alert('FBX 导入失败：' + err.message);
+  } finally {
+    URL.revokeObjectURL(url);
+    e.target.value = '';
+  }
+});
+
+// ==================== 预览 ====================
+const PREVIEW = {
+  walk: 4.6,
+  run: 7.5,
+  jump: 6.4,
+  gUp: 16,
+  gUpCut: 38,
+  gFall: 26,
+  radius: SPAWN_RADIUS,
+  half: SPAWN_HALF,
+  foot: SPAWN_HALF + SPAWN_RADIUS,
+  eye: PLAYER_EYE,
+  stepUp: 0.45,
+};
+
+const previewState = {
+  pos: new THREE.Vector3(),
+  vy: 0,
+  grounded: false,
+  jumpHeld: false,
+  camYaw: 0,
+  camPitch: 0,
+};
+
+let editorCam = null;
+const _ray = new THREE.Raycaster();
+const _down = new THREE.Vector3(0, -1, 0);
+const _probe = new THREE.Vector3();
+
+function solidTargets() {
+  return objectsRoot.children.filter(o => o.userData.mapType !== 'spawn');
+}
+
+function groundBelow(x, y, z, reach) {
+  _probe.set(x, y, z);
+  _ray.set(_probe, _down);
+  _ray.far = reach;
+  const hits = _ray.intersectObjects(solidTargets(), true);
+  return hits.length ? hits[0].point.y : null;
+}
+
+function blockedTowards(from, dir, dist) {
+  for (const h of [-PREVIEW.half * 0.7, 0, PREVIEW.half * 0.85]) {
+    _probe.set(from.x, from.y + h, from.z);
+    _ray.set(_probe, dir);
+    _ray.far = dist + PREVIEW.radius;
+    const hits = _ray.intersectObjects(solidTargets(), true);
+    if (hits.length) return true;
+  }
+  return false;
+}
+
+function enterPreview() {
+  if (previewOn) return;
+  const marks = spawnMarkers();
+  const at = marks.length
+    ? marks[0].position.clone()
+    : new THREE.Vector3(0, PREVIEW.foot + 0.02, 0);
+  if (!marks.length) toast('还没放出生点，从原点开始预览');
+
+  editorCam = { pos: camera.position.clone(), yaw, pitch };
+  previewOn = true;
+  document.body.classList.add('preview');
+  closeSheet();
+  clearSelection();
+  transform.visible = false;
+
+  previewState.pos.copy(at);
+  previewState.vy = 0;
+  previewState.grounded = false;
+  pitch = 0;
+  keys.clear();
+  pointerIsDown = false;
+
+  if (DESKTOP && renderer.domElement.requestPointerLock) {
+    try { renderer.domElement.requestPointerLock(); } catch (_e) { }
+  }
+}
+
+function exitPreview() {
+  if (!previewOn) return;
+  previewOn = false;
+  document.body.classList.remove('preview');
+  document.body.classList.remove('locked');
+  if (document.pointerLockElement && document.exitPointerLock) {
+    try { document.exitPointerLock(); } catch (_e) { }
+  }
+  if (editorCam) {
+    camera.position.copy(editorCam.pos);
+    yaw = editorCam.yaw;
+    pitch = editorCam.pitch;
+  }
+  keys.clear();
+  pointerIsDown = false;
+  toast('已退出预览');
+}
+
+function previewPointerLost() {
+  if (previewOn && DESKTOP) exitPreview();
+}
+
+document.getElementById('btnPreview').onclick = () => (previewOn ? exitPreview() : enterPreview());
+document.getElementById('previewExit').onclick = exitPreview;
+
+function stepPreview(dt) {
+  const st = previewState;
+  const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion); fwd.y = 0;
+  const rgt = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion); rgt.y = 0;
+  if (fwd.lengthSq() > 1e-6) fwd.normalize();
+  if (rgt.lengthSq() > 1e-6) rgt.normalize();
+
+  const wish = new THREE.Vector3();
+  if (keys.has('KeyW') || moveState.up) wish.add(fwd);
+  if (keys.has('KeyS') || moveState.down) wish.sub(fwd);
+  if (keys.has('KeyA') || moveState.left) wish.sub(rgt);
+  if (keys.has('KeyD') || moveState.right) wish.add(rgt);
+
+  const run = keys.has('ShiftLeft') || keys.has('ShiftRight');
+  const speed = run ? PREVIEW.run : PREVIEW.walk;
+
+  if (wish.lengthSq() > 1e-6) {
+    wish.normalize();
+    const dist = speed * dt;
+    for (const axis of [
+      new THREE.Vector3(wish.x, 0, 0),
+      new THREE.Vector3(0, 0, wish.z),
+    ]) {
+      if (axis.lengthSq() < 1e-8) continue;
+      const dir = axis.clone().normalize();
+      const step = dist * axis.length();
+      if (blockedTowards(st.pos, dir, step)) continue;
+      const next = st.pos.clone().addScaledVector(dir, step);
+      const g = groundBelow(next.x, next.y + PREVIEW.half, next.z, PREVIEW.foot + PREVIEW.stepUp + 0.2);
+      if (g !== null && st.grounded && g > next.y - PREVIEW.foot + PREVIEW.stepUp) continue;
+      st.pos.copy(next);
+    }
+  }
+
+  const wantJump = keys.has('Space') || moveState.topBtn;
+  if (wantJump && st.grounded && !st.jumpHeld) {
+    st.vy = PREVIEW.jump;
+    st.grounded = false;
+  }
+  st.jumpHeld = wantJump;
+
+  const g = st.vy > 0 ? (wantJump ? PREVIEW.gUp : PREVIEW.gUpCut) : PREVIEW.gFall;
+  st.vy -= g * dt;
+  st.pos.y += st.vy * dt;
+
+  const floor = groundBelow(st.pos.x, st.pos.y + PREVIEW.half + 4, st.pos.z, PREVIEW.half + 4 + PREVIEW.foot + 0.1);
+  if (floor !== null && st.pos.y - PREVIEW.foot <= floor + 0.02 && st.vy <= 0) {
+    st.pos.y = floor + PREVIEW.foot;
+    st.vy = 0;
+    st.grounded = true;
+  } else {
+    st.grounded = false;
+  }
+
+  if (st.pos.y < -40) {
+    toast('掉出地图了，回到出生点');
+    const marks = spawnMarkers();
+    st.pos.copy(marks.length ? marks[0].position : new THREE.Vector3(0, PREVIEW.foot + 0.02, 0));
+    st.vy = 0;
+  }
+
+  camera.position.set(st.pos.x, st.pos.y + PREVIEW.eye, st.pos.z);
+}
+
+// ==================== 主循环 ====================
+let last = performance.now();
+function frame(now) {
   requestAnimationFrame(frame);
-  const dt=Math.min(.05,(now-last)/1000); last=now;
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
 
   camera.rotation.order = 'YXZ';
   camera.rotation.set(pitch, yaw, 0);
 
-  const speed = 10;
-  const fwd = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion); fwd.y=0; fwd.normalize();
-  const rgt = new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion); rgt.y=0; rgt.normalize();
+  if (previewOn) {
+    stepPreview(dt);
+    composer.render();
+    return;
+  }
+
+  const fast = keys.has('ShiftLeft') || keys.has('ShiftRight');
+  const speed = fast ? 24 : 10;
+  const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion); fwd.y = 0; fwd.normalize();
+  const rgt = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion); rgt.y = 0; rgt.normalize();
   const move = new THREE.Vector3();
 
   if (moveState.up) move.add(fwd);
@@ -1253,17 +2342,21 @@ function frame(now){
   if (keys.has('KeyA')) move.sub(rgt);
   if (keys.has('KeyD')) move.add(rgt);
   if (keys.has('Space')) move.y += 1;
-  if (keys.has('ControlLeft')||keys.has('ControlRight')) move.y -= 1;
+  if (keys.has('ControlLeft') || keys.has('ControlRight')) move.y -= 1;
 
-  if (move.lengthSq()) camera.position.addScaledVector(move.normalize(), speed*dt);
+  if (move.lengthSq()) camera.position.addScaledVector(move.normalize(), speed * dt);
 
   composer.render();
 }
 requestAnimationFrame(frame);
 
-createPrimitive('box',{name:'默认地面',color:'#8d908c',position:[0,-.25,0],scale:[50,.5,50]});
+createPrimitive('box', {
+  name: '默认地面', color: '#8d908c', tex: 'ground', texRepeat: 20,
+  position: [0, -.25, 0], scale: [50, .5, 50],
+});
 selectObject(null);
 pushHistory(true);
+
 </script>
 </body>
 </html>
