@@ -304,7 +304,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title">当前版本2.2.0</div>
+  <div class="title">当前版本2.2.1</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图</button>
   <button id="btnImportGltf">📥 导入 GLTF / GLB</button>
@@ -1312,7 +1312,14 @@ function suggestRepeat(obj) {
 propTex.addEventListener('change', () => {
   const name = propTex.value;
   if (name === '__import__') {
-    // 恢复下拉为当前状态，然后打开文件选择器
+    // ✅ 添加风险提示弹窗
+    if (!confirm('⚠️ 警告：自定义贴图功能存在极其难以修复的bug，已放弃此功能的维护，Bug可能会导致无法继续编辑您的地图，在使用此功能前最好先保存一遍地图，再次提醒，请谨慎使用！')) {
+      // 用户取消，恢复下拉框的值
+      const s0 = selection.find(surfaceEditable);
+      propTex.value = s0 && s0.userData.mapCustom ? '__import__' : (s0 ? (s0.userData.mapTex || '') : '');
+      return;
+    }
+    // 用户确认继续
     const s0 = selection.find(surfaceEditable);
     propTex.value = s0 && s0.userData.mapCustom ? '__import__' : (s0 ? (s0.userData.mapTex || '') : '');
     document.getElementById('texInput').click();
