@@ -304,7 +304,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title">当前版本2.0.0</div>
+  <div class="title">当前版本2.2.0</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图</button>
   <button id="btnImportGltf">📥 导入 GLTF / GLB</button>
@@ -1142,7 +1142,9 @@ function createPrimitive(type, data = {}) {
   mesh.userData.mapName = data.name || primitiveNames[type];
   mesh.userData.mapColor = data.color || '#c5c9cf';
   mesh.userData.mapTex = data.tex || '';
-  mesh.userData.mapTexRepeat = Number.isFinite(+data.texRepeat) ? +data.texRepeat : 1;
+  // ✅ 兼容数组格式 [u,v] 与旧版单个数字，避免 NaN 导致平铺失效
+  const repRaw = Array.isArray(data.texRepeat) ? data.texRepeat[0] : data.texRepeat;
+  mesh.userData.mapTexRepeat = Number.isFinite(+repRaw) ? +repRaw : 1;
   mesh.userData.mapOpacity = Number.isFinite(+data.opacity) ? +data.opacity : 1;
   mesh.userData.mapCustom = data.customTex || null;
   mesh.position.fromArray(data.position || placementPoint(type));
