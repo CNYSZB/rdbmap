@@ -303,7 +303,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title">当前版本bata2.3.1</div>
+  <div class="title">当前版本bata2.3.2</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图</button>
   <button id="btnImportGltf">📥 导入 GLTF / GLB</button>
@@ -536,8 +536,34 @@ function getSaves() {
   }
 }
 
+// 修复：写入 localStorage 之前不再假设一定成功。
+// 存储配额写满（QuotaExceededError）过去会直接抛出未捕获异常，
+// 打断脚本执行——这在手机端表现得就像“死机”。现在改为捕获异常，
+// 并在写满时自动清理最旧的一份自动存档后重试一次。
 function setSaves(saves) {
-  localStorage.setItem(SAVES_KEY, JSON.stringify(saves));
+  try {
+    localStorage.setItem(SAVES_KEY, JSON.stringify(saves));
+    return true;
+  } catch (err) {
+    const autoSaves = saves
+      .filter(s => /^自动存档\d+$/.test(s.name))
+      .sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt));
+    if (autoSaves.length > 1) {
+      const drop = autoSaves[0];
+      const pruned = saves.filter(s => s.id !== drop.id);
+      try {
+        localStorage.setItem(SAVES_KEY, JSON.stringify(pruned));
+        toast('⚠️ 存储空间不足，已自动清理最旧的自动存档');
+        return true;
+      } catch (err2) {
+        console.error('存档写入仍然失败：', err2);
+      }
+    } else {
+      console.error('存档写入失败：', err);
+    }
+    toast('⚠️ 保存失败（存储空间不足），建议导出地图备份');
+    return false;
+  }
 }
 
 function getNextAutoName(saves) {
@@ -549,10 +575,13 @@ function getNextAutoName(saves) {
   }
 }
 
-function autoSave() {
-  const mapData = serializeMap();
+// 修复：autoSave 和 manualSave 原来各自复制一份「查找/新建存档」逻辑，
+// 现在抽成公共的 persistMapData，避免重复代码和潜在的不一致。
+// autoSave 现在可以接收一个已经算好的 mapData，避免每次都重新完整
+// 序列化一次场景（原来 pushHistory -> snapshot() 和 autoSave() 各自
+// 序列化一次，等于每次操作都做了两倍的工作，模型贴图多的时候尤其卡）。
+function persistMapData(mapData) {
   const saves = getSaves();
-  
   if (currentSaveId) {
     const save = saves.find(s => s.id === currentSaveId);
     if (save) {
@@ -560,10 +589,9 @@ function autoSave() {
       save.updatedAt = new Date().toISOString();
       save.objectCount = mapData.objects.length;
       setSaves(saves);
-      return;
+      return save;
     }
   }
-  
   const name = getNextAutoName(saves);
   const newSave = {
     id: Date.now().toString(),
@@ -573,43 +601,38 @@ function autoSave() {
     objectCount: mapData.objects.length,
     data: mapData
   };
-  
   currentSaveId = newSave.id;
   saves.push(newSave);
   setSaves(saves);
+  return newSave;
+}
+
+function autoSave(mapData) {
+  if (!mapData) mapData = serializeMap();
+  persistMapData(mapData);
+}
+
+// 修复：把「写 localStorage」这一步做成小延迟合并（debounce）。
+// 拖动手柄松手、缩放松手等操作会连续触发好几次 pushHistory，
+// 之前每次都立刻同步写一次 localStorage，现在合并到 200ms 后只写最后一次，
+// 減少主线程被连续的大字符串写入卡住的情况。
+let autoSaveTimer = null;
+let autoSavePendingData = null;
+function scheduleAutoSave(mapData) {
+  autoSavePendingData = mapData;
+  if (autoSaveTimer) return;
+  autoSaveTimer = setTimeout(() => {
+    autoSaveTimer = null;
+    const data = autoSavePendingData;
+    autoSavePendingData = null;
+    autoSave(data);
+  }, 200);
 }
 
 function manualSave() {
   const mapData = serializeMap();
-  const saves = getSaves();
-  
-  if (currentSaveId) {
-    const save = saves.find(s => s.id === currentSaveId);
-    if (save) {
-      save.data = mapData;
-      save.updatedAt = new Date().toISOString();
-      save.objectCount = mapData.objects.length;
-      setSaves(saves);
-      toast(`已保存：${save.name}`);
-      refreshSavesList();
-      return;
-    }
-  }
-  
-  const name = getNextAutoName(saves);
-  const newSave = {
-    id: Date.now().toString(),
-    name: name,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    objectCount: mapData.objects.length,
-    data: mapData
-  };
-  
-  currentSaveId = newSave.id;
-  saves.push(newSave);
-  setSaves(saves);
-  toast(`已保存：${name}`);
+  const save = persistMapData(mapData);
+  toast(`已保存：${save.name}`);
   refreshSavesList();
 }
 
@@ -1952,7 +1975,21 @@ function disposeObject(root) {
 }
 
 function roundArray(a,n=5){return Array.from(a,v=>+Number(v).toFixed(n));}
-function imageToDataURL(img){if(!img||!img.width)return null;try{const c=document.createElement('canvas');c.width=img.width;c.height=img.height;c.getContext('2d').drawImage(img,0,0);return c.toDataURL('image/png');}catch(_){return null;}}
+// 修复：给转出来的 dataURL 做缓存（挂在 image 对象本身上）。
+// 之前每次 serializeModel 都会对模型里每张贴图重新画 canvas + toDataURL，
+// 贴图越大、模型越多，每次移动/缩放松手时就越卡，这是造成“死机”的主要原因之一。
+function imageToDataURL(img){
+  if(!img||!img.width)return null;
+  if(img.__mapCachedDataURL) return img.__mapCachedDataURL;
+  try{
+    const c=document.createElement('canvas');
+    c.width=img.width;c.height=img.height;
+    c.getContext('2d').drawImage(img,0,0);
+    const url = c.toDataURL('image/png');
+    img.__mapCachedDataURL = url;
+    return url;
+  }catch(_){return null;}
+}
 function serializeMaterial(m){return{color:m?.color?'#'+m.color.getHexString():'#ffffff',roughness:Number.isFinite(m?.roughness)?m.roughness:.8,metalness:Number.isFinite(m?.metalness)?m.metalness:0,emissive:m?.emissive?'#'+m.emissive.getHexString():'#000000',emissiveIntensity:Number.isFinite(m?.emissiveIntensity)?m.emissiveIntensity:1,transparent:!!m?.transparent,opacity:Number.isFinite(m?.opacity)?m.opacity:1,side:m?.side===THREE.DoubleSide?2:m?.side===THREE.BackSide?1:0,map:m?.map?.image?imageToDataURL(m.map.image):null};}
 function serializeModel(root){root.updateMatrixWorld(true);const inv=new THREE.Matrix4().copy(root.matrixWorld).invert();const meshes=[];const lb=new THREE.Box3();root.traverse(o=>{if(!o.isMesh||!o.geometry?.attributes?.position)return;if(o.userData.isOutline)return;const g=o.geometry.clone();g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv,o.matrixWorld));if(!g.attributes.normal)g.computeVertexNormals();g.computeBoundingBox();if(g.boundingBox)lb.union(g.boundingBox);const ml=Array.isArray(o.material)?o.material:[o.material];meshes.push({positions:roundArray(g.attributes.position.array),normals:roundArray(g.attributes.normal.array),uvs:g.attributes.uv?roundArray(g.attributes.uv.array):null,indices:g.index?Array.from(g.index.array):null,materials:ml.map(serializeMaterial),groups:g.groups.map(v=>({start:v.start,count:v.count,materialIndex:v.materialIndex||0}))});g.dispose();});const c=lb.isEmpty()?new THREE.Vector3():lb.getCenter(new THREE.Vector3());const s=lb.isEmpty()?new THREE.Vector3(1,1,1):lb.getSize(new THREE.Vector3());return{meshes,bounds:{center:roundArray(c.toArray()),size:roundArray(s.toArray())}};}
 function serializeObject(o) {
@@ -2052,17 +2089,23 @@ function loadMapData(d, rh = true) {
   historyLock = false;
   if (rh) pushHistory(true);
 }
-function snapshot(){return JSON.stringify(serializeMap());}
+// 修复：pushHistory 原来会调用一次 snapshot()（内部完整序列化一次场景），
+// 然后又调用 autoSave()（内部再完整序列化一次场景），
+// 等于每次移动/旋转/缩放/复制松手都把整个场景（包括所有导入模型的
+// 网格数据和贴图 base64 编码）重复序列化了两遍。物体一多、
+// 模型贴图一大，这里就会长时间占满主线程，表现为“死机”。
+// 现在只序列化一次，结果同时用于历史记录和自动存档。
 function pushHistory(r=false){
   if(historyLock)return;
-  const s=snapshot();
+  const mapData = serializeMap();
+  const s = JSON.stringify(mapData);
   if(r){history=[s];historyIndex=0;return;}
   if(history[historyIndex]===s)return;
   history=history.slice(0,historyIndex+1);
   history.push(s);
   if(history.length>40)history.shift();
   historyIndex=history.length-1;
-  autoSave();
+  scheduleAutoSave(mapData);
 }
 function restoreSnapshot(s){loadMapData(JSON.parse(s),false);}
 function undo(){if(historyIndex<=0)return;historyIndex--;restoreSnapshot(history[historyIndex]);}
@@ -2086,22 +2129,13 @@ gltfInput.addEventListener('change', async e => {
   finally{for(const u of new Set(urls.values()))URL.revokeObjectURL(u);e.target.value='';}
 });
 
+// 修复：原来的 beforeunload 处理器不管三七二十一，每次关闭/刷新页面
+// 都会新建一条"自动存档N"记录并追加进 localStorage，从不复用、也从不清理。
+// 这会导致存档列表和 localStorage 占用量随着关闭页面的次数无限增长，
+// 越用越卡，最终写满配额直接报错。现在改为复用 autoSave()，
+// 和手动保存、拖动松手时走同一条"更新当前关联存档"的逻辑。
 window.addEventListener('beforeunload', () => {
-  const mapData = serializeMap();
-  const saves = getSaves();
-  const name = getNextAutoName(saves);
-  
-  const newSave = {
-    id: Date.now().toString(),
-    name: name,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    objectCount: mapData.objects.length,
-    data: mapData
-  };
-  
-  saves.push(newSave);
-  setSaves(saves);
+  autoSave();
 });
 
 function resize() {
