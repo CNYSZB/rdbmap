@@ -1773,6 +1773,26 @@ renderer.domElement.addEventListener('pointerleave', () => {
 
 renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
 
+// 修复：触屏上手势有时会被系统识别成别的操作（比如滑动过程中被判定为
+// 滚动/缩放手势），这种情况下浏览器发出的是 pointercancel 而不是
+// pointerup。TransformControls 内部只处理 pointerup 来结束拖拽，
+// 收到 pointercancel 时不会复位，于是 ctrlDragging 会永远卡在 true——
+// 之后所有新的指针事件都会被 `if (ctrlDragging) return;` 直接拦下，
+// 表现为缩放/移动手柄和视角拖动完全没反应，但十字键（另一套独立的
+// 触摸事件）还能用。这里加一个全局兜底：任何指针抬起或被取消时，
+// 强制把所有拖拽/视角状态复位。
+function forceReleaseDragLocks() {
+  if (!ctrlDragging && !pointerIsDown && !isRotating && !isBoxSelecting && !lookLocked) return;
+  ctrlDragging = false;
+  pointerIsDown = false;
+  isRotating = false;
+  if (isBoxSelecting) { isBoxSelecting = false; selectBoxEl.style.display = 'none'; }
+  if (transform) transform.dragging = false;
+  if (lookLocked) endLook();
+}
+window.addEventListener('pointercancel', forceReleaseDragLocks);
+window.addEventListener('pointerup', forceReleaseDragLocks);
+
 renderer.domElement.addEventListener('wheel', e => {
   if (previewOn) return;
   e.preventDefault();
@@ -1942,7 +1962,7 @@ window.addEventListener('keydown', e => {
 });
 
 window.addEventListener('keyup', e => keys.delete(e.code));
-window.addEventListener('blur', () => keys.clear());
+window.addEventListener('blur', () => { keys.clear(); forceReleaseDragLocks(); });
 
 
 document.getElementById('btnUndo').onclick = undo;
