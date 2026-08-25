@@ -303,9 +303,10 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title">当前版本bata2.3.2</div>
+  <div class="title">当前版本3.0.0</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
-  <button id="btnExportMap">📤 导出地图</button>
+  <button id="btnExportMap">📤 导出地图（JSON）</button>
+  <button id="btnExportGltf">📤 导出 GLTF（含贴图 · ZIP）</button>
   <button id="btnImportGltf">📥 导入 GLTF / GLB</button>
   <button id="btnImportFbx">📥 导入 FBX</button>
   <button id="btnRedo">↪️ 重做</button>
@@ -427,6 +428,7 @@
 import * as THREE from 'three';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -536,10 +538,6 @@ function getSaves() {
   }
 }
 
-// 修复：写入 localStorage 之前不再假设一定成功。
-// 存储配额写满（QuotaExceededError）过去会直接抛出未捕获异常，
-// 打断脚本执行——这在手机端表现得就像“死机”。现在改为捕获异常，
-// 并在写满时自动清理最旧的一份自动存档后重试一次。
 function setSaves(saves) {
   try {
     localStorage.setItem(SAVES_KEY, JSON.stringify(saves));
@@ -575,11 +573,6 @@ function getNextAutoName(saves) {
   }
 }
 
-// 修复：autoSave 和 manualSave 原来各自复制一份「查找/新建存档」逻辑，
-// 现在抽成公共的 persistMapData，避免重复代码和潜在的不一致。
-// autoSave 现在可以接收一个已经算好的 mapData，避免每次都重新完整
-// 序列化一次场景（原来 pushHistory -> snapshot() 和 autoSave() 各自
-// 序列化一次，等于每次操作都做了两倍的工作，模型贴图多的时候尤其卡）。
 function persistMapData(mapData) {
   const saves = getSaves();
   if (currentSaveId) {
@@ -612,10 +605,6 @@ function autoSave(mapData) {
   persistMapData(mapData);
 }
 
-// 修复：把「写 localStorage」这一步做成小延迟合并（debounce）。
-// 拖动手柄松手、缩放松手等操作会连续触发好几次 pushHistory，
-// 之前每次都立刻同步写一次 localStorage，现在合并到 200ms 后只写最后一次，
-// 減少主线程被连续的大字符串写入卡住的情况。
 let autoSaveTimer = null;
 let autoSavePendingData = null;
 function scheduleAutoSave(mapData) {
@@ -1087,20 +1076,17 @@ function applyObjectColor(root, hex) {
   });
 }
 
-// ==================== 修复 applyObjectSurface 提高稳定性 ====================
 function applyObjectSurface(root) {
   if (!root || !root.isMesh) return;
   if (root.userData.mapType === 'model' || root.userData.mapType === 'spawn') return;
   const tex = root.userData.mapTex || '';
   const rep = root.userData.mapTexRepeat || 1;
   const opacity = root.userData.mapOpacity === undefined ? 1 : root.userData.mapOpacity;
-  const custom = root.userData.mapCustom; // 自定义导入贴图 (dataURL)
+  const custom = root.userData.mapCustom;
   const m = root.material;
   if (!m) return;
 
-  // 清理旧的 map 引用，防止纹理累积导致内存泄漏
   if (m.map && m.map !== root._oldMapRef) {
-    // 不直接 dispose，因为可能被其他材质共享，但我们可以解除引用
   }
   root._oldMapRef = m.map;
 
@@ -1108,7 +1094,6 @@ function applyObjectSurface(root) {
     const key = 'custom|' + custom + '|' + rep;
     let t = texCache.get(key);
     if (!t) {
-      // 使用更稳定的加载方式
       t = new THREE.TextureLoader().load(custom);
       t.wrapS = t.wrapT = THREE.RepeatWrapping;
       t.colorSpace = THREE.SRGBColorSpace;
@@ -1136,7 +1121,6 @@ function applyObjectSurface(root) {
     m.side = THREE.DoubleSide;
     m.color.set(root.userData.mapColor || '#c5c9cf');
   } else {
-    // 处理普通纹理，加入缓存清理机制
     const namedTex = namedTexture(tex, rep);
     if (namedTex) {
       m.map = namedTex;
@@ -1341,23 +1325,16 @@ function suggestRepeat(obj) {
   return Math.max(1, Math.round(span / 2.5));
 }
 
-// ==================== 修复 propTex 的 change 事件 ====================
-// 原代码中，点击"导入贴图"会弹出 confirm，并可能引发混乱。
-// 修复方案：简化流程，直接触发文件选择，并在文件加载完成后统一处理。
 propTex.addEventListener('change', () => {
   const name = propTex.value;
   if (name === '__import__') {
-    // 直接触发文件选择，移除有风险的 confirm 弹窗
     document.getElementById('texInput').click();
-    // 立即将下拉框恢复到之前的值，避免显示异常
     const s0 = selection.find(surfaceEditable);
     propTex.value = s0 && s0.userData.mapCustom ? '__import__' : (s0 ? (s0.userData.mapTex || '') : '');
     return;
   }
-  // 处理普通纹理选择
   for (const o of selection) {
     if (!surfaceEditable(o)) continue;
-    // 如果用户选择了普通纹理，清除自定义纹理标记
     if (o.userData.mapCustom) {
       o.userData.mapCustom = null;
     }
@@ -1371,8 +1348,6 @@ propTex.addEventListener('change', () => {
   pushHistory();
 });
 
-// ==================== 修复 texInput 的 change 事件 ====================
-// 确保导入自定义贴图后，UI 和材质状态正确更新
 const texInput = document.getElementById('texInput');
 texInput.addEventListener('change', e => {
   const f = e.target.files[0];
@@ -1380,22 +1355,17 @@ texInput.addEventListener('change', e => {
   const reader = new FileReader();
   reader.onload = () => {
     const url = reader.result;
-    // 应用自定义贴图到所有选中的、可编辑表面的物体
     for (const o of selection) {
       if (!surfaceEditable(o)) continue;
-      // 清除之前的纹理设置，设置为自定义贴图
       o.userData.mapCustom = url;
-      o.userData.mapTex = ''; // 确保不冲突
-      // 直接应用表面纹理
+      o.userData.mapTex = '';
       applyObjectSurface(o);
     }
-    // 刷新属性面板，确保下拉框状态正确
     refreshProps();
     pushHistory();
     toast('已导入自定义贴图');
   };
   reader.readAsDataURL(f);
-  // 重置 input，以便可以重复选择同一个文件
   e.target.value = '';
 });
 
@@ -1419,7 +1389,6 @@ propOpacity.addEventListener('input', () => {
 });
 propOpacity.addEventListener('change', pushHistory);
 
-// ==================== 90° 伪旋转 ====================
 function rotateSelected(deg) {
   if (!selection.length) { toast('先选中一个物体'); return; }
   const rad = deg * Math.PI / 180;
@@ -1773,14 +1742,6 @@ renderer.domElement.addEventListener('pointerleave', () => {
 
 renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
 
-// 修复：触屏上手势有时会被系统识别成别的操作（比如滑动过程中被判定为
-// 滚动/缩放手势），这种情况下浏览器发出的是 pointercancel 而不是
-// pointerup。TransformControls 内部只处理 pointerup 来结束拖拽，
-// 收到 pointercancel 时不会复位，于是 ctrlDragging 会永远卡在 true——
-// 之后所有新的指针事件都会被 `if (ctrlDragging) return;` 直接拦下，
-// 表现为缩放/移动手柄和视角拖动完全没反应，但十字键（另一套独立的
-// 触摸事件）还能用。这里加一个全局兜底：任何指针抬起或被取消时，
-// 强制把所有拖拽/视角状态复位。
 function forceReleaseDragLocks() {
   if (!ctrlDragging && !pointerIsDown && !isRotating && !isBoxSelecting && !lookLocked) return;
   ctrlDragging = false;
@@ -1995,9 +1956,6 @@ function disposeObject(root) {
 }
 
 function roundArray(a,n=5){return Array.from(a,v=>+Number(v).toFixed(n));}
-// 修复：给转出来的 dataURL 做缓存（挂在 image 对象本身上）。
-// 之前每次 serializeModel 都会对模型里每张贴图重新画 canvas + toDataURL，
-// 贴图越大、模型越多，每次移动/缩放松手时就越卡，这是造成“死机”的主要原因之一。
 function imageToDataURL(img){
   if(!img||!img.width)return null;
   if(img.__mapCachedDataURL) return img.__mapCachedDataURL;
@@ -2069,15 +2027,94 @@ function download(n, t) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+function getCurrentSaveName() {
+  if (!currentSaveId) return '未命名地图';
+  const saves = getSaves();
+  const save = saves.find(s => s.id === currentSaveId);
+  return save ? save.name : '未命名地图';
+}
+
 function exportMap() {
   closeSheet();
   const d = serializeMap();
-  download('custom-map.rbmap', JSON.stringify(d));
+  const saveName = getCurrentSaveName();
+  d.name = saveName;
+  download(saveName + '.rbmap', JSON.stringify(d));
   const n = d.spawns ? d.spawns.length : 0;
   toast(`已导出 ${d.objects.length} 个物体` + (n ? ` · ${n} 个出生点` : ' · 没有出生点，进游戏用默认位置'));
 }
 
 document.getElementById('btnExportMap').onclick = exportMap;
+
+// ==================== GLTF 导出 (新增) ====================
+document.getElementById('btnExportGltf').onclick = exportGltf;
+
+async function exportGltf() {
+  closeSheet();
+  
+  try {
+    toast('正在导出 GLTF...');
+    
+    const exportables = objectsRoot.children.filter(o => o.userData.mapType !== 'spawn');
+    
+    if (exportables.length === 0) {
+      toast('❌ 没有可导出的物体');
+      return;
+    }
+    
+    const exportScene = new THREE.Scene();
+    
+    for (const obj of exportables) {
+      const clone = obj.clone(true);
+      clone.position.copy(obj.position);
+      clone.rotation.copy(obj.rotation);
+      clone.scale.copy(obj.scale);
+      exportScene.add(clone);
+    }
+    
+    const exporter = new GLTFExporter();
+    
+    const gltfData = await new Promise((resolve, reject) => {
+      exporter.parse(
+        exportScene,
+        (result) => resolve(result),
+        (error) => reject(error),
+        {
+          binary: false,
+          embedImages: true,
+          includeCustomExtensions: false,
+        }
+      );
+    });
+    
+    const saveName = getCurrentSaveName();
+    
+    let gltfString;
+    if (typeof gltfData === 'string') {
+      gltfString = gltfData;
+    } else {
+      if (gltfData.scenes && gltfData.scenes.length > 0) {
+        gltfData.scenes[0].name = saveName;
+      }
+      gltfData.asset.generator = 'RagdollBox Map Editor - ' + saveName;
+      gltfString = JSON.stringify(gltfData, null, 2);
+    }
+    
+    const blob = new Blob([gltfString], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = saveName + '.gltf';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 2000);
+    
+    toast(`✅ GLTF 导出成功！${exportables.length} 个物体`);
+    
+  } catch (error) {
+    console.error('GLTF 导出失败:', error);
+    toast('❌ GLTF 导出失败: ' + error.message);
+  }
+}
+
 document.getElementById('btnOpenMap').onclick = () => { closeSheet(); document.getElementById('mapInput').click(); };
 document.getElementById('mapInput').addEventListener('change', async e => {
   const f = e.target.files[0]; if (!f) return;
@@ -2109,12 +2146,6 @@ function loadMapData(d, rh = true) {
   historyLock = false;
   if (rh) pushHistory(true);
 }
-// 修复：pushHistory 原来会调用一次 snapshot()（内部完整序列化一次场景），
-// 然后又调用 autoSave()（内部再完整序列化一次场景），
-// 等于每次移动/旋转/缩放/复制松手都把整个场景（包括所有导入模型的
-// 网格数据和贴图 base64 编码）重复序列化了两遍。物体一多、
-// 模型贴图一大，这里就会长时间占满主线程，表现为“死机”。
-// 现在只序列化一次，结果同时用于历史记录和自动存档。
 function pushHistory(r=false){
   if(historyLock)return;
   const mapData = serializeMap();
@@ -2149,11 +2180,6 @@ gltfInput.addEventListener('change', async e => {
   finally{for(const u of new Set(urls.values()))URL.revokeObjectURL(u);e.target.value='';}
 });
 
-// 修复：原来的 beforeunload 处理器不管三七二十一，每次关闭/刷新页面
-// 都会新建一条"自动存档N"记录并追加进 localStorage，从不复用、也从不清理。
-// 这会导致存档列表和 localStorage 占用量随着关闭页面的次数无限增长，
-// 越用越卡，最终写满配额直接报错。现在改为复用 autoSave()，
-// 和手动保存、拖动松手时走同一条"更新当前关联存档"的逻辑。
 window.addEventListener('beforeunload', () => {
   autoSave();
 });
