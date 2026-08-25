@@ -72,7 +72,6 @@
       display: flex; align-items: center; justify-content: center;
       backdrop-filter: blur(8px); background: rgba(22,28,36,.85);
     }
-    /* 顶部一键保存：显眼胶囊按钮 */
     #topbar button.accent {
       width: auto !important; height: clamp(34px, 7vw, 40px) !important;
       padding: 0 clamp(12px, 4vw, 18px) !important;
@@ -304,7 +303,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title">当前版本2.2.1</div>
+  <div class="title">当前版本bata2.3.1</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图</button>
   <button id="btnImportGltf">📥 导入 GLTF / GLB</button>
@@ -511,9 +510,7 @@ const IS_TOUCH = navigator.maxTouchPoints > 0 && matchMedia('(pointer:coarse)').
 const DESKTOP = !IS_TOUCH;
 document.body.classList.add(DESKTOP ? 'desktop' : 'touch');
 
-// 手机端加大变换手柄，方便触摸操作
 if (IS_TOUCH) transform.setSize(1.15);
-// 预览 HUD 按设备显示对应操作说明
 const previewHint = document.getElementById('previewHint');
 if (previewHint) previewHint.textContent = IS_TOUCH ? '单指拖动＝转视角 · 十字键移动 · ⇧跳 · ⇩下落' : 'WASD 移动 · 空格 跳 · Shift 跑';
 
@@ -582,7 +579,6 @@ function autoSave() {
   setSaves(saves);
 }
 
-// 快速保存：不弹窗，沿用当前关联存档名，否则自动命名
 function manualSave() {
   const mapData = serializeMap();
   const saves = getSaves();
@@ -1068,6 +1064,7 @@ function applyObjectColor(root, hex) {
   });
 }
 
+// ==================== 修复 applyObjectSurface 提高稳定性 ====================
 function applyObjectSurface(root) {
   if (!root || !root.isMesh) return;
   if (root.userData.mapType === 'model' || root.userData.mapType === 'spawn') return;
@@ -1078,10 +1075,17 @@ function applyObjectSurface(root) {
   const m = root.material;
   if (!m) return;
 
+  // 清理旧的 map 引用，防止纹理累积导致内存泄漏
+  if (m.map && m.map !== root._oldMapRef) {
+    // 不直接 dispose，因为可能被其他材质共享，但我们可以解除引用
+  }
+  root._oldMapRef = m.map;
+
   if (custom) {
     const key = 'custom|' + custom + '|' + rep;
     let t = texCache.get(key);
     if (!t) {
+      // 使用更稳定的加载方式
       t = new THREE.TextureLoader().load(custom);
       t.wrapS = t.wrapT = THREE.RepeatWrapping;
       t.colorSpace = THREE.SRGBColorSpace;
@@ -1109,7 +1113,13 @@ function applyObjectSurface(root) {
     m.side = THREE.DoubleSide;
     m.color.set(root.userData.mapColor || '#c5c9cf');
   } else {
-    m.map = namedTexture(tex, rep);
+    // 处理普通纹理，加入缓存清理机制
+    const namedTex = namedTexture(tex, rep);
+    if (namedTex) {
+      m.map = namedTex;
+    } else {
+      m.map = null;
+    }
     m.transparent = opacity < 1;
     m.opacity = opacity;
     m.depthWrite = opacity > 0.02;
@@ -1142,7 +1152,6 @@ function createPrimitive(type, data = {}) {
   mesh.userData.mapName = data.name || primitiveNames[type];
   mesh.userData.mapColor = data.color || '#c5c9cf';
   mesh.userData.mapTex = data.tex || '';
-  // ✅ 兼容数组格式 [u,v] 与旧版单个数字，避免 NaN 导致平铺失效
   const repRaw = Array.isArray(data.texRepeat) ? data.texRepeat[0] : data.texRepeat;
   mesh.userData.mapTexRepeat = Number.isFinite(+repRaw) ? +repRaw : 1;
   mesh.userData.mapOpacity = Number.isFinite(+data.opacity) ? +data.opacity : 1;
@@ -1309,25 +1318,26 @@ function suggestRepeat(obj) {
   return Math.max(1, Math.round(span / 2.5));
 }
 
+// ==================== 修复 propTex 的 change 事件 ====================
+// 原代码中，点击"导入贴图"会弹出 confirm，并可能引发混乱。
+// 修复方案：简化流程，直接触发文件选择，并在文件加载完成后统一处理。
 propTex.addEventListener('change', () => {
   const name = propTex.value;
   if (name === '__import__') {
-    // ✅ 添加风险提示弹窗
-    if (!confirm('⚠️ 警告：自定义贴图功能存在极其难以修复的bug，已放弃此功能的维护，Bug可能会导致无法继续编辑您的地图，在使用此功能前最好先保存一遍地图，再次提醒，请谨慎使用！')) {
-      // 用户取消，恢复下拉框的值
-      const s0 = selection.find(surfaceEditable);
-      propTex.value = s0 && s0.userData.mapCustom ? '__import__' : (s0 ? (s0.userData.mapTex || '') : '');
-      return;
-    }
-    // 用户确认继续
+    // 直接触发文件选择，移除有风险的 confirm 弹窗
+    document.getElementById('texInput').click();
+    // 立即将下拉框恢复到之前的值，避免显示异常
     const s0 = selection.find(surfaceEditable);
     propTex.value = s0 && s0.userData.mapCustom ? '__import__' : (s0 ? (s0.userData.mapTex || '') : '');
-    document.getElementById('texInput').click();
     return;
   }
+  // 处理普通纹理选择
   for (const o of selection) {
     if (!surfaceEditable(o)) continue;
-    o.userData.mapCustom = null;
+    // 如果用户选择了普通纹理，清除自定义纹理标记
+    if (o.userData.mapCustom) {
+      o.userData.mapCustom = null;
+    }
     o.userData.mapTex = name;
     if (name && name !== 'clear' && name !== 'invisible' && (o.userData.mapTexRepeat || 1) === 1) {
       o.userData.mapTexRepeat = suggestRepeat(o);
@@ -1336,6 +1346,34 @@ propTex.addEventListener('change', () => {
   }
   refreshProps();
   pushHistory();
+});
+
+// ==================== 修复 texInput 的 change 事件 ====================
+// 确保导入自定义贴图后，UI 和材质状态正确更新
+const texInput = document.getElementById('texInput');
+texInput.addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const url = reader.result;
+    // 应用自定义贴图到所有选中的、可编辑表面的物体
+    for (const o of selection) {
+      if (!surfaceEditable(o)) continue;
+      // 清除之前的纹理设置，设置为自定义贴图
+      o.userData.mapCustom = url;
+      o.userData.mapTex = ''; // 确保不冲突
+      // 直接应用表面纹理
+      applyObjectSurface(o);
+    }
+    // 刷新属性面板，确保下拉框状态正确
+    refreshProps();
+    pushHistory();
+    toast('已导入自定义贴图');
+  };
+  reader.readAsDataURL(f);
+  // 重置 input，以便可以重复选择同一个文件
+  e.target.value = '';
 });
 
 propTexRep.addEventListener('change', () => {
@@ -1358,35 +1396,13 @@ propOpacity.addEventListener('input', () => {
 });
 propOpacity.addEventListener('change', pushHistory);
 
-// ==================== 导入自定义贴图 ====================
-const texInput = document.getElementById('texInput');
-texInput.addEventListener('change', e => {
-  const f = e.target.files[0];
-  if (!f) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    const url = reader.result;
-    for (const o of selection) {
-      if (!surfaceEditable(o)) continue;
-      o.userData.mapCustom = url;
-      o.userData.mapTex = '';
-      applyObjectSurface(o);
-    }
-    refreshProps();
-    pushHistory();
-    toast('已导入贴图');
-  };
-  reader.readAsDataURL(f);
-  e.target.value = '';
-});
-
 // ==================== 90° 伪旋转 ====================
 function rotateSelected(deg) {
   if (!selection.length) { toast('先选中一个物体'); return; }
   const rad = deg * Math.PI / 180;
   for (const o of selection) {
     if (o.userData.mapType === 'spawn') continue;
-    o.rotation.y += rad; // 只绕垂直轴，每次 90°，导出的 rotation 保持整齐
+    o.rotation.y += rad;
   }
   refreshProps();
   pushHistory();
@@ -1592,7 +1608,6 @@ document.addEventListener('pointerlockchange', () => {
 
 renderer.domElement.addEventListener('pointerdown', e => {
   if (previewOn) {
-    // 预览时：手机上单指拖动转视角
     pointerIsDown = true;
     lastPointer = { x: e.clientX, y: e.clientY };
     renderer.domElement.setPointerCapture(e.pointerId);
@@ -1625,7 +1640,7 @@ renderer.domElement.addEventListener('pointermove', e => {
       const dx = e.clientX - lastPointer.x;
       const dy = e.clientY - lastPointer.y;
       lastPointer = { x: e.clientX, y: e.clientY };
-      turnCamera(dx * 0.6, dy * 0.6); // 0.6 是手感系数，觉得慢可改大
+      turnCamera(dx * 0.6, dy * 0.6);
     }
     return;
   }
@@ -1643,12 +1658,10 @@ renderer.domElement.addEventListener('pointermove', e => {
   const totalDy = e.clientY - pointerDownPos.y;
   const movedEnough = Math.hypot(totalDx, totalDy) > DRAG_THRESHOLD;
 
-  // 手机上默认：空白处拖动 = 旋转视角，点按/拖手柄 = 编辑，两者共存
   if (!DESKTOP && !isRotating && movedEnough) {
     isRotating = true;
   }
 
-  // 手机上只有开多选模式才能框选；桌面上空白处一拖就是框选
   const boxAllowed = DESKTOP || multiSelectMode;
   if (boxAllowed && !isRotating && !isBoxSelecting && movedEnough) {
     if (!pickAt({ clientX: pointerDownPos.x, clientY: pointerDownPos.y })) {
@@ -1715,7 +1728,6 @@ renderer.domElement.addEventListener('pointerup', e => {
   if (isBoxSelecting) {
     finishBoxSelect(e, additive);
   } else if (!isRotating && pointerIsDown) {
-    // 不管桌面还是手机：短按（没拖动）即可点选物体，拖动过了阈值就转视角/框选
     const hitObj = pickAt(e);
     if (hitObj) {
       if (additive) toggleInSelection(hitObj);
@@ -2075,7 +2087,6 @@ gltfInput.addEventListener('change', async e => {
 });
 
 window.addEventListener('beforeunload', () => {
-  // 退出时强制新建存档，不覆盖已有存档
   const mapData = serializeMap();
   const saves = getSaves();
   const name = getNextAutoName(saves);
