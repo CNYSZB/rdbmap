@@ -144,6 +144,84 @@
     .sheet .row { display: flex; gap: 8px; }
     .sheet .row button { flex: 1; text-align: center; }
 
+    /* ===== 更新公告弹窗 ===== */
+    #updateOverlay {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,.7); backdrop-filter: blur(6px);
+      align-items: center; justify-content: center;
+    }
+    #updateOverlay.show { display: flex; }
+    #updateBox {
+      background: var(--panel); border-radius: 20px;
+      padding: 28px 24px 24px; max-width: 500px; width: 92%;
+      border: 1px solid var(--accent); box-shadow: 0 12px 60px rgba(0,0,0,.6);
+      max-height: 80vh; overflow-y: auto;
+    }
+    #updateBox .badge {
+      display: inline-block; background: var(--accent); color: #fff;
+      font-size: 11px; padding: 2px 12px; border-radius: 20px;
+      font-weight: 700; letter-spacing: .06em; margin-bottom: 6px;
+    }
+    #updateBox .version { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    #updateBox .sub { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+    #updateBox .changelog { margin: 12px 0 20px; padding: 0; list-style: none; }
+    #updateBox .changelog li {
+      padding: 8px 0 8px 28px; border-bottom: 1px solid rgba(255,255,255,.05);
+      position: relative; font-size: 14px; line-height: 1.5;
+    }
+    #updateBox .changelog li::before {
+      content: ""; position: absolute; left: 2px; top: 11px;
+      width: 16px; height: 16px; border-radius: 50%; background: var(--accent);
+      opacity: .2;
+    }
+    #updateBox .changelog li .icon { position: absolute; left: 3px; top: 10px; font-size: 14px; }
+    #updateBox .btn-ok {
+      width: 100%; padding: 12px; border-radius: 12px;
+      background: var(--accent); color: #fff; border: none;
+      font-size: 16px; font-weight: 600; cursor: pointer;
+    }
+    #updateBox .btn-ok:hover { background: #4d92e8; }
+
+    /* ===== 新手教程 ===== */
+    #tutorialOverlay {
+      display: none; position: fixed; inset: 0; z-index: 180;
+      background: rgba(0,0,0,.65); backdrop-filter: blur(4px);
+      align-items: center; justify-content: center;
+    }
+    #tutorialOverlay.show { display: flex; }
+    #tutorialBox {
+      background: var(--panel); border-radius: 20px;
+      padding: 28px 24px 24px; max-width: 480px; width: 92%;
+      border: 1px solid var(--line); box-shadow: 0 12px 60px rgba(0,0,0,.6);
+      max-height: 80vh; overflow-y: auto;
+    }
+    #tutorialBox .step-indicators {
+      display: flex; gap: 6px; justify-content: center; margin-bottom: 16px;
+    }
+    #tutorialBox .step-indicators .dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--line);
+      transition: background .2s;
+    }
+    #tutorialBox .step-indicators .dot.active { background: var(--accent); }
+    #tutorialBox .step-title { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+    #tutorialBox .step-desc { color: var(--muted); font-size: 14px; line-height: 1.7; margin-bottom: 18px; }
+    #tutorialBox .step-desc kbd {
+      display: inline-block; padding: 1px 8px; border-radius: 4px;
+      background: #121821; border: 1px solid var(--line);
+      font: 12px/1.4 ui-monospace, monospace; color: var(--text);
+    }
+    #tutorialBox .tutorial-nav {
+      display: flex; gap: 10px; margin-top: 4px;
+    }
+    #tutorialBox .tutorial-nav button {
+      flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--line);
+      background: var(--panel2); color: var(--text); cursor: pointer; font-size: 14px;
+    }
+    #tutorialBox .tutorial-nav button.primary {
+      background: var(--accent); border-color: var(--accent); color: #fff;
+    }
+    #tutorialBox .tutorial-nav button:active { opacity: .7; }
+
     .save-item {
       background: var(--panel2);
       border: 1px solid var(--line);
@@ -255,6 +333,7 @@
 
   <div id="topbar">
     <span class="title">RagdollBox 地图编辑器</span>
+    <button id="btnFullscreen" title="全屏">⛶</button>
     <button id="btnSaveQuick" class="accent">💾&nbsp;保存</button>
     <button id="btnMenu">☰</button>
   </div>
@@ -300,16 +379,51 @@
 <div id="toast"></div>
 <div id="overlay"></div>
 
+<!-- ===== 更新公告弹窗 ===== -->
+<div id="updateOverlay">
+  <div id="updateBox">
+    <div class="badge">🎉 新版本</div>
+    <div class="version" id="updateVersion">v3.1.0</div>
+    <div class="sub">RagdollBox 地图编辑器</div>
+    <ul class="changelog" id="updateChangelog">
+      <li><span class="icon">📖</span> 新增新手教程：首次使用自动弹出，手把手教你操作</li>
+      <li><span class="icon">🔔</span> 新增更新公告：每次更新都会显示，让你知道改了啥</li>
+      <li><span class="icon">⛶</span> 新增全屏按钮：顶部工具栏一键全屏，沉浸编辑</li>
+    </ul>
+    <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
+  </div>
+</div>
+
+<!-- ===== 新手教程弹窗 ===== -->
+<div id="tutorialOverlay">
+  <div id="tutorialBox">
+    <div class="step-indicators" id="tutorialDots">
+      <span class="dot active"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+    </div>
+    <div class="step-title" id="tutorialTitle">👆 怎么选中物体</div>
+    <div class="step-desc" id="tutorialDesc">在物体上<strong>点一下</strong>，它就变橙色高亮了。<br>想取消选中就点空白处。</div>
+    <div class="tutorial-nav">
+      <button id="tutorialPrev" style="flex:0.4;">← 上一步</button>
+      <button id="tutorialNext" class="primary">下一步 →</button>
+    </div>
+  </div>
+</div>
+
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title">当前版本3.0.0</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 v3.1.0</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnExportGltf">📤 导出 GLTF（含贴图 · ZIP）</button>
   <button id="btnImportGltf">📥 导入 GLTF / GLB</button>
   <button id="btnImportFbx">📥 导入 FBX</button>
   <button id="btnRedo">↪️ 重做</button>
+  <button id="btnTutorial">📖 重新看新手教程</button>
+  <button id="btnViewUpdate">📋 查看更新历史</button>
   <button id="btnKeys">⌨️ 快捷键一览</button>
   <button id="btnCredits">🎬 制作人员</button>
 </div>
@@ -416,6 +530,10 @@
 <input id="fbxInput" type="file" accept=".fbx" hidden />
 <input id="texInput" type="file" accept="image/*" hidden />
 
+<audio id="updateSound" preload="auto">
+  <source src="https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3" type="audio/mpeg">
+</audio>
+
 <script type="importmap">
 {
   "imports": {
@@ -435,6 +553,99 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
+// ==================== 版本号 ====================
+const APP_VERSION = '3.1.0';
+const LAST_VERSION_KEY = 'ragdollbox_last_version';
+const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
+
+// ==================== 更新检测 ====================
+function checkForUpdates() {
+  const lastVersion = localStorage.getItem(LAST_VERSION_KEY);
+  const isNew = lastVersion !== APP_VERSION;
+  if (isNew) {
+    showUpdateNotice();
+    localStorage.setItem(LAST_VERSION_KEY, APP_VERSION);
+  }
+}
+
+function showUpdateNotice() {
+  const overlay = document.getElementById('updateOverlay');
+  const versionEl = document.getElementById('updateVersion');
+  if (versionEl) versionEl.textContent = 'v' + APP_VERSION;
+  overlay.classList.add('show');
+  // 播放音效
+  const audio = document.getElementById('updateSound');
+  if (audio) {
+    audio.volume = 0.3;
+    audio.play().catch(() => {});
+  }
+}
+
+document.getElementById('updateOkBtn').onclick = () => {
+  document.getElementById('updateOverlay').classList.remove('show');
+};
+
+// ==================== 新手教程 ====================
+const TUTORIAL_STEPS = [
+  { title: '👆 怎么选中物体', desc: '在物体上<strong>点一下</strong>，它就变橙色高亮了。<br>想取消选中就点空白处。' },
+  { title: '✋ 怎么移动/旋转/缩放', desc: '底部工具栏有四个按钮：<strong>选中、移动、旋转、缩放</strong>。<br>点一下切换工具，然后拖动物体上的红绿蓝手柄。' },
+  { title: '🎮 怎么预览地图', desc: '点底部 <strong>“预览”</strong> 按钮，你就进入游戏视角了。<br><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 走路，<kbd>空格</kbd> 跳跃，<kbd>Shift</kbd> 加速。<br>按 <kbd>Esc</kbd> 退出预览。' },
+  { title: '💾 怎么保存和导出', desc: '顶部 <strong>“保存”</strong> 按钮自动存到浏览器里。<br>菜单里可以 <strong>导出为文件</strong>，方便分享给别人。' },
+];
+
+let tutorialStep = 0;
+
+function showTutorial(step) {
+  const overlay = document.getElementById('tutorialOverlay');
+  overlay.classList.add('show');
+  tutorialStep = step || 0;
+  renderTutorialStep();
+}
+
+function renderTutorialStep() {
+  const step = TUTORIAL_STEPS[tutorialStep];
+  document.getElementById('tutorialTitle').textContent = step.title;
+  document.getElementById('tutorialDesc').innerHTML = step.desc;
+
+  const dots = document.querySelectorAll('#tutorialDots .dot');
+  dots.forEach((d, i) => d.classList.toggle('active', i === tutorialStep));
+
+  document.getElementById('tutorialPrev').style.visibility = tutorialStep === 0 ? 'hidden' : 'visible';
+  document.getElementById('tutorialNext').textContent = tutorialStep === TUTORIAL_STEPS.length - 1 ? '🎉 开始玩吧！' : '下一步 →';
+}
+
+document.getElementById('tutorialNext').onclick = () => {
+  if (tutorialStep === TUTORIAL_STEPS.length - 1) {
+    document.getElementById('tutorialOverlay').classList.remove('show');
+    localStorage.setItem(TUTORIAL_SHOWN_KEY, 'true');
+  } else {
+    tutorialStep++;
+    renderTutorialStep();
+  }
+};
+
+document.getElementById('tutorialPrev').onclick = () => {
+  if (tutorialStep > 0) { tutorialStep--; renderTutorialStep(); }
+};
+
+function checkTutorial() {
+  const shown = localStorage.getItem(TUTORIAL_SHOWN_KEY);
+  if (shown === 'true') return;
+  // 延迟一下等场景加载完
+  setTimeout(() => showTutorial(0), 800);
+}
+
+// ==================== 全屏 ====================
+document.getElementById('btnFullscreen').onclick = () => {
+  const el = document.documentElement;
+  if (!document.fullscreenElement) {
+    el.requestFullscreen?.() || el.webkitRequestFullscreen?.();
+  } else {
+    document.exitFullscreen?.() || document.webkitExitFullscreen?.();
+  }
+};
+
+// ==================== Three.js 初始化 ====================
 const viewport = document.getElementById('viewport');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -490,7 +701,8 @@ const proxyStart = {
 const perObjectStart = new Map();
 
 const transform = new TransformControls(camera, renderer.domElement);
-transform.setSpace('local');
+// ===== 修复：缩放时使用世界坐标系 =====ps好像没修好，不管了
+transform.setSpace('world');
 transform.setSize(0.85);
 transform.attach(transformProxy);
 transform.visible = false;
@@ -1446,6 +1658,10 @@ document.getElementById('btnKeys').onclick = () => openSheet(panelKeys);
 document.getElementById('btnSaves').onclick = () => openSheet(panelSaves);
 document.getElementById('btnSaveQuick').onclick = manualSave;
 
+// 菜单里的按钮
+document.getElementById('btnTutorial').onclick = () => { closeSheet(); showTutorial(0); };
+document.getElementById('btnViewUpdate').onclick = () => { closeSheet(); showUpdateNotice(); };
+
 document.getElementById('saveSearch').addEventListener('input', () => {
   refreshSavesList();
 });
@@ -2046,7 +2262,7 @@ function exportMap() {
 
 document.getElementById('btnExportMap').onclick = exportMap;
 
-// ==================== GLTF 导出 (新增) ====================
+// ==================== GLTF 导出 ====================
 document.getElementById('btnExportGltf').onclick = exportGltf;
 
 async function exportGltf() {
@@ -2456,6 +2672,10 @@ createPrimitive('box', {
 });
 selectObject(null);
 pushHistory(true);
+
+// ===== 启动检测 =====
+checkForUpdates();
+checkTutorial();
 
 </script>
 </body>
