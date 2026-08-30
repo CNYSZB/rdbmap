@@ -144,6 +144,20 @@
     .sheet .row { display: flex; gap: 8px; }
     .sheet .row button { flex: 1; text-align: center; }
 
+/* ===== 导入游戏教程弹窗 ===== */
+#importTutorialOverlay {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,.7); backdrop-filter: blur(6px);
+  align-items: center; justify-content: center;
+}
+#importTutorialOverlay.show { display: flex; }
+#importTutorialBox {
+  background: var(--panel); border-radius: 20px;
+  padding: 28px 24px 24px; max-width: 720px; width: 94%;
+  border: 1px solid var(--accent); box-shadow: 0 12px 60px rgba(0,0,0,.6);
+  max-height: 85vh; overflow-y: auto;
+}
+
     /* ===== 更新公告弹窗 ===== */
     #updateOverlay {
       display: none; position: fixed; inset: 0; z-index: 200;
@@ -379,16 +393,26 @@
 <div id="toast"></div>
 <div id="overlay"></div>
 
+<!-- ===== 导入游戏教程弹窗 ===== -->
+<div id="importTutorialOverlay">
+  <div id="importTutorialBox">
+    <div class="title" style="text-align:center;font-size:18px;font-weight:700;margin-bottom:4px;">📖 导入游戏教程</div>
+    <div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:16px;">将你编辑好的地图导入到 RagdollBox 游戏中</div>
+    <div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:12px;background:#000;margin-bottom:16px;">
+      <iframe src="https://player.bilibili.com/player.html?bvid=BV1y74R6YEc4&autoplay=0" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;border-radius:12px;" allowfullscreen></iframe>
+    </div>
+    <button id="importTutorialClose" style="width:100%;padding:12px;border-radius:12px;background:var(--accent);color:#fff;border:none;font-size:16px;font-weight:600;cursor:pointer;">我知道了</button>
+  </div>
+</div>
+
 <!-- ===== 更新公告弹窗 ===== -->
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">v3.1.0</div>
+    <div class="version" id="updateVersion">v3.1.2</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li><span class="icon">📖</span> 新增新手教程：首次使用自动弹出，手把手教你操作</li>
-      <li><span class="icon">🔔</span> 新增更新公告：每次更新都会显示，让你知道改了啥</li>
-      <li><span class="icon">⛶</span> 新增全屏按钮：顶部工具栏一键全屏，沉浸编辑</li>
+      <li><span class="icon">📖</span> 新增导入游戏教程，视频一步步教你更清楚</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -415,10 +439,11 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 v3.1.0</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 v3.1.2</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnExportGltf">📤 导出 GLTF（含贴图 · ZIP）</button>
+  <button id="btnImportTutorial" style="border-color:var(--accent);color:var(--accent);">📖 导入游戏教程</button>
   <button id="btnImportGltf">📥 导入 GLTF / GLB</button>
   <button id="btnImportFbx">📥 导入 FBX</button>
   <button id="btnRedo">↪️ 重做</button>
@@ -555,7 +580,7 @@ import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // ==================== 版本号 ====================
-const APP_VERSION = '3.1.0';
+const APP_VERSION = '3.1.2';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 
@@ -1662,6 +1687,20 @@ document.getElementById('btnSaveQuick').onclick = manualSave;
 // 菜单里的按钮
 document.getElementById('btnTutorial').onclick = () => { closeSheet(); showTutorial(0); };
 document.getElementById('btnViewUpdate').onclick = () => { closeSheet(); showUpdateNotice(); };
+
+// ===== 导入游戏教程按钮 =====
+document.getElementById('btnImportTutorial').onclick = () => {
+  closeSheet();
+  document.getElementById('importTutorialOverlay').classList.add('show');
+};
+document.getElementById('importTutorialClose').onclick = () => {
+  document.getElementById('importTutorialOverlay').classList.remove('show');
+};
+document.getElementById('importTutorialOverlay').onclick = (e) => {
+  if (e.target === e.currentTarget) {
+    document.getElementById('importTutorialOverlay').classList.remove('show');
+  }
+};
 
 document.getElementById('saveSearch').addEventListener('input', () => {
   refreshSavesList();
