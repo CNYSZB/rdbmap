@@ -349,6 +349,7 @@
     <span class="title">RagdollBox 地图编辑器</span>
     <button id="btnFullscreen" title="全屏">⛶</button>
     <button id="btnSaveQuick" class="accent">💾&nbsp;保存</button>
+    <button id="btnToggleLocal" class="accent" style="width:auto !important;height:clamp(34px,7vw,40px) !important;padding:0 clamp(12px,4vw,18px) !important;border-radius:20px !important;gap:4px;background:var(--accent) !important;border-color:var(--accent) !important;color:#fff !important;font-size:clamp(12px,3vw,14px) !important;font-weight:600;">🔄 局部</button>
     <button id="btnMenu">☰</button>
   </div>
 
@@ -409,10 +410,10 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">v3.3.0</div>
+    <div class="version" id="updateVersion">v3.4.0</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li><span class="icon">⚙️</span> 增加了游戏内实际的物品(板条箱，油桶，爆炸油桶，石油桶，小医疗包和医疗包)虽然地图编辑器内这些没有物理效果</li>
+      <li>缩放，移动等参数会跟随物体的旋转而旋转，不满意移动物体的效果也可以在右上角找到局部按钮切换成世界回到老版本的移动操控(缩放不会被此功能影响)调整更精确</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -439,7 +440,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 v3.3.0</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 v3.4.0</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnExportGltf">📤 导出 GLTF（含贴图 · ZIP）</button>
@@ -586,7 +587,7 @@ import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // ==================== 版本号 ====================
-const APP_VERSION = '3.3.0';
+const APP_VERSION = '3.4.0';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 
@@ -675,6 +676,18 @@ document.getElementById('btnFullscreen').onclick = () => {
   }
 };
 
+// 切换局部/世界坐标系
+document.getElementById('btnToggleLocal').onclick = () => {
+  useLocalSpace = !useLocalSpace;
+  transform.setSpace(useLocalSpace ? 'local' : 'world');
+  const btn = document.getElementById('btnToggleLocal');
+  btn.textContent = useLocalSpace ? '🔄 局部' : '🌐 世界';
+  btn.style.background = useLocalSpace ? 'var(--accent)' : 'var(--panel2)';
+  btn.style.borderColor = useLocalSpace ? 'var(--accent)' : 'var(--line)';
+  toast(useLocalSpace ? '已切换为局部坐标系（跟随物体旋转）' : '已切换为世界坐标系（固定方向）');
+  syncProxyToSelection();
+};
+
 // ==================== Three.js 初始化 ====================
 const viewport = document.getElementById('viewport');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -730,8 +743,9 @@ const proxyStart = {
 };
 const perObjectStart = new Map();
 
+let useLocalSpace = true;
 const transform = new TransformControls(camera, renderer.domElement);
-transform.setSpace('world');
+transform.setSpace('local');
 transform.setSize(0.85);
 transform.attach(transformProxy);
 transform.visible = false;
@@ -1572,11 +1586,23 @@ function isSelected(obj) { return selection.includes(obj); }
 function syncProxyToSelection() {
   if (!selection.length) { transform.visible = false; return; }
   const center = new THREE.Vector3();
-  for (const o of selection) center.add(o.position);
-  center.divideScalar(selection.length);
-  transformProxy.position.copy(center);
-  transformProxy.scale.set(1,1,1);
-  transformProxy.rotation.set(0,0,0);
+  if (useLocalSpace) {
+    const avgQuat = new THREE.Quaternion();
+    for (const o of selection) {
+      center.add(o.position);
+      avgQuat.slerp(o.quaternion, 1 / selection.length);
+    }
+    center.divideScalar(selection.length);
+    transformProxy.position.copy(center);
+    transformProxy.scale.set(1,1,1);
+    transformProxy.quaternion.copy(avgQuat);
+  } else {
+    for (const o of selection) center.add(o.position);
+    center.divideScalar(selection.length);
+    transformProxy.position.copy(center);
+    transformProxy.scale.set(1,1,1);
+    transformProxy.rotation.set(0,0,0);
+  }
   transform.visible = currentTool !== 'select';
 }
 
