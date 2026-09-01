@@ -409,10 +409,10 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">v3.1.2</div>
+    <div class="version" id="updateVersion">v3.3.0</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li><span class="icon">📖</span> 新增导入游戏教程，视频一步步教你更清楚</li>
+      <li><span class="icon">⚙️</span> 增加了游戏内实际的物品(板条箱，油桶，爆炸油桶，石油桶，小医疗包和医疗包)虽然地图编辑器内这些没有物理效果</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -439,7 +439,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 v3.1.2</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 v3.3.0</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnExportGltf">📤 导出 GLTF（含贴图 · ZIP）</button>
@@ -525,6 +525,12 @@
     <button data-add="ramp">📐 斜坡</button>
     <button data-add="triangle">🔽 三角体</button>
   </div>
+  <div style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px;">
+    <div style="font-size:11px;color:var(--accent);margin-bottom:6px;">🎮 游戏道具（可交互 · 固定大小不可缩放）</div>
+    <div class="grid2" id="propButtonContainer">
+      <!-- 道具按钮由 JS 自动生成 -->
+    </div>
+  </div>
   <div style="margin-top:10px">
     <button data-add="spawn" style="text-align:center">🚩 出生点（可放多个）</button>
   </div>
@@ -580,7 +586,7 @@ import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // ==================== 版本号 ====================
-const APP_VERSION = '3.1.2';
+const APP_VERSION = '3.3.0';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 
@@ -599,7 +605,6 @@ function showUpdateNotice() {
   const versionEl = document.getElementById('updateVersion');
   if (versionEl) versionEl.textContent = 'v' + APP_VERSION;
   overlay.classList.add('show');
-  // 播放音效
   const audio = document.getElementById('updateSound');
   if (audio) {
     audio.volume = 0.3;
@@ -657,7 +662,6 @@ document.getElementById('tutorialPrev').onclick = () => {
 function checkTutorial() {
   const shown = localStorage.getItem(TUTORIAL_SHOWN_KEY);
   if (shown === 'true') return;
-  // 延迟一下等场景加载完
   setTimeout(() => showTutorial(0), 800);
 }
 
@@ -727,7 +731,6 @@ const proxyStart = {
 const perObjectStart = new Map();
 
 const transform = new TransformControls(camera, renderer.domElement);
-// ===== 修复：缩放时使用世界坐标系 =====ps好像没修好，不管了
 transform.setSpace('world');
 transform.setSize(0.85);
 transform.attach(transformProxy);
@@ -763,6 +766,66 @@ const primitiveNames = {
   hex: '六边形体', ramp: '斜坡', triangle: '三角体', model: '导入模型',
   spawn: '出生点'
 };
+
+// ================================================================
+// === 道具配置表 START ===
+// 以后新增道具：在这里加一行，按钮自动生成，序列化自动支持
+// 形状支持: box, cylinder, sphere, cone, ramp, triangle
+// box尺寸: [宽, 高, 深]   cylinder尺寸: [半径, 高度]   sphere尺寸: [半径]
+// ================================================================
+const PROP_DEFS = {
+  crate: {
+    name: '板条箱',
+    label: '板条箱',
+    color: '#c5a56b',
+    shape: 'box',
+    size: [1, 1, 1]
+  },
+  barrel: {
+    name: '油桶',
+    label: '油桶',
+    color: '#888888',
+    shape: 'cylinder',
+    size: [0.4, 1.1]
+  },
+  explbarrel: {
+    name: '爆炸油桶',
+    label: '爆炸油桶',
+    color: '#cc2222',
+    shape: 'cylinder',
+    size: [0.4, 1.1]
+  },
+  oil: {
+  name: '石油油桶',
+  label: '石油油桶',
+  color: '#4a3a2a',
+  shape: 'cylinder',
+  size: [0.4, 1.1]
+},
+smallmed: {
+  name: '小医疗包',
+  label: '小医疗包',
+  color: '#ff4466',
+  shape: 'box',
+  size: [0.4, 0.2, 0.5]
+},
+medmed: {
+  name: '医疗包',
+  label: '医疗包',
+  color: '#ff2244',
+  shape: 'box',
+  size: [0.8, 0.2, 1]
+}
+  // ★ 在这里添加新道具，例如：
+  // newprop: {
+  //   name: '新道具',
+  //   label: '⭐ 新道具',
+  //   color: '#ffaa00',
+  //   shape: 'box',        // 或 cylinder / sphere / cone / ramp / triangle
+  //   size: [1, 1, 1]      // box: [宽,高,深]  cylinder: [半径,高度]  sphere: [半径]
+  // }
+};
+// === 道具配置表 END ================================================
 
 // ==================== 存档系统 ====================
 const SAVES_KEY = 'ragdollbox_saves';
@@ -818,7 +881,7 @@ function persistMapData(mapData) {
     if (save) {
       save.data = mapData;
       save.updatedAt = new Date().toISOString();
-      save.objectCount = mapData.objects.length;
+      save.objectCount = (mapData.objects?.length || 0) + (mapData.props?.length || 0);
       setSaves(saves);
       return save;
     }
@@ -829,7 +892,7 @@ function persistMapData(mapData) {
     name: name,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    objectCount: mapData.objects.length,
+    objectCount: (mapData.objects?.length || 0) + (mapData.props?.length || 0),
     data: mapData
   };
   currentSaveId = newSave.id;
@@ -1260,6 +1323,64 @@ const SPAWN_HALF = 0.55;
 const SPAWN_RADIUS = 0.3;
 const PLAYER_EYE = 0.72;
 
+// ============================================================
+// 通用道具创建函数（根据配置表自动生成几何体）
+// ============================================================
+function createProp(propType, data = {}) {
+  const def = PROP_DEFS[propType];
+  if (!def) {
+    console.warn('未知道具类型:', propType);
+    return null;
+  }
+  
+  // 根据形状创建几何体
+  let geometry;
+  const s = def.size;
+  switch (def.shape) {
+    case 'box':
+      geometry = new THREE.BoxGeometry(s[0], s[1], s[2]);
+      break;
+    case 'cylinder':
+      geometry = new THREE.CylinderGeometry(s[0], s[0], s[1], 20);
+      break;
+    case 'sphere':
+      geometry = new THREE.SphereGeometry(s[0], 24, 16);
+      break;
+    case 'cone':
+      geometry = new THREE.ConeGeometry(s[0], s[1], 20);
+      break;
+    case 'ramp':
+      geometry = makePrismGeometry([[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5]]);
+      break;
+    case 'triangle':
+      geometry = makePrismGeometry([[-0.5, -0.5], [0.5, -0.5], [0, 0.5]]);
+      break;
+    default:
+      geometry = new THREE.BoxGeometry(1, 1, 1);
+  }
+  
+  const mat = new THREE.MeshStandardMaterial({
+    color: data.color || def.color,
+    roughness: 0.7,
+    metalness: 0.05
+  });
+  const mesh = new THREE.Mesh(geometry, mat);
+  mesh.castShadow = mesh.receiveShadow = true;
+  mesh.userData.isProp = true;
+  mesh.userData.propType = propType;
+  mesh.userData.mapObject = true;
+  mesh.userData.mapType = propType;
+  mesh.userData.mapName = data.name || def.name;
+  mesh.userData.mapColor = data.color || def.color;
+  mesh.position.fromArray(data.position || placementPoint(propType));
+  mesh.rotation.fromArray(data.rotation || [0, 0, 0]);
+  mesh.scale.set(1, 1, 1); // 固定大小
+  objectsRoot.add(mesh);
+  return mesh;
+}
+
+// ============================================================
+
 function makeSpawnMarker() {
   const g = new THREE.Group();
   const body = new THREE.Mesh(
@@ -1300,6 +1421,16 @@ function geometryFor(type) {
 function applyObjectColor(root, hex) {
   root.userData.mapColor = hex;
   if (root.userData.mapType === 'spawn') return;
+  if (root.userData.isProp) {
+    root.traverse(o => {
+      if (!o.isMesh || !o.material) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of mats) {
+        if (m.color) m.color.set(hex);
+      }
+    });
+    return;
+  }
   if (root.userData.mapType !== 'model' && root.userData.mapTex) {
     applyObjectSurface(root);
     return;
@@ -1316,6 +1447,7 @@ function applyObjectColor(root, hex) {
 
 function applyObjectSurface(root) {
   if (!root || !root.isMesh) return;
+  if (root.userData.isProp) return;
   if (root.userData.mapType === 'model' || root.userData.mapType === 'spawn') return;
   const tex = root.userData.mapTex || '';
   const rep = root.userData.mapTexRepeat || 1;
@@ -1324,8 +1456,6 @@ function applyObjectSurface(root) {
   const m = root.material;
   if (!m) return;
 
-  if (m.map && m.map !== root._oldMapRef) {
-  }
   root._oldMapRef = m.map;
 
   if (custom) {
@@ -1389,12 +1519,14 @@ function createSpawn(data = {}) {
 
 function createPrimitive(type, data = {}) {
   if (type === 'spawn') return createSpawn(data);
+  // 如果是道具类型，走道具创建
+  if (PROP_DEFS[type]) return createProp(type, data);
   const mat = new THREE.MeshStandardMaterial({ color: data.color || '#c5c9cf', roughness: .82, metalness: .04 });
   const mesh = new THREE.Mesh(geometryFor(type), mat);
   mesh.castShadow = mesh.receiveShadow = true;
   mesh.userData.mapObject = true;
   mesh.userData.mapType = type;
-  mesh.userData.mapName = data.name || primitiveNames[type];
+  mesh.userData.mapName = data.name || primitiveNames[type] || type;
   mesh.userData.mapColor = data.color || '#c5c9cf';
   mesh.userData.mapTex = data.tex || '';
   const repRaw = Array.isArray(data.texRepeat) ? data.texRepeat[0] : data.texRepeat;
@@ -1517,7 +1649,7 @@ propTex.innerHTML = TEXTURES.map(t => `<option value="${t.id}">${t.name}</option
 
 function surfaceEditable(obj) {
   const t = obj && obj.userData.mapType;
-  return !!t && t !== 'model' && t !== 'spawn';
+  return !!t && t !== 'model' && t !== 'spawn' && !obj.userData.isProp;
 }
 
 function refreshProps() {
@@ -1545,8 +1677,14 @@ function refreshProps() {
     document.getElementById('propColor').value = selected.userData.mapColor || '#c5c9cf';
     const f = v => v.toFixed(2);
     document.getElementById('propPos').textContent = selected.position.toArray().map(f).join(', ');
-    document.getElementById('propScale').textContent = selected.scale.toArray().map(f).join(', ');
-    document.getElementById('propType').textContent = primitiveNames[selected.userData.mapType] || selected.userData.mapType;
+    const scale = selected.scale.toArray();
+    document.getElementById('propScale').textContent = scale.map(f).join(', ');
+    let typeName = primitiveNames[selected.userData.mapType] || selected.userData.mapType;
+    if (selected.userData.isProp) {
+      const def = PROP_DEFS[selected.userData.propType];
+      typeName = def ? def.name : '道具';
+    }
+    document.getElementById('propType').textContent = typeName;
   } else {
     document.getElementById('propName').value = `已选中 ${selection.length} 个物体`;
     document.getElementById('propColor').value = selection[0].userData.mapColor || '#c5c9cf';
@@ -1711,6 +1849,7 @@ document.getElementById('btnManualSave').onclick = () => {
   refreshSavesList();
 };
 
+// ===== 地形按钮 =====
 document.querySelectorAll('[data-add]').forEach(btn => {
   btn.onclick = () => {
     const obj = createPrimitive(btn.dataset.add);
@@ -1718,6 +1857,46 @@ document.querySelectorAll('[data-add]').forEach(btn => {
     setTool('translate');
     closeSheet();
     pushHistory();
+  };
+});
+
+// ===== 道具按钮自动生成（从配置表读取） =====
+function generatePropButtons() {
+  const container = document.getElementById('propButtonContainer');
+  container.innerHTML = '';
+  for (const [id, def] of Object.entries(PROP_DEFS)) {
+    const btn = document.createElement('button');
+    btn.dataset.addProp = id;
+    btn.textContent = def.label || def.name;
+    btn.style.borderColor = def.color || 'var(--line)';
+    btn.onclick = () => {
+      const obj = createProp(id);
+      if (obj) {
+        selectObject(obj);
+        setTool('translate');
+        closeSheet();
+        pushHistory();
+        toast(`已放置${def.name}`);
+      }
+    };
+    container.appendChild(btn);
+  }
+}
+generatePropButtons();
+
+// ===== 道具放置按钮（通用，用于 data-add-prop 属性） =====
+document.querySelectorAll('[data-add-prop]').forEach(btn => {
+  btn.onclick = () => {
+    const type = btn.dataset.addProp;
+    const def = PROP_DEFS[type];
+    const obj = createProp(type);
+    if (obj) {
+      selectObject(obj);
+      setTool('translate');
+      closeSheet();
+      pushHistory();
+      toast(`已放置${def ? def.name : type}`);
+    }
   };
 });
 
@@ -1736,6 +1915,18 @@ transform.addEventListener('mouseDown', () => {
   if (currentTool === 'scale') scaleStart = transformProxy.scale.clone();
 });
 transform.addEventListener('objectChange', () => {
+  // 道具禁止缩放：如果是道具，强制scale为1
+  const hasProp = selection.some(o => o.userData.isProp);
+  if (hasProp && currentTool === 'scale') {
+    transformProxy.scale.set(1, 1, 1);
+    for (const o of selection) {
+      if (o.userData.isProp) {
+        o.scale.set(1, 1, 1);
+      }
+    }
+    return;
+  }
+  
   if (currentTool === 'scale' && (keys.has('ShiftLeft') || keys.has('ShiftRight'))) {
     const axis = transform.axis || 'X';
     const old = scaleStart || new THREE.Vector3(1,1,1);
@@ -2200,6 +2391,23 @@ function duplicateSelected() {
   if (!selection.length) return;
   const newOnes = [];
   for (const obj of selection) {
+    // 如果是道具，直接复制
+    if (obj.userData.isProp) {
+      const def = PROP_DEFS[obj.userData.propType];
+      if (!def) continue;
+      const q = new THREE.Quaternion().copy(obj.quaternion);
+      const newProp = createProp(obj.userData.propType, {
+        position: obj.position.toArray().map(v => v + 0.1),
+        rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z],
+        color: obj.userData.mapColor,
+        name: obj.userData.mapName + ' 副本'
+      });
+      if (newProp) {
+        newProp.quaternion.copy(q);
+        newOnes.push(newProp);
+      }
+      continue;
+    }
     const data = serializeObject(obj);
     data.name += ' 副本';
     newOnes.push(restoreObject(data));
@@ -2235,6 +2443,15 @@ function serializeObject(o) {
     rotation: roundArray([o.rotation.x, o.rotation.y, o.rotation.z]),
     scale: roundArray(o.scale.toArray()),
   };
+  // 如果是道具，直接返回props格式
+  if (o.userData.isProp) {
+    const q = new THREE.Quaternion().copy(o.quaternion);
+    return {
+      id: o.userData.propType,
+      p: roundArray(o.position.toArray()),
+      q: roundArray([q.x, q.y, q.z, q.w])
+    };
+  }
   if (b.type === 'model') { Object.assign(b, serializeModel(o)); return b; }
   const tex = o.userData.mapTex || '';
   const opacity = o.userData.mapOpacity === undefined ? 1 : o.userData.mapOpacity;
@@ -2261,16 +2478,29 @@ function spawnMarkers() {
 function serializeMap() {
   const marks = spawnMarkers();
   const spawns = marks.map(o => roundArray(o.position.toArray()));
+  const objects = [];
+  const props = [];
+  for (const child of objectsRoot.children) {
+    if (child.userData.isProp) {
+      const q = new THREE.Quaternion().copy(child.quaternion);
+      props.push({
+        id: child.userData.propType,
+        p: roundArray(child.position.toArray()),
+        q: roundArray([q.x, q.y, q.z, q.w])
+      });
+    } else if (child.userData.mapType !== 'spawn') {
+      objects.push(serializeObject(child));
+    }
+  }
   return {
     format: 'RagdollBoxMap',
-    version: 1,
+    version: 2,
     name: '自定义地图',
     spawn: spawns[0] || [0, .87, 9],
     spawns: spawns.length ? spawns : undefined,
     exportedAt: new Date().toISOString(),
-    objects: objectsRoot.children
-      .filter(o => o.userData.mapType !== 'spawn')
-      .map(serializeObject),
+    objects: objects,
+    props: props
   };
 }
 
@@ -2297,7 +2527,8 @@ function exportMap() {
   d.name = saveName;
   download(saveName + '.rbmap', JSON.stringify(d));
   const n = d.spawns ? d.spawns.length : 0;
-  toast(`已导出 ${d.objects.length} 个物体` + (n ? ` · ${n} 个出生点` : ' · 没有出生点，进游戏用默认位置'));
+  const propCount = d.props ? d.props.length : 0;
+  toast(`已导出 ${d.objects.length} 个物体` + (propCount ? ` + ${propCount} 个道具` : '') + (n ? ` · ${n} 个出生点` : ' · 没有出生点'));
 }
 
 document.getElementById('btnExportMap').onclick = exportMap;
@@ -2382,10 +2613,28 @@ document.getElementById('mapInput').addEventListener('change', async e => {
 function clearObjects(){clearSelection();for(const o of[...objectsRoot.children]){objectsRoot.remove(o);disposeObject(o);}}
 function materialFromData(d={}){const m=new THREE.MeshStandardMaterial({color:d.color||'#ffffff',roughness:d.roughness??.8,metalness:d.metalness??0,emissive:d.emissive||'#000000',emissiveIntensity:d.emissiveIntensity??1,transparent:!!d.transparent,opacity:d.opacity??1,side:d.side===2?THREE.DoubleSide:d.side===1?THREE.BackSide:THREE.FrontSide});if(d.map){m.map=new THREE.TextureLoader().load(d.map);m.map.colorSpace=THREE.SRGBColorSpace;}return m;}
 function restoreModel(d){const r=new THREE.Group();r.userData.mapObject=true;r.userData.mapType='model';r.userData.mapName=d.name||'导入模型';r.userData.mapColor=d.color||'#ffffff';r.userData.serializedBounds=d.bounds;for(const md of d.meshes||[]){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(md.positions,3));if(md.normals)g.setAttribute('normal',new THREE.Float32BufferAttribute(md.normals,3));if(md.uvs)g.setAttribute('uv',new THREE.Float32BufferAttribute(md.uvs,2));if(md.indices)g.setIndex(md.indices);if(!md.normals)g.computeVertexNormals();const mats=(md.materials||[{}]).map(materialFromData);g.clearGroups();for(const gr of md.groups||[])g.addGroup(gr.start,gr.count,gr.materialIndex||0);const mesh=new THREE.Mesh(g,mats.length===1?mats[0]:mats);mesh.castShadow=mesh.receiveShadow=true;r.add(mesh);}r.position.fromArray(d.position||[0,0,0]);r.rotation.fromArray(d.rotation||[0,0,0]);r.scale.fromArray(d.scale||[1,1,1]);objectsRoot.add(r);return r;}
-function restoreObject(d){if(d.type==='model')return restoreModel(d);return createPrimitive(d.type,d);}
+function restoreObject(d){
+  // 如果是道具格式
+  if (d.id && PROP_DEFS[d.id]) {
+    const def = PROP_DEFS[d.id];
+    const mesh = createProp(d.id, {
+      position: d.p || [0, 0.5, 0],
+      rotation: d.rotation || [0, 0, 0],
+      color: d.color || def.color,
+      name: d.name || def.name
+    });
+    if (d.q && d.q.length === 4) {
+      mesh.quaternion.set(d.q[0], d.q[1], d.q[2], d.q[3]);
+    }
+    return mesh;
+  }
+  if (d.type === 'model') return restoreModel(d);
+  return createPrimitive(d.type, d);
+}
 function loadMapData(d, rh = true) {
   if (!d || d.format !== 'RagdollBoxMap') throw new Error('不是RagdollBoxMap文件');
   const objs = Array.isArray(d.objects) ? d.objects : [];
+  const props = Array.isArray(d.props) ? d.props : [];
   const spawns = Array.isArray(d.spawns) && d.spawns.length
     ? d.spawns
     : (Array.isArray(d.spawn) ? [d.spawn] : []);
@@ -2394,6 +2643,20 @@ function loadMapData(d, rh = true) {
   for (const o of objs) {
     if (!o || o.type === 'spawn') continue;
     restoreObject(o);
+  }
+  // 恢复道具（使用配置表自动识别）
+  for (const p of props) {
+    if (p.id && PROP_DEFS[p.id]) {
+      const def = PROP_DEFS[p.id];
+      const mesh = createProp(p.id, {
+        position: p.p || [0, 0.5, 0],
+        color: p.color || def.color,
+        name: p.name || def.name
+      });
+      if (p.q && p.q.length === 4) {
+        mesh.quaternion.set(p.q[0], p.q[1], p.q[2], p.q[3]);
+      }
+    }
   }
   for (const p of spawns) {
     if (!Array.isArray(p) || p.length < 3) continue;
