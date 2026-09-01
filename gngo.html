@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <title>更新公告</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; min-height: 100dvh;
+      background: #11151b;
+      color: #eef4fb;
+      font: 14px/1.6 "Microsoft YaHei", sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .container {
+      max-width: 480px;
+      width: 100%;
+    }
+    .version {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+    .sub {
+      color: #9baabc;
+      font-size: 13px;
+      margin-bottom: 14px;
+    }
+    .changelog {
+      list-style: none;
+    }
+    .changelog li {
+      padding: 6px 0 6px 20px;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      position: relative;
+    }
+    .changelog li:last-child {
+      border-bottom: none;
+    }
+    .changelog li .icon {
+      position: absolute;
+      left: 0;
+      top: 6px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="version" id="versionText">v3.3.0</div>
+  <div class="sub">RagdollBox 地图编辑器</div>
+  <ul class="changelog" id="changelogList">
+    <li><span class="icon">✨</span> 示例更新内容 1</li>
+    <li><span class="icon">🔧</span> 示例更新内容 2</li>
+    <li><span class="icon">🐛</span> 示例更新内容 3</li>
+    <li><span class="icon">⚡</span> 示例更新内容 4</li>
+  </ul>
+</div>
+</body>
+</html>
