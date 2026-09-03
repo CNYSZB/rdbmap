@@ -347,7 +347,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 v3.6.0 · 组功能</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 v3.6.1 · 组功能</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnExportGltf">📤 导出 GLTF（含贴图 · ZIP）</button>
@@ -454,10 +454,10 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">v3.6.0</div>
+    <div class="version" id="updateVersion">v3.6.1</div>
     <div class="sub">RagdollBox 地图编辑器 · 组功能</div>
     <ul class="changelog" id="updateChangelog">
-      <li>优化了穿透选中要体验，并且修复了穿透选中后就会自动解体的bug</li>
+      <li>修复一些组的bug</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -510,7 +510,7 @@ import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // ==================== 版本号 ====================
-const APP_VERSION = '3.6.0';
+const APP_VERSION = '3.6.1';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
@@ -1791,6 +1791,10 @@ function updateGroupHighlights() {
   }
 }
 
+// 只有当 selection 恰好等于某个组的全部成员时，才认为"选中了整组"，
+// 应作为一个整体联动变换。如果 selection 只是组内的一部分成员
+// （比如通过"穿透选中"单独选中了组内一个物体），必须返回 null，
+// 否则移动时会错误地带着整组一起动。
 function getCommonGroup() {
   if (!selection.length) return null;
   var firstGroup = groupManager.getGroupOfObject(selection[0]);
@@ -1798,6 +1802,7 @@ function getCommonGroup() {
   for (var i = 0; i < selection.length; i++) {
     if (groupManager.getGroupOfObject(selection[i]) !== firstGroup) return null;
   }
+  if (selection.length !== firstGroup.members.length) return null;
   return firstGroup;
 }
 
@@ -2558,30 +2563,28 @@ renderer.domElement.addEventListener('pointerup', function(e) {
     if (hitObj) {
       var group = groupManager.getGroupOfObject(hitObj);
       if (group && !additive) {
-        var isGroupSelected = selection.length === group.members.length;
-        for (var i = 0; i < group.members.length; i++) {
-          if (!selection.includes(group.members[i])) { isGroupSelected = false; break; }
-        }
-        if (isGroupSelected && _lastSelectedGroup === group && _selectionDepth === 0) {
-          _selectionDepth = 1;
+        // 主流建模软件式交互：
+        // 第一次点组内物体 -> 选中整组（方便整体移动/查看）
+        // 已经在操作这个组（无论当前是整组选中还是组内单个物体）时，
+        // 再点组内任意一个物体 -> 直接单独选中那个物体，
+        // 可以在组内自由切换选中目标，不需要点两次同一个物体。
+        if (_lastSelectedGroup === group) {
           selectObject(hitObj);
-          toast('🔍 已穿透选中: ' + (hitObj.userData.mapName || '物体'));
+          toast('🔍 已单独选中: ' + (hitObj.userData.mapName || '物体'));
         } else {
-          _selectionDepth = 0;
           _lastSelectedGroup = group;
           setSelection(group.members);
           toast('📦 已选中组: ' + group.name + ' (' + group.members.length + '个物体)');
         }
       } else if (additive) {
         toggleInSelection(hitObj);
-        _selectionDepth = 0;
+        _lastSelectedGroup = null;
       } else {
-        _selectionDepth = 0;
+        _lastSelectedGroup = null;
         selectObject(hitObj);
       }
     } else if (!additive) {
       clearSelection();
-      _selectionDepth = 0;
       _lastSelectedGroup = null;
     }
   }
@@ -3545,7 +3548,6 @@ function stepPreview(dt) {
 // 主循环
 // ============================================================
 var last = performance.now();
-var _selectionDepth = 0;
 var _lastSelectedGroup = null;
 
 function frame(now) {
