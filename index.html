@@ -293,13 +293,14 @@
     <div id="groupInfo" style="display:none;width:100%;border-top:1px solid var(--line);padding-top:6px;margin-top:4px;gap:6px;flex-wrap:wrap;align-items:center;">
       <span class="group-badge">📦 组</span>
       <span class="group-member-count" id="groupMemberCount">成员: 0</span>
+      <button id="btnRenameGroup" class="btn-small" style="padding:3px 10px;font-size:10px;">✏️ 重命名</button>
       <button id="btnUngroup" class="danger" style="padding:3px 10px;font-size:10px;">🔓 解组</button>
       <button id="btnSaveToLibrary" class="accent" style="padding:3px 10px;font-size:10px;">💾 保存到组库</button>
-      <span style="font-size:10px;color:var(--muted);">点击组内物体可穿透选中单个</span>
+      <span style="font-size:10px;color:var(--muted);">再次点击组内物体可单独选中</span>
     </div>
   </div>
 
-  <div id="hintBar">右键拖动 = 视角 · 滚轮 = 前后 · Shift+左键 = 加选 · 点击组内物体两次穿透选中</div>
+  <div id="hintBar">右键拖动 = 视角 · 滚轮 = 前后 · Shift+左键 = 加选 · 点击组切换选中/单独选中物体</div>
 
   <div id="previewHud">
     <span>预览中 · <b id="previewHint">WASD 移动 · 空格 跳 · Shift 跑</b></span>
@@ -347,7 +348,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 v3.6.1 · 组功能</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 v3.5.0 · 组功能</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnExportGltf">📤 导出 GLTF（含贴图 · ZIP）</button>
@@ -454,10 +455,10 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">v3.6.1</div>
+    <div class="version" id="updateVersion">v3.6.3</div>
     <div class="sub">RagdollBox 地图编辑器 · 组功能</div>
     <ul class="changelog" id="updateChangelog">
-      <li>修复一些组的bug</li>
+      <li>优化了使用组功能的体验，不过我到底要优化多久？或许这是我最后一次优化</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -510,7 +511,7 @@ import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // ==================== 版本号 ====================
-const APP_VERSION = '3.6.1';
+const APP_VERSION = '3.6.3';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
@@ -2045,12 +2046,23 @@ function createGroupFromSelection() {
 
 function ungroupSelected() {
   var commonGroup = getCommonGroup();
-  if (!commonGroup) { toast('请选中一个组（点击组内物体两次可选中组）'); return; }
+  if (!commonGroup) { toast('请先选中一个组'); return; }
   var members = commonGroup.members.slice();
   groupManager.ungroup(commonGroup);
   setSelection(members);
   refreshProps();
   pushHistory();
+}
+
+function renameGroupSelected() {
+  var commonGroup = getCommonGroup();
+  if (!commonGroup) { toast('请先选中一个组'); return; }
+  var newName = prompt('请输入组的新名称：', commonGroup.name);
+  if (!newName || !newName.trim()) return;
+  commonGroup.name = newName.trim();
+  refreshProps();
+  pushHistory();
+  toast('✅ 已重命名为: ' + commonGroup.name);
 }
 
 function saveGroupToLibrary() {
@@ -2124,6 +2136,7 @@ function refreshLibraryList() {
     html += '<div class="lib-meta">' + count + ' 个物体 · ' + date + '</div></div>';
     html += '<div class="lib-actions">';
     html += '<button class="accent" onclick="window._placeGroup(\'' + g.id + '\')">📥 放置</button>';
+    html += '<button onclick="window._renameGroupInLib(\'' + g.id + '\', event)">✏️</button>';
     html += '<button class="danger" onclick="window._deleteGroupFromLib(\'' + g.id + '\')">🗑</button>';
     html += '</div></div>';
   }
@@ -2136,6 +2149,28 @@ window._placeGroup = function(id) {
     closeSheet();
     placeGroupFromLibrary(data);
   }
+};
+window._renameGroupInLib = function(id, event) {
+  if (event) event.stopPropagation();
+  var lib = groupLibrary.getAll();
+  var data = null;
+  for (var i = 0; i < lib.length; i++) {
+    if (lib[i].id === id) { data = lib[i]; break; }
+  }
+  if (!data) return;
+  var newName = prompt('请输入新名称：', data.name);
+  if (!newName || !newName.trim()) return;
+  var trimmed = newName.trim();
+  for (var i = 0; i < lib.length; i++) {
+    if (lib[i].name === trimmed && lib[i].id !== id) {
+      alert('已存在同名的组');
+      return;
+    }
+  }
+  data.name = trimmed;
+  groupLibrary.save(data);
+  toast('已重命名：' + trimmed);
+  refreshLibraryList();
 };
 window._deleteGroupFromLib = function(id) {
   if (!confirm('确定要从组库中删除这个组吗？')) return;
@@ -2190,6 +2225,7 @@ document.getElementById('btnSaveQuick').onclick = manualSave;
 // 组按钮
 document.getElementById('btnCreateGroup').onclick = createGroupFromSelection;
 document.getElementById('btnUngroup').onclick = ungroupSelected;
+document.getElementById('btnRenameGroup').onclick = renameGroupSelected;
 document.getElementById('btnSaveToLibrary').onclick = saveGroupToLibrary;
 
 // 菜单里的按钮
