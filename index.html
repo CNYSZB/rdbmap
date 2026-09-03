@@ -325,6 +325,12 @@
     <button id="btnPreview"><span class="icon">🎮</span>预览</button>
     <button id="btnSaves"><span class="icon">📂</span>存档</button>
     <button id="btnUndo"><span class="icon">↩️</span>撤销</button>
+    <div style="display:flex;align-items:center;gap:6px;background:rgba(22,28,36,.6);padding:4px 10px;border-radius:12px;backdrop-filter:blur(4px);">
+    <div style="display:flex;align-items:center;gap:6px;background:rgba(22,28,36,.6);padding:4px 10px;border-radius:12px;backdrop-filter:blur(4px);">
+    <span style="font-size:11px;color:var(--muted);">UI缩放</span>
+    <input id="uiScaleInput" type="number" min="0.5" max="2.0" step="0.05" value="1.0" style="width:50px;border:1px solid var(--line);background:#121821;color:var(--text);border-radius:6px;padding:3px 4px;font-size:12px;text-align:center;" />
+    <button id="uiScaleApply" style="padding:3px 8px;font-size:11px;border-radius:6px;">应用</button>
+    </div>
   </div>
 </div>
 
@@ -352,7 +358,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 batav3.6.4</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 3.7.0</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
@@ -460,10 +466,12 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">bata3.6.4</div>
-    <div class="sub">RagdollBox 地图编辑器 · 组功能</div>
+    <div class="version" id="updateVersion">3.7.0</div>
+    <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li>进行一些测试，但是不知道有没有问题</li>
+      <li>正式增加物理支持和分享码功能（小金制作）</li>
+      <li>现在支持手机客户端，APK包体仅有3.68M，上传至7723</li>
+      <li>现在可以快捷调整全局UI大小</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -516,7 +524,7 @@ import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // ==================== 版本号 ====================
-const APP_VERSION = '3.6.4';
+const APP_VERSION = '3.7.0';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
@@ -3835,6 +3843,49 @@ resize();
 
 console.log('🎮 RagdollBox 地图编辑器 v' + APP_VERSION + ' · 组功能已加载！');
 console.log('📦 组操作: 选中多个物体 → 建组 | 点击组内物体穿透选中 | 组旋转以组中心为轴');
+
+// ============================================================
+// 全局UI缩放（数字输入框）
+// ============================================================
+var uiScaleInput = document.getElementById('uiScaleInput');
+var uiScaleApply = document.getElementById('uiScaleApply');
+var appEl = document.getElementById('app');
+
+function applyUIScale(val) {
+  val = Math.max(0.5, Math.min(2.0, val));
+  uiScaleInput.value = val.toFixed(2);
+  appEl.style.transform = 'scale(' + val + ')';
+  appEl.style.transformOrigin = 'center top';
+  appEl.style.width = (100 / val) + '%';
+  appEl.style.height = (100 / val) + 'dvh';
+  appEl.style.marginLeft = ((1 - 1/val) * 50) + '%';
+  localStorage.setItem('ragdollbox_ui_scale', val.toFixed(2));
+}
+
+uiScaleApply.addEventListener('click', function() {
+  var val = parseFloat(uiScaleInput.value);
+  if (!isNaN(val) && val >= 0.5 && val <= 2.0) {
+    applyUIScale(val);
+  } else {
+    alert('请输入 0.5 ~ 2.0 之间的数值');
+    uiScaleInput.value = '1.0';
+  }
+});
+
+uiScaleInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    uiScaleApply.click();
+  }
+});
+
+// 恢复上次保存的大小
+var savedScale = localStorage.getItem('ragdollbox_ui_scale');
+if (savedScale) {
+  var val = parseFloat(savedScale);
+  if (!isNaN(val) && val >= 0.5 && val <= 2.0) {
+    applyUIScale(val);
+  }
+}
 </script>
 </body>
 </html>
