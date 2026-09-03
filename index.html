@@ -281,6 +281,9 @@
     <label>纹理</label><select id="propTex"></select>
     <label>平铺</label><input id="propTexRep" type="number" min="0.1" max="64" step="0.5" value="1" />
     <label>不透明</label><input id="propOpacity" type="range" min="0" max="1" step="0.05" value="1" />
+    <label>物理</label><input id="propPhys" type="checkbox" />
+    <label>质量</label><input id="propMass" type="number" min="0.2" max="20000" step="1" value="10" />
+    <label>弹力</label><input id="propBounce" type="range" min="0" max="0.95" step="0.05" value="0.12" />
     <span class="prop-info">位置:<b id="propPos">0,0,0</b></span>
     <span class="prop-info">缩放:<b id="propScale">1,1,1</b></span>
     <span class="prop-info">类型:<b id="propType">-</b></span>
@@ -348,9 +351,10 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 v3.5.0 · 组功能</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 batav3.6.4</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
+  <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
   <button id="btnExportGltf">📤 导出 GLTF（含贴图 · ZIP）</button>
   <button id="btnImportTutorial" style="border-color:var(--accent);color:var(--accent);">📖 导入游戏教程</button>
   <button id="btnImportGltf">📥 导入 GLTF / GLB</button>
@@ -455,10 +459,10 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">v3.6.3</div>
+    <div class="version" id="updateVersion">bata3.6.4</div>
     <div class="sub">RagdollBox 地图编辑器 · 组功能</div>
     <ul class="changelog" id="updateChangelog">
-      <li>优化了使用组功能的体验，不过我到底要优化多久？或许这是我最后一次优化</li>
+      <li>进行一些测试，但是不知道有没有问题</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -511,7 +515,7 @@ import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // ==================== 版本号 ====================
-const APP_VERSION = '3.6.3';
+const APP_VERSION = '3.6.4';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
@@ -976,6 +980,13 @@ var PROP_DEFS = {
     color: '#ff2244',
     shape: 'box',
     size: [0.8, 0.2, 1]
+  },
+  water: {
+  name: '水体',
+  label: '水',
+  color: '#3a8fc9',
+  shape: 'box',
+  size: [10, 0.2, 10]
   }
 };
 
@@ -1672,6 +1683,9 @@ function createPrimitive(type, data) {
   mesh.userData.mapTexRepeat = Number.isFinite(+repRaw) ? +repRaw : 1;
   mesh.userData.mapOpacity = Number.isFinite(+data.opacity) ? +data.opacity : 1;
   mesh.userData.mapCustom = data.customTex || null;
+  mesh.userData.mapPhysics = !!data.physics;
+  mesh.userData.mapMass = Number.isFinite(+data.mass) ? +data.mass : 0;
+  mesh.userData.mapBounce = Number.isFinite(+data.bounce) ? +data.bounce : 0.12;
   mesh.position.fromArray(data.position || placementPoint(type));
   mesh.rotation.fromArray(data.rotation || [0, 0, 0]);
   mesh.scale.fromArray(data.scale || [1, 1, 1]);
@@ -1840,7 +1854,30 @@ btnMulti.onclick = function() {
 var propTex = document.getElementById('propTex');
 var propTexRep = document.getElementById('propTexRep');
 var propOpacity = document.getElementById('propOpacity');
+var propPhys = document.getElementById('propPhys');
+var propMass = document.getElementById('propMass');
+var propBounce = document.getElementById('propBounce');
 propTex.innerHTML = TEXTURES.map(function(t) { return '<option value="' + t.id + '">' + t.name + '</option>'; }).join('');
+
+function physEditable(obj) {
+  var t = obj && obj.userData.mapType;
+  return !!t && t !== 'model' && t !== 'spawn' && !obj.userData.isProp;
+}
+
+function shapeVolume(obj) {
+  var s = obj.scale;
+  var sx = Math.abs(s.x) || 1, sy = Math.abs(s.y) || 1, sz = Math.abs(s.z) || 1;
+  var t = obj.userData.mapType;
+  if (t === 'sphere') return Math.PI / 6 * sx * sy * sz;
+  if (t === 'cylinder' || t === 'hex') return Math.PI / 4 * sx * sz * sy;
+  if (t === 'cone') return Math.PI / 12 * sx * sz * sy;
+  if (t === 'ramp' || t === 'triangle') return sx * sy * sz / 2;
+  return sx * sy * sz;
+}
+
+function defaultMass(obj) {
+  return Math.max(0.2, Math.min(20000, shapeVolume(obj) * 300));
+}
 
 function surfaceEditable(obj) {
   var t = obj && obj.userData.mapType;
@@ -1874,6 +1911,17 @@ function refreshProps() {
     else { propTex.value = s0.userData.mapTex || ''; }
     propTexRep.value = s0.userData.mapTexRepeat || 1;
     propOpacity.value = s0.userData.mapOpacity === undefined ? 1 : s0.userData.mapOpacity;
+  }
+
+  var phys = selection.filter(physEditable);
+  for (var j = 0; j < [propPhys, propMass, propBounce].length; j++) {
+    [propPhys, propMass, propBounce][j].disabled = !phys.length;
+  }
+  if (phys.length) {
+    var p0 = phys[0];
+    propPhys.checked = !!p0.userData.mapPhysics;
+    propMass.value = p0.userData.mapMass || Math.round(defaultMass(p0) * 10) / 10;
+    propBounce.value = p0.userData.mapBounce === undefined ? 0.12 : p0.userData.mapBounce;
   }
 
   if (selection.length === 1) {
@@ -1975,6 +2023,39 @@ propOpacity.addEventListener('input', function() {
   }
 });
 propOpacity.addEventListener('change', pushHistory);
+
+propPhys.addEventListener('change', function() {
+  var on = propPhys.checked;
+  for (var i = 0; i < selection.length; i++) {
+    var o = selection[i];
+    if (!physEditable(o)) continue;
+    o.userData.mapPhysics = on;
+    if (on && !o.userData.mapMass) o.userData.mapMass = Math.round(defaultMass(o) * 10) / 10;
+  }
+  refreshProps();
+  pushHistory();
+  toast(on ? '选中物体已设为物理物体' : '选中物体改回固定');
+});
+
+propMass.addEventListener('change', function() {
+  var m = Math.max(0.2, Math.min(20000, +propMass.value || 1));
+  for (var i = 0; i < selection.length; i++) {
+    var o = selection[i];
+    if (!physEditable(o)) continue;
+    o.userData.mapMass = m;
+  }
+  pushHistory();
+});
+
+propBounce.addEventListener('input', function() {
+  var b = Math.max(0, Math.min(0.95, +propBounce.value));
+  for (var i = 0; i < selection.length; i++) {
+    var o = selection[i];
+    if (!physEditable(o)) continue;
+    o.userData.mapBounce = b;
+  }
+});
+propBounce.addEventListener('change', pushHistory);
 
 function rotateSelected(deg) {
   if (!selection.length) { toast('先选中一个物体'); return; }
@@ -2978,6 +3059,11 @@ function serializeObject(o) {
     rotation: roundArray([o.rotation.x, o.rotation.y, o.rotation.z]),
     scale: roundArray(o.scale.toArray())
   };
+  if (o.userData.mapPhysics) {
+    b.physics = 1;
+    b.mass = Math.max(0.2, Math.min(20000, +o.userData.mapMass || defaultMass(o)));
+    b.bounce = o.userData.mapBounce === undefined ? 0.12 : +o.userData.mapBounce;
+  }
   var tex = o.userData.mapTex || '';
   var opacity = o.userData.mapOpacity === undefined ? 1 : o.userData.mapOpacity;
   var custom = o.userData.mapCustom;
@@ -3022,7 +3108,7 @@ function serializeMap() {
   for (var i = 0; i < children.length; i++) {
     var child = children[i];
     if (child.userData.isProp) {
-      var q = new THREE.QUaternion().copy(child.quaternion);
+      var q = new THREE.Quaternion().copy(child.quaternion);
       props.push({ id: child.userData.propType, p: roundArray(child.position.toArray()), q: roundArray([q.x, q.y, q.z, q.w]) });
       propItems.push(child);
     } else if (child.userData.mapType !== 'spawn') {
@@ -3080,6 +3166,82 @@ function exportMap() {
 }
 
 document.getElementById('btnExportMap').onclick = exportMap;
+
+// ============================================================
+// 上传到游戏（生成分享码）
+// ============================================================
+var RDB_RELAY = 'https://relay.riftcrown.com';
+
+function showShareCode(code) {
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;' +
+    'justify-content:center;background:rgba(0,0,0,.72)';
+  wrap.innerHTML =
+    '<div style="background:#1b1d21;border:1px solid rgba(255,255,255,.18);padding:24px;' +
+    'max-width:min(420px,88vw);text-align:center;color:#eee;' +
+    'font:14px/1.6 system-ui,sans-serif">' +
+    '<div style="font-weight:700;font-size:16px;margin-bottom:14px">分享码</div>' +
+    '<div style="font:800 34px/1.2 ui-monospace,monospace;letter-spacing:10px;padding:16px 4px;' +
+    'background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);user-select:all">' +
+    code + '</div>' +
+    '<div style="opacity:.6;font-size:12px;margin-top:14px;text-align:left">' +
+    '在手机上打开游戏 → 选地图 → 添加地图，' +
+    '把这串码输进去就能下载。' +
+    '90 天没人用会自动清掉。</div>' +
+    '<div style="display:flex;gap:10px;margin-top:18px">' +
+    '<button id="scCopy" style="flex:1">复制</button>' +
+    '<button id="scOk" class="primary" style="flex:1">知道了</button></div></div>';
+  document.body.appendChild(wrap);
+  wrap.querySelector('#scCopy').onclick = function() {
+    var btn = wrap.querySelector('#scCopy');
+    var done = function() { btn.textContent = '已复制'; };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(done, done);
+    } else done();
+  };
+  wrap.querySelector('#scOk').onclick = function() { wrap.remove(); };
+  wrap.addEventListener('click', function(e) { if (e.target === wrap) wrap.remove(); });
+}
+
+async function uploadMapToGame() {
+  closeSheet();
+  var d = serializeMap();
+  var name = getCurrentSaveName();
+  var exportData = JSON.parse(JSON.stringify(d));
+  delete exportData.groups;
+  exportData.name = name;
+  var raw = new TextEncoder().encode(JSON.stringify(exportData));
+
+  var body = raw;
+  var enc = 'raw';
+  if (typeof CompressionStream === 'function') {
+    try {
+      var stream = new Blob([raw]).stream().pipeThrough(new CompressionStream('gzip'));
+      body = new Uint8Array(await new Response(stream).arrayBuffer());
+      enc = 'gzip';
+    } catch (_e) { body = raw; enc = 'raw'; }
+  }
+  if (body.length > 3 * 1024 * 1024) {
+    toast('地图太大（' + (body.length / 1048576).toFixed(1) + 'MB，上限 3MB）');
+    return;
+  }
+
+  toast('正在上传…');
+  try {
+    var r = await fetch(RDB_RELAY + '/map/put?enc=' + enc + '&n=' + encodeURIComponent(name.slice(0, 40)), {
+      method: 'POST',
+      headers: { 'content-type': 'application/octet-stream' },
+      body: body,
+    });
+    var res = await r.json();
+    if (res && res.ok && res.code) { showShareCode(res.code); return; }
+    toast((res && res.msg) || '上传失败（' + r.status + '）');
+  } catch (_e) {
+    toast('连不上服务器，检查网络');
+  }
+}
+
+document.getElementById('btnUploadMap').onclick = uploadMapToGame;
 
 // ============================================================
 // GLTF 导出
