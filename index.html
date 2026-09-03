@@ -347,7 +347,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 v3.5.0 · 组功能</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 v3.6.0 · 组功能</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnExportGltf">📤 导出 GLTF（含贴图 · ZIP）</button>
@@ -454,14 +454,10 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">v3.5.0</div>
+    <div class="version" id="updateVersion">v3.6.0</div>
     <div class="sub">RagdollBox 地图编辑器 · 组功能</div>
     <ul class="changelog" id="updateChangelog">
-      <li>组功能：选中多个物体可打包成组</li>
-      <li>组库：保存组到本地，跨地图复用</li>
-      <li>组穿透：点击组内物体两次可单独选中</li>
-      <li>组旋转：以组中心为轴整体旋转</li>
-      <li>组存档：组信息随地图保存</li>
+      <li>优化了穿透选中要体验，并且修复了穿透选中后就会自动解体的bug</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -514,7 +510,7 @@ import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // ==================== 版本号 ====================
-const APP_VERSION = '3.5.0';
+const APP_VERSION = '3.6.0';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
