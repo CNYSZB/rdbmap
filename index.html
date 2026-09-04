@@ -258,6 +258,84 @@
       color: var(--text); border-radius: 6px; padding: 4px 6px; font-size: 11px;
     }
     #propsBar input[type="range"] { width: 78px; }
+
+    /* 转移弹窗 */
+    .transfer-dialog {
+      background: var(--panel);
+      border: 1px solid var(--accent);
+      border-radius: 20px;
+      padding: 24px;
+      max-width: 440px;
+      width: 92%;
+      box-shadow: 0 12px 60px rgba(0,0,0,.6);
+    }
+    .transfer-dialog .title {
+      text-align: center;
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+    .transfer-dialog .sub {
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 18px;
+    }
+    .transfer-dialog .input-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .transfer-dialog .input-group input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      background: #121821;
+      color: var(--text);
+      border-radius: 8px;
+      font-size: 14px;
+      text-align: center;
+      letter-spacing: 4px;
+      font-family: ui-monospace, monospace;
+    }
+    .transfer-dialog .input-group input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .transfer-dialog .input-group button {
+      padding: 10px 16px;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+    .transfer-dialog .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+    .transfer-dialog .btn-row button {
+      flex: 1;
+      text-align: center;
+      padding: 11px;
+      border-radius: 10px;
+    }
+    .transfer-dialog .code-display {
+      font-family: ui-monospace, monospace;
+      font-size: 28px;
+      letter-spacing: 8px;
+      text-align: center;
+      padding: 16px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      margin-bottom: 14px;
+      user-select: all;
+      color: var(--accent);
+    }
+    .transfer-dialog .hint {
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+      margin-bottom: 12px;
+    }
   </style>
 </head>
 <body>
@@ -362,6 +440,7 @@
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
+  <button id="btnTransferMap" style="border-color:var(--accent);color:var(--accent);">📤 跨设备转移</button>
   <button id="btnExportGltf">📤 导出 GLTF（含贴图 · ZIP）</button>
   <button id="btnImportTutorial" style="border-color:var(--accent);color:var(--accent);">📖 导入游戏教程</button>
   <button id="btnImportGltf">📥 导入 GLTF / GLB</button>
@@ -450,6 +529,35 @@
   <button id="btnManualSave" class="accent">💾 立即存档</button>
 </div>
 
+<!-- ===== 跨设备转移弹窗 ===== -->
+<div id="transferOverlay" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);align-items:center;justify-content:center;">
+  <div class="transfer-dialog">
+    <div class="title">📤 跨设备转移</div>
+    <div class="sub">将地图上传到云端，在另一台设备上下载</div>
+    
+    <div id="transferUploadArea" style="margin-bottom:14px;">
+      <button id="transferUploadBtn" class="accent" style="width:100%;padding:14px;border-radius:10px;font-size:16px;font-weight:600;">📤 上传当前地图</button>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted);text-align:center;">地图数据会保存 90 天，大小上限 3MB</div>
+    </div>
+
+    <div id="transferDownloadArea">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px;">或输入分享码下载：</div>
+      <div class="input-group">
+        <input id="transferCodeInput" type="text" placeholder="XXXXXX" maxlength="6" />
+        <button id="transferDownloadBtn" class="accent">📥 下载</button>
+      </div>
+    </div>
+
+    <div id="transferResult" style="display:none;margin-top:14px;padding:14px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--line);">
+      <div id="transferResultContent"></div>
+    </div>
+
+    <div class="btn-row" style="margin-top:14px;">
+      <button id="transferCloseBtn" style="flex:1;">关闭</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== 导入游戏教程弹窗 ===== -->
 <div id="importTutorialOverlay">
   <div id="importTutorialBox">
@@ -472,6 +580,7 @@
       <li>正式增加物理支持和分享码功能（小金制作）</li>
       <li>现在支持手机客户端，APK包体仅有3.68M，上传至7723</li>
       <li>现在可以快捷调整全局UI大小</li>
+      <li>新增跨设备转移功能，支持多设备间同步地图</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -3177,7 +3286,7 @@ function exportMap() {
 document.getElementById('btnExportMap').onclick = exportMap;
 
 // ============================================================
-// 上传到游戏（生成分享码）
+// 上传到游戏（生成分享码） - 使用旧接口 relay.riftcrown.com
 // ============================================================
 var RDB_RELAY = 'https://relay.riftcrown.com';
 
@@ -3251,6 +3360,234 @@ async function uploadMapToGame() {
 }
 
 document.getElementById('btnUploadMap').onclick = uploadMapToGame;
+
+// ============================================================
+// ============ 跨设备转移（新接口 /put /get） ================
+// ============================================================
+var TRANSFER_BASE = 'https://rdpmapeditor.pages.dev';
+
+// 显示转移弹窗
+document.getElementById('btnTransferMap').onclick = function() {
+  closeSheet();
+  var overlay = document.getElementById('transferOverlay');
+  overlay.style.display = 'flex';
+  // 清空之前的状态
+  document.getElementById('transferCodeInput').value = '';
+  var result = document.getElementById('transferResult');
+  result.style.display = 'none';
+  result.querySelector('#transferResultContent').innerHTML = '';
+};
+
+// 关闭转移弹窗
+document.getElementById('transferCloseBtn').onclick = function() {
+  document.getElementById('transferOverlay').style.display = 'none';
+};
+document.getElementById('transferOverlay').onclick = function(e) {
+  if (e.target === e.currentTarget) {
+    document.getElementById('transferOverlay').style.display = 'none';
+  }
+};
+
+// 上传当前地图
+document.getElementById('transferUploadBtn').onclick = async function() {
+  var btn = this;
+  var result = document.getElementById('transferResult');
+  var content = document.getElementById('transferResultContent');
+  
+  btn.disabled = true;
+  btn.textContent = '⏳ 上传中...';
+  result.style.display = 'block';
+  content.innerHTML = '<div style="color:var(--muted);">⏳ 序列化地图数据...</div>';
+
+  try {
+    var mapData = serializeMap();
+    var exportData = JSON.parse(JSON.stringify(mapData));
+    // 移除 groups 字段以减少数据量（可选）
+    delete exportData.groups;
+    var jsonStr = JSON.stringify(exportData);
+    var raw = new TextEncoder().encode(jsonStr);
+
+    // 尝试 gzip 压缩
+    var body = raw;
+    var enc = 'raw';
+    if (typeof CompressionStream === 'function') {
+      try {
+        var stream = new Blob([raw]).stream().pipeThrough(new CompressionStream('gzip'));
+        body = new Uint8Array(await new Response(stream).arrayBuffer());
+        enc = 'gzip';
+      } catch (_e) { /* 降级到 raw */ }
+    }
+
+    var sizeMB = body.length / 1048576;
+    if (body.length > 3 * 1024 * 1024) {
+      content.innerHTML = '<div style="color:var(--danger);">❌ 地图太大（' + sizeMB.toFixed(1) + 'MB，上限 3MB）<br>请精简地图后再试</div>';
+      btn.disabled = false;
+      btn.textContent = '📤 上传当前地图';
+      return;
+    }
+
+    content.innerHTML = '<div style="color:var(--muted);">📤 上传到云端... (' + sizeMB.toFixed(1) + 'MB)</div>';
+
+    var response = await fetch(TRANSFER_BASE + '/put', {
+  method: 'POST',
+  headers: { 'content-type': 'application/octet-stream' },
+  mode: 'cors',
+  body: body
+});
+
+    var res = await response.json();
+    if (res.ok && res.code) {
+      content.innerHTML = 
+        '<div style="text-align:center;">' +
+        '<div style="font-size:13px;color:var(--accent);margin-bottom:6px;">✅ 上传成功！</div>' +
+        '<div style="font-family:ui-monospace,monospace;font-size:32px;letter-spacing:10px;padding:12px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:8px;user-select:all;color:var(--accent);">' + res.code + '</div>' +
+        '<div style="font-size:12px;color:var(--muted);margin-top:8px;">分享这个码给其他设备，即可下载你的地图</div>' +
+        '<button onclick="navigator.clipboard.writeText(\'' + res.code + '\')" style="margin-top:10px;padding:6px 16px;border-radius:6px;font-size:12px;background:var(--panel2);border:1px solid var(--line);color:var(--text);">📋 复制分享码</button>' +
+        '</div>';
+      toast('✅ 上传成功！分享码: ' + res.code);
+    } else {
+      content.innerHTML = '<div style="color:var(--danger);">❌ 上传失败：' + (res.msg || '未知错误') + '</div>';
+    }
+  } catch (err) {
+    console.error(err);
+    content.innerHTML = '<div style="color:var(--danger);">❌ 网络错误：' + err.message + '</div>';
+  }
+
+  btn.disabled = false;
+  btn.textContent = '📤 上传当前地图';
+};
+
+// 下载地图
+document.getElementById('transferDownloadBtn').onclick = async function() {
+  var input = document.getElementById('transferCodeInput');
+  var code = input.value.trim().toUpperCase();
+  var result = document.getElementById('transferResult');
+  var content = document.getElementById('transferResultContent');
+
+  if (!code || code.length < 4) {
+    result.style.display = 'block';
+    content.innerHTML = '<div style="color:var(--danger);">❌ 请输入有效的分享码（4-8位）</div>';
+    return;
+  }
+
+  var btn = this;
+  btn.disabled = true;
+  btn.textContent = '⏳ 下载中...';
+  result.style.display = 'block';
+  content.innerHTML = '<div style="color:var(--muted);">📥 正在下载地图...</div>';
+
+  try {
+    var response = await fetch(TRANSFER_BASE + '/get?code=' + encodeURIComponent(code), {
+  mode: 'cors'
+});
+    
+    if (!response.ok) {
+      var errText = await response.text();
+      try {
+        var errJson = JSON.parse(errText);
+        content.innerHTML = '<div style="color:var(--danger);">❌ 下载失败：' + (errJson.msg || '未知错误') + '</div>';
+      } catch (_e) {
+        content.innerHTML = '<div style="color:var(--danger);">❌ 下载失败：' + response.status + ' ' + response.statusText + '</div>';
+      }
+      btn.disabled = false;
+      btn.textContent = '📥 下载';
+      return;
+    }
+
+    // 获取原始数据（可能是 gzip 压缩的）
+    var arrayBuffer = await response.arrayBuffer();
+    var data = new Uint8Array(arrayBuffer);
+    
+    // 尝试解压 gzip
+    var jsonStr = null;
+    if (data.length > 2 && data[0] === 0x1f && data[1] === 0x8b) {
+      // gzip 压缩
+      try {
+        var blob = new Blob([data]);
+        var decompressed = await new Response(blob.stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+        jsonStr = new TextDecoder().decode(decompressed);
+      } catch (_e) {
+        // 如果解压失败，尝试直接当作文本
+        jsonStr = new TextDecoder().decode(data);
+      }
+    } else {
+      jsonStr = new TextDecoder().decode(data);
+    }
+
+    // 解析 JSON
+    var mapData;
+    try {
+      mapData = JSON.parse(jsonStr);
+    } catch (_e) {
+      // 尝试修复：可能是纯文本错误消息
+      if (jsonStr.startsWith('{')) {
+        throw new Error('JSON 解析失败: ' + jsonStr.slice(0, 100));
+      }
+      throw new Error('无效的地图数据格式');
+    }
+
+    // 检查是否是错误响应
+    if (mapData.ok === false) {
+      content.innerHTML = '<div style="color:var(--danger);">❌ 下载失败：' + (mapData.msg || '未知错误') + '</div>';
+      btn.disabled = false;
+      btn.textContent = '📥 下载';
+      return;
+    }
+
+    // 加载地图
+    if (objectsRoot.children.length > 0) {
+      if (!confirm('⚠️ 这将清空当前舞台所有物体，确定要加载新地图吗？')) {
+        content.innerHTML = '<div style="color:var(--muted);">已取消加载</div>';
+        btn.disabled = false;
+        btn.textContent = '📥 下载';
+        return;
+      }
+    }
+
+    // 确保 mapData 有必要的字段    
+    if (!mapData.format) {
+      // 如果下载的数据缺少 format 字段，尝试包装
+      mapData = {
+        format: 'RagdollBoxMap',
+        version: 3,
+        name: mapData.name || '已转移地图',
+        objects: mapData.objects || [],
+        props: mapData.props || [],
+        spawns: mapData.spawns || mapData.spawn || [[0, 0.87, 9]],
+        groups: mapData.groups || []
+      };
+    }
+
+    clearObjects();
+    loadMapData(mapData, false);
+    currentSaveId = null; // 不关联到本地存档
+    content.innerHTML = '<div style="color:var(--accent);">✅ 地图加载成功！<br><span style="font-size:12px;color:var(--muted);">物体数：' + 
+      (mapData.objects ? mapData.objects.length : 0) + 
+      (mapData.props ? ' + ' + mapData.props.length + ' 个道具' : '') +
+      '</span></div>';
+    toast('✅ 地图已从云端加载');
+    pushHistory(true);
+
+  } catch (err) {
+    console.error(err);
+    content.innerHTML = '<div style="color:var(--danger);">❌ 加载失败：' + err.message + '</div>';
+  }
+
+  btn.disabled = false;
+  btn.textContent = '📥 下载';
+};
+
+// 回车键触发下载
+document.getElementById('transferCodeInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    document.getElementById('transferDownloadBtn').click();
+  }
+});
+
+// 自动大写输入
+document.getElementById('transferCodeInput').addEventListener('input', function() {
+  this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+});
 
 // ============================================================
 // GLTF 导出
