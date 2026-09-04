@@ -436,7 +436,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 3.7.0</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 3.7.5</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
@@ -484,8 +484,8 @@
   <div class="handle"></div>
   <div class="title">制作人员</div>
   <div style="text-align:center;color:var(--muted);font-size:13px;line-height:2.1;padding:4px 0 10px;">
-    <div>原版制作人员：<b style="color:var(--text)">Jindinghe</b></div>
-    <div>重制版 + 组功能：<b style="color:var(--text)">走位很呆 · Claude Sonnet 5</b></div>
+    <div>原版制作人员和重置版部分功能作者：<b style="color:var(--text)">Jindinghe使用cloude</b></div>
+    <div>重制版：<b style="color:var(--text)">走位很呆使用Claude Sonnet 5和deepseek</b></div>
     <div>Bug反馈邮箱：<b style="color:var(--text)">dchatstudio@outlook.com</b></div>
   </div>
 </div>
@@ -537,7 +537,7 @@
     
     <div id="transferUploadArea" style="margin-bottom:14px;">
       <button id="transferUploadBtn" class="accent" style="width:100%;padding:14px;border-radius:10px;font-size:16px;font-weight:600;">📤 上传当前地图</button>
-      <div style="margin-top:10px;font-size:12px;color:var(--muted);text-align:center;">地图数据会保存 90 天，大小上限 3MB</div>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted);text-align:center;">地图数据会保存 30天，大小上限 3MB 码一次性</div>
     </div>
 
     <div id="transferDownloadArea">
@@ -574,13 +574,10 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">3.7.0</div>
+    <div class="version" id="updateVersion">3.7.5</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li>正式增加物理支持和分享码功能（小金制作）</li>
-      <li>现在支持手机客户端，APK包体仅有3.68M，上传至7723</li>
-      <li>现在可以快捷调整全局UI大小</li>
-      <li>新增跨设备转移功能，支持多设备间同步地图</li>
+      <li>增加与分享地图功能独立的转移存档功能，可以更方便地转移存档，复制按钮只需要点一次，别重复点，不然会复制很多个码，转移存档的码为一次性，30天未使用报废</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -633,7 +630,7 @@ import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // ==================== 版本号 ====================
-const APP_VERSION = '3.7.0';
+const APP_VERSION = '3.7.5';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
@@ -3305,7 +3302,7 @@ function showShareCode(code) {
     '<div style="opacity:.6;font-size:12px;margin-top:14px;text-align:left">' +
     '在手机上打开游戏 → 选地图 → 添加地图，' +
     '把这串码输进去就能下载。' +
-    '90 天没人用会自动清掉。</div>' +
+    '90天没人用会自动清掉，分享码为一次性，用过了就没了</div>' +
     '<div style="display:flex;gap:10px;margin-top:18px">' +
     '<button id="scCopy" style="flex:1">复制</button>' +
     '<button id="scOk" class="primary" style="flex:1">知道了</button></div></div>';
