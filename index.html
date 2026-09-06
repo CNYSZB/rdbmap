@@ -789,11 +789,12 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 4.0.0</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 4.1.0</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
   <button id="btnTransferMap" style="border-color:var(--accent);color:var(--accent);">📤 跨设备转移</button>
+  <button id="btnFeaturedMaps" style="border-color:var(--accent);color:var(--accent);">⭐ 精选地图</button>
   <button id="btnExportGltf">📤 导出 GLTF（含贴图 · ZIP）</button>
   <button id="btnImportTutorial" style="border-color:var(--accent);color:var(--accent);">📖 导入游戏教程</button>
   <button id="btnImportGltf">📥 导入 GLTF / GLB</button>
@@ -890,7 +891,7 @@
     
     <div id="transferUploadArea" style="margin-bottom:14px;">
       <button id="transferUploadBtn" class="accent" style="width:100%;padding:14px;border-radius:10px;font-size:16px;font-weight:600;">📤 上传当前地图</button>
-      <div style="margin-top:10px;font-size:12px;color:var(--muted);text-align:center;">地图数据会保存 30天，大小上限 3MB 码一次性</div>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted);text-align:center;">地图数据会保存 30天，大小上限 3MB</div>
     </div>
 
     <div id="transferDownloadArea">
@@ -927,21 +928,10 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">4.0.0</div>
+    <div class="version" id="updateVersion">4.1.0</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li>新增「项目设置」：环境光、太阳、雾、曝光、天空盒（渐变 / 纯色 / 自定义全景图）</li>
-      <li>水体换成游戏里那一套着色器，带反射和焦散，形状 / 深度 / 水色都能调</li>
-      <li>新增可放置光源：点光源和聚光灯，颜色、亮度、范围、张角都能调</li>
-      <li>新增地图下限，低于这个高度就是虚空</li>
-      <li>物体新增「碰撞」开关，关掉就只剩外观</li>
-      <li>新增项目资源：贴图 / 声音 / 模型都能导入，直接套用</li>
-      <li>物体可以挂声音：拳头、近战、钝器、枪击、碰撞、走路、循环播放</li>
-      <li>右边新增层级结构面板，可以搜索、折叠、点名字选中</li>
-      <li>游戏里所有道具和枪械都能放了，放置面板全部改成缩略图方块</li>
-      <li>新增项目文件夹导出 / 导入（.zip，带上所有资源）</li>
-      <li>新增地图预览图，游戏里选地图时会显示</li>
-      <li>本次更新由小金使用cloude制作</li>
+      <li>增加了精选地图</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -994,7 +984,7 @@ import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // ==================== 版本号 ====================
-const APP_VERSION = '4.0.0';
+const APP_VERSION = '4.1.0';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
@@ -3819,7 +3809,7 @@ function showShareCode(code) {
     '<div style="opacity:.6;font-size:12px;margin-top:14px;text-align:left">' +
     '在手机上打开游戏 → 选地图 → 添加地图，' +
     '把这串码输进去就能下载。' +
-    '90天没人用会自动清掉，分享码为一次性，用过了就没了</div>' +
+    '90天没人用会自动清掉</div>' +
     '<div style="display:flex;gap:10px;margin-top:18px">' +
     '<button id="scCopy" style="flex:1">复制</button>' +
     '<button id="scOk" class="primary" style="flex:1">知道了</button></div></div>';
@@ -7159,6 +7149,48 @@ window.RDPMAP = {
 
 console.log('🎮 RagdollBox 地图编辑器 v' + APP_VERSION + ' · 组功能已加载！');
 console.log('📦 组操作: 选中多个物体 → 建组 | 点击组内物体穿透选中 | 组旋转以组中心为轴');
+
+// ============================================================
+// 精选地图 - 弹窗加载 maps.html
+// ============================================================
+document.getElementById('btnFeaturedMaps').onclick = function() {
+  closeSheet();
+  showFeaturedMapsModal();
+};
+
+function showFeaturedMapsModal() {
+  // 如果已存在则移除旧的
+  var old = document.getElementById('featuredMapsModal');
+  if (old) old.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'featuredMapsModal';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;';
+
+  var box = document.createElement('div');
+  box.style.cssText = 'background:var(--panel);border-radius:20px;border:1px solid var(--accent);box-shadow:0 12px 60px rgba(0,0,0,.6);max-width:560px;width:94%;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;';
+
+  var header = document.createElement('div');
+  header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:16px 20px 12px;border-bottom:1px solid var(--line);flex-shrink:0;';
+  header.innerHTML = '<span style="font-size:18px;font-weight:700;">⭐ 精选地图</span><button id="fmClose" style="background:transparent;border:1px solid var(--line);border-radius:50%;width:36px;height:36px;color:var(--muted);font-size:18px;cursor:pointer;">✕</button>';
+
+  var iframe = document.createElement('iframe');
+  iframe.src = 'maps.html';
+  iframe.style.cssText = 'width:100%;flex:1;border:none;background:#11151b;min-height:400px;';
+
+  box.appendChild(header);
+  box.appendChild(iframe);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  document.getElementById('fmClose').onclick = function() {
+    overlay.remove();
+  };
+
+  overlay.onclick = function(e) {
+    if (e.target === overlay) overlay.remove();
+  };
+}
 
 // ============================================================
 // 全局UI缩放（数字输入框）
