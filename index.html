@@ -18,6 +18,8 @@
       --danger: #ff6f78;
       --group-color: #b47aff;
       --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --hier-w: clamp(170px, 21vw, 230px);
+      --hier-max-h: 400vh;
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
     html, body {
@@ -87,7 +89,7 @@
     #topbar button.accent:active { background: #4d92e8 !important; }
 
     #propsBar {
-      display: none; position: absolute; top: 55px; left: 3%; right: 3%; z-index: 50;
+      display: none; position: absolute; top: 55px; right: calc(var(--hier-w) + 18px); left: 3%; z-index: 50;
       padding: 8px 10px; border-radius: 12px;
       background: rgba(22,28,36,.92); backdrop-filter: blur(8px);
       border: 1px solid var(--line); gap: 6px; flex-wrap: wrap; align-items: center;
@@ -336,6 +338,358 @@
       text-align: center;
       margin-bottom: 12px;
     }
+
+    /* ===== 层级结构面板 - 右侧 ===== */
+    body.touch {
+      --hier-w: clamp(150px, 36vw, 200px);
+      --hier-max-h: 150vh;
+    }
+
+    #hierPanel {
+  position: absolute;
+  right: 8px;
+  top: 96px;
+  z-index: 46;
+  width: var(--hier-w);
+  max-height: var(--hier-max-h);
+  background: rgba(22, 28, 36, .92);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 0.2s, max-height 0.2s;
+  height: auto;
+  min-height: 44px;
+}
+
+    #hierPanel.collapsed {
+      width: 44px;
+      max-height: 44px;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    #hierPanel.collapsed .hierBody {
+      display: none;
+    }
+    #hierPanel.collapsed .hierHead .hierTitle {
+      display: none;
+    }
+    #hierPanel.collapsed .hierHead {
+      justify-content: center;
+      padding: 8px 6px;
+    }
+
+    #hierPanel .hierHead {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--line);
+      flex-shrink: 0;
+      min-height: 36px;
+    }
+    #hierPanel .hierTitle {
+      flex: 1;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    #hierPanel .hierHead button {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border-radius: 6px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    #hierPanel .hierHead button:hover {
+      background: rgba(255,255,255,.08);
+    }
+
+    #hierPanel .hierBody {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 6px 8px 8px;
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+
+    #hierSearch {
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 11px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #121821;
+  color: var(--text);
+  flex-shrink: 0;
+}
+    #hierSearch::placeholder {
+      color: var(--muted);
+      opacity: 0.6;
+    }
+
+    #hierList {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 0;
+  min-height: 0;
+  height: auto;
+  max-height: none;
+  flex: 0 1 auto;
+}
+    #hierList::-webkit-scrollbar {
+      width: 4px;
+    }
+    #hierList::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    #hierList::-webkit-scrollbar-thumb {
+      background: var(--line);
+      border-radius: 4px;
+    }
+
+    .hierRow {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 6px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 11px;
+      background: rgba(255,255,255,.02);
+      transition: background 0.12s;
+      min-height: 26px;
+    }
+    .hierRow:hover {
+      background: rgba(101, 169, 255, .1);
+    }
+    .hierRow.on {
+      background: rgba(255, 154, 60, .18);
+      box-shadow: 0 0 0 1px #ff9a3c inset;
+    }
+    .hierRow .hi {
+      font-size: 12px;
+      flex-shrink: 0;
+      width: 18px;
+      text-align: center;
+    }
+    .hierRow .hn {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 11px;
+    }
+    .hierRow .hg {
+      font-size: 9px;
+      color: var(--group-color);
+      flex-shrink: 0;
+      opacity: 0.7;
+      background: rgba(180,122,255,.12);
+      padding: 0 6px;
+      border-radius: 8px;
+      max-width: 60px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .hierRow.group-parent {
+      background: rgba(180,122,255,.06);
+      border-left: 2px solid var(--group-color);
+      font-weight: 500;
+    }
+    .hierRow.group-parent .hn {
+      color: var(--group-color);
+    }
+    .hierRow.group-parent .toggle-icon {
+      font-size: 10px;
+      color: var(--muted);
+      flex-shrink: 0;
+      width: 16px;
+      text-align: center;
+      transition: transform 0.15s;
+    }
+    .hierRow.group-parent.expanded .toggle-icon {
+      transform: rotate(0deg);
+    }
+    .hierRow.group-parent:not(.expanded) .toggle-icon {
+      transform: rotate(-90deg);
+    }
+
+    .hierRow.group-child {
+      padding-left: 24px;
+      background: rgba(255,255,255,.015);
+    }
+    .hierRow.group-child .hi {
+      font-size: 10px;
+      opacity: 0.7;
+    }
+    .hierRow.group-child .hn {
+      font-weight: 400;
+      color: var(--text);
+      opacity: 0.85;
+    }
+
+    .hierEmpty {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      padding: 16px 4px;
+    }
+    .hierFoot {
+  font-size: 10px;
+  color: var(--muted);
+  text-align: right;
+  padding: 4px 2px 0;
+  flex-shrink: 0;
+  border-top: 1px solid rgba(255,255,255,.04);
+}
+
+    body.preview #hierPanel,
+    body.locked #hierPanel {
+      display: none !important;
+    }
+
+    body.touch #hierPanel {
+      top: 84px;
+      --hier-w: clamp(140px, 40vw, 190px);
+      --hier-max-h: 38vh;
+    }
+    body.touch #hierPanel.collapsed {
+      width: 40px;
+      max-height: 40px;
+    }
+    body.touch .hierRow {
+      padding: 5px 6px;
+      min-height: 30px;
+      font-size: 12px;
+    }
+    body.touch .hierRow.group-child {
+      padding-left: 28px;
+    }
+
+    body.touch #propsBar {
+      right: calc(var(--hier-w) + 12px) !important;
+    }
+    #hierPanel.collapsed ~ #propsBar,
+    #hierPanel.collapsed + #propsBar {
+      right: 66px !important;
+    }
+
+    /* ===== 方块缩略图按钮 ===== */
+    .tileGrid {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px;
+    }
+    .tileGrid .tile {
+      width: 76px; height: 76px; padding: 4px; margin: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 2px; border-radius: 10px; text-align: center; overflow: hidden;
+    }
+    .tileGrid .tile img {
+      width: 44px; height: 44px; object-fit: contain; pointer-events: none;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .5));
+    }
+    .tileGrid .tile span {
+      font-size: 9.5px; line-height: 1.15; color: var(--muted);
+      max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .tileGrid .tile:active span { color: var(--text); }
+    .placeSec {
+      font-size: 11px; color: var(--accent); margin: 10px 0 6px;
+      letter-spacing: 1.5px; border-top: 1px solid var(--line); padding-top: 8px;
+    }
+    .placeSec:first-of-type { border-top: none; padding-top: 0; margin-top: 4px; }
+
+    .sheetTop { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .sheetTop button { width: auto !important; margin: 0 !important; }
+    #panelGameProps input[type="text"], #panelSound input[type="text"] {
+      width: 100%; padding: 9px 10px; margin-bottom: 10px; font-size: 13px;
+      border: 1px solid var(--line); background: #121821; color: var(--text); border-radius: 8px;
+    }
+    #panelGameProps .row button { flex: 1; }
+
+    /* ===== 资源列表 ===== */
+    .assetRow {
+      display: flex; align-items: center; gap: 10px; padding: 9px;
+      background: var(--panel2); border: 1px solid var(--line);
+      border-radius: 10px; margin-bottom: 6px;
+    }
+    .assetRow .apv {
+      width: 38px; height: 38px; flex-shrink: 0; border-radius: 7px;
+      background: rgba(255, 255, 255, .05); background-size: cover; background-position: center;
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+    }
+    .assetRow .ainfo { flex: 1; min-width: 0; }
+    .assetRow .an { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .assetRow .am { font-size: 10px; color: var(--muted); }
+    .assetRow .aacts { display: flex; gap: 5px; flex-shrink: 0; }
+    .assetRow .aacts button { margin: 0 !important; }
+
+    /* ===== 声音行 ===== */
+    .sndRow {
+      background: var(--panel2); border: 1px solid var(--line);
+      border-radius: 10px; padding: 9px; margin-bottom: 6px;
+    }
+    .sndRow .sr1 { display: flex; gap: 6px; margin-bottom: 6px; }
+    .sndRow .sr1 select { flex: 1; min-width: 0; }
+    .sndRow .sr1 button { width: auto !important; margin: 0 !important; flex-shrink: 0; }
+    .sndRow .sr2 { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+    .sndRow .sr2 label { font-size: 10px; color: var(--muted); }
+    .sndRow .sr2 input { width: 56px; }
+    .sndRow .sr2 button { width: auto !important; margin: 0 !important; }
+    .sndRow select, .sndRow input {
+      border: 1px solid var(--line); background: #121821; color: var(--text);
+      border-radius: 6px; padding: 5px 6px; font-size: 11px;
+    }
+
+    /* ===== 项目设置 ===== */
+    #panelProject { max-height: 78dvh; }
+    .envSec {
+      font-size: 11px; color: var(--accent); letter-spacing: 1.5px;
+      margin: 14px 0 8px; border-top: 1px solid var(--line); padding-top: 10px;
+    }
+    .envSec:first-of-type { border-top: none; padding-top: 0; margin-top: 2px; }
+    .envRow {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 7px; flex-wrap: wrap;
+    }
+    .envRow label { flex: 1; min-width: 110px; font-size: 12px; color: var(--muted); }
+    .envRow input[type="color"] { width: 34px; height: 26px; padding: 2px; border-radius: 6px; border: 1px solid var(--line); background: #121821; }
+    .envRow input[type="number"] { width: 74px; }
+    .envRow input[type="number"], .envRow select {
+      border: 1px solid var(--line); background: #121821; color: var(--text);
+      border-radius: 6px; padding: 5px 7px; font-size: 12px;
+    }
+    .envRow select { max-width: 170px; }
+    .thumbBox { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; }
+    .thumbPv {
+      width: 128px; height: 80px; flex-shrink: 0; border-radius: 8px;
+      border: 1px solid var(--line); background: #121821 center/cover no-repeat;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; color: var(--muted);
+    }
+    .thumbActs { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+    .thumbActs button { width: 100% !important; margin: 0 !important; text-align: center; }
+
+    #propsBar #collideWrap { display: inline-flex; align-items: center; gap: 4px; }
+    #propsBar optgroup { color: var(--muted); }
   </style>
 </head>
 <body>
@@ -347,7 +701,7 @@
   </main>
 
   <div id="topbar">
-    <span class="title">RagdollBox 地图编辑器 · 组功能</span>
+    <span class="title"><img src="icon.png" style="height:20px;width:20px;vertical-align:middle;margin-right:8px;border-radius:4px;" />RagdollBox 地图编辑器</span>
     <button id="btnFullscreen" title="全屏">⛶</button>
     <button id="btnSaveQuick" class="accent">💾&nbsp;保存</button>
     <button id="btnToggleLocal" class="accent" style="width:auto !important;height:clamp(34px,7vw,40px) !important;padding:0 clamp(12px,4vw,18px) !important;border-radius:20px !important;gap:4px;background:var(--accent) !important;border-color:var(--accent) !important;color:#fff !important;font-size:clamp(12px,3vw,14px) !important;font-weight:600;">🔄 局部</button>
@@ -371,7 +725,6 @@
     <button id="btnFocus">🎯 聚焦</button>
     <button id="btnDuplicate">📋复制</button>
     <button id="btnDelete" class="danger">🗑删除</button>
-    <!-- 组信息（选中组时显示） -->
     <div id="groupInfo" style="display:none;width:100%;border-top:1px solid var(--line);padding-top:6px;margin-top:4px;gap:6px;flex-wrap:wrap;align-items:center;">
       <span class="group-badge">📦 组</span>
       <span class="group-member-count" id="groupMemberCount">成员: 0</span>
@@ -436,7 +789,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 3.7.5</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 4.0.0</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
@@ -574,10 +927,21 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">3.7.5</div>
+    <div class="version" id="updateVersion">4.0.0</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li>增加与分享地图功能独立的转移存档功能，可以更方便地转移存档，复制按钮只需要点一次，别重复点，不然会复制很多个码，转移存档的码为一次性，30天未使用报废</li>
+      <li>新增「项目设置」：环境光、太阳、雾、曝光、天空盒（渐变 / 纯色 / 自定义全景图）</li>
+      <li>水体换成游戏里那一套着色器，带反射和焦散，形状 / 深度 / 水色都能调</li>
+      <li>新增可放置光源：点光源和聚光灯，颜色、亮度、范围、张角都能调</li>
+      <li>新增地图下限，低于这个高度就是虚空</li>
+      <li>物体新增「碰撞」开关，关掉就只剩外观</li>
+      <li>新增项目资源：贴图 / 声音 / 模型都能导入，直接套用</li>
+      <li>物体可以挂声音：拳头、近战、钝器、枪击、碰撞、走路、循环播放</li>
+      <li>右边新增层级结构面板，可以搜索、折叠、点名字选中</li>
+      <li>游戏里所有道具和枪械都能放了，放置面板全部改成缩略图方块</li>
+      <li>新增项目文件夹导出 / 导入（.zip，带上所有资源）</li>
+      <li>新增地图预览图，游戏里选地图时会显示</li>
+      <li>本次更新由小金使用cloude制作</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -630,7 +994,7 @@ import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // ==================== 版本号 ====================
-const APP_VERSION = '3.7.5';
+const APP_VERSION = '4.0.0';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
@@ -746,7 +1110,8 @@ var camera = new THREE.PerspectiveCamera(65, 1, 0.05, 500);
 camera.position.set(8, 7, 12);
 var yaw = -0.58, pitch = -0.28;
 
-scene.add(new THREE.HemisphereLight(0xdceaff, 0x55564f, 1.15));
+var hemi = new THREE.HemisphereLight(0xdceaff, 0x55564f, 1.15);
+scene.add(hemi);
 var sun = new THREE.DirectionalLight(0xfff3df, 2.1);
 sun.position.set(20, 35, 16);
 sun.castShadow = true;
@@ -820,7 +1185,11 @@ var shiftHeld = false;
 var primitiveNames = {
   box: '方块', sphere: '球体', cylinder: '圆柱体', cone: '圆锥',
   hex: '六边形体', ramp: '斜坡', triangle: '三角体', model: '导入模型',
-  spawn: '出生点'
+  spawn: '出生点', water: '水体', light: '光源', gun: '枪械'
+};
+
+var KIND_ICON = {
+  object: '🟫', prop: '🎮', gun: '🔫', water: '💧', light: '💡', spawn: '🚩'
 };
 
 // ============================================================
@@ -947,26 +1316,18 @@ class GroupManager {
     this._groupMap.clear();
   }
 
-  // 序列化组（用于存档和组库）
-  // 注意：成员用 {type, index} 引用 objects[]/props[] 数组下标，
-  // 而不是 obj.uuid —— uuid 是运行时随机生成的，读档重建物体后会变，
-  // 用 uuid 匹配会导致组在读档后失联（表现为"自动解组"）。
-  // 数组下标在同一份存档的写入/读取之间是稳定的，可以安全对应。
-  serializeGroups(allObjectsInOrder, allPropsInOrder) {
+  serializeGroups(lists) {
     var result = [];
     for (var i = 0; i < this.groups.length; i++) {
       var g = this.groups[i];
       var memberRefs = [];
       for (var j = 0; j < g.members.length; j++) {
         var obj = g.members[j];
-        var isProp = !!obj.userData.isProp;
-        var list = isProp ? allPropsInOrder : allObjectsInOrder;
+        var kind = objKindOf(obj);
+        var list = lists[kind] || lists.object;
         var idx = list.indexOf(obj);
-        if (idx === -1) continue; // 理论上不应发生，安全跳过
-        memberRefs.push({
-          type: isProp ? 'prop' : 'object',
-          index: idx
-        });
+        if (idx === -1) continue;
+        memberRefs.push({ type: kind, index: idx });
       }
       if (memberRefs.length >= 2) {
         result.push({
@@ -979,17 +1340,14 @@ class GroupManager {
     return result;
   }
 
-  // 从序列化数据恢复组
-  // allObjects/allProps 必须与写档时 serializeGroups 用的顺序完全一致
-  // （即 loadMapData 按 objects[]/props[] 数组顺序 restoreObject 出来的结果）
-  deserializeGroups(data, allObjects, allProps) {
+  deserializeGroups(data, lists) {
     this.clear();
     for (var i = 0; i < data.length; i++) {
       var gData = data[i];
       var members = [];
       for (var j = 0; j < gData.members.length; j++) {
         var m = gData.members[j];
-        var list = m.type === 'prop' ? allProps : allObjects;
+        var list = lists[m.type] || lists.object;
         var item = list && list[m.index];
         if (item) members.push(item);
       }
@@ -1053,57 +1411,30 @@ var groupLibrary = new GroupLibrary();
 // ================================================================
 // === 道具配置表 ================================================
 // ================================================================
-var PROP_DEFS = {
-  crate: {
-    name: '板条箱',
-    label: '板条箱',
-    color: '#c5a56b',
-    shape: 'box',
-    size: [1, 1, 1]
-  },
-  barrel: {
-    name: '油桶',
-    label: '油桶',
-    color: '#888888',
-    shape: 'cylinder',
-    size: [0.4, 1.1]
-  },
-  explbarrel: {
-    name: '爆炸油桶',
-    label: '爆炸油桶',
-    color: '#cc2222',
-    shape: 'cylinder',
-    size: [0.4, 1.1]
-  },
-  oil: {
-    name: '石油油桶',
-    label: '石油油桶',
-    color: '#4a3a2a',
-    shape: 'cylinder',
-    size: [0.4, 1.1]
-  },
-  smallmed: {
-    name: '小医疗包',
-    label: '小医疗包',
-    color: '#ff4466',
-    shape: 'box',
-    size: [0.4, 0.2, 0.5]
-  },
-  medmed: {
-    name: '医疗包',
-    label: '医疗包',
-    color: '#ff2244',
-    shape: 'box',
-    size: [0.8, 0.2, 1]
-  },
-  water: {
-  name: '水体',
-  label: '水',
-  color: '#3a8fc9',
-  shape: 'box',
-  size: [10, 0.2, 10]
-  }
+var GAME_ITEMS = [{"id":"spawnpoint","n":"重生点","s":"box","d":[2.08,0.13,2.08],"c":"#2fd06a"},{"id":"board","n":"公告牌","s":"box","d":[1.9,1.15,0.1],"c":"#4a3a28"},{"id":"button","n":"按钮","s":"box","d":[0.165,0.32,0.052],"c":"#555555"},{"id":"oil","n":"油桶","s":"cyl","d":[1.05,0.48],"c":"#59636a"},{"id":"phone","n":"手机","s":"box","d":[0.096,0.16,0.018],"c":"#202020"},{"id":"clock","n":"时钟","s":"box","d":[0.428,0.45,0.053],"c":"#d7d7d7"},{"id":"tv","n":"电视","s":"box","d":[1.2,0.654,0.072],"c":"#252525"},{"id":"crate","n":"木箱","s":"box","d":[1.0,1.0,1.0],"c":"#8a5f34"},{"id":"barrel","n":"铁桶","s":"cyl","d":[1.05,0.38],"c":"#4e6470"},{"id":"explbarrel","n":"爆炸油桶","s":"cyl","d":[1.05,0.38],"c":"#b23023"},{"id":"saw","n":"旋转锯","s":"cyl","d":[0.06,0.52],"c":"#cfd3d8"},{"id":"radio","n":"收音机","s":"box","d":[0.365,0.435,0.143],"c":"#2b2b2b"},{"id":"camera","n":"摄像机","s":"box","d":[0.285,1.58,0.294],"c":"#2a2d33"},{"id":"bandage","n":"绷带","s":"box","d":[0.23,0.21,0.14],"c":"#ac9f86"},{"id":"smallmed","n":"小型医疗箱","s":"box","d":[0.43,0.25,0.66],"c":"#d8dde2"},{"id":"medmed","n":"中型医疗箱","s":"box","d":[0.882,0.227,1.0],"c":"#c4cdd4"},{"id":"cash","n":"现金","s":"box","d":[0.5,0.5,0.5],"c":"#8d9299"},{"id":"ammolight","n":"轻型弹药箱","s":"box","d":[0.52,0.3,0.3],"c":"#6d7a4a"},{"id":"ammoheavy","n":"重型弹药箱","s":"box","d":[0.62,0.34,0.34],"c":"#4f5a38"},{"id":"ammosniper","n":"狙击弹药箱","s":"box","d":[0.46,0.24,0.26],"c":"#3d4550"},{"id":"ammogrenade","n":"榴弹弹药箱","s":"box","d":[0.58,0.36,0.4],"c":"#6b5a2c"},{"id":"plank","n":"长木板","s":"box","d":[2.4,0.12,0.5],"c":"#8a5f34"},{"id":"lamp","n":"台灯","s":"box","d":[0.53,1.913,0.53],"c":"#54595f"},{"id":"table","n":"桌子","s":"box","d":[1.4,0.86,0.9],"c":"#6b4a28"},{"id":"bed","n":"床","s":"box","d":[1.09,0.59,2.31],"c":"#7a5230"},{"id":"midarmor","n":"防弹衣","s":"box","d":[0.62,0.4,0.38],"c":"#3d4436"},{"id":"vestarmor","n":"战术防弹衣","s":"box","d":[0.46,0.46,0.3],"c":"#35392f"},{"id":"headarmor_1","n":"战术头盔","s":"box","d":[0.36,0.32,0.35],"c":"#4b5144"},{"id":"headarmor_2","n":"重型头盔","s":"box","d":[0.38,0.35,0.38],"c":"#3f4540"},{"id":"lightarmor","n":"轻型防弹衣","s":"box","d":[0.435,0.448,0.311],"c":"#4a4f42"},{"id":"heavyarmor","n":"重型防弹衣","s":"box","d":[0.501,0.79,0.327],"c":"#2f342c"},{"id":"headarmor_nv","n":"头戴式双眼夜视仪","s":"box","d":[0.291,0.187,0.47],"c":"#3b4038"},{"id":"headarmor_steel","n":"旧式钢盔","s":"box","d":[0.385,0.252,0.393],"c":"#6a6f66"},{"id":"headarmor_riot","n":"武警头盔","s":"box","d":[0.382,0.329,0.358],"c":"#6a6f66"},{"id":"headarmor_riot_visor","n":"武警头盔(带面罩)","s":"box","d":[0.379,0.329,0.383],"c":"#6a6f66"},{"id":"shipin_cap","n":"鸭舌帽","s":"box","d":[0.508,0.127,0.326],"c":"#6a6f66"},{"id":"shipin_cap2","n":"鸭舌帽2","s":"box","d":[0.508,0.127,0.326],"c":"#6a6f66"},{"id":"shipin_cowboy","n":"牛仔帽","s":"box","d":[0.613,0.14,0.613],"c":"#6a6f66"},{"id":"shipin_safety","n":"安全帽","s":"box","d":[0.44,0.343,0.348],"c":"#6a6f66"},{"id":"shipin_mask_dark","n":"艾路迪克口罩","s":"box","d":[0.219,0.178,0.298],"c":"#6a6f66"},{"id":"shipin_mask","n":"口罩","s":"box","d":[0.218,0.178,0.298],"c":"#6a6f66"},{"id":"shipin_straw","n":"草帽","s":"box","d":[0.518,0.125,0.518],"c":"#6a6f66"},{"id":"shipin_hat","n":"礼帽","s":"box","d":[0.454,0.123,0.454],"c":"#6a6f66"},{"id":"shipin_tophat","n":"高礼帽","s":"box","d":[0.454,0.356,0.454],"c":"#6a6f66"},{"id":"shipin_beanie","n":"毛线帽","s":"box","d":[0.34,0.193,0.333],"c":"#6a6f66"},{"id":"shipin_face_mask","n":"面具","s":"box","d":[0.314,0.312,0.295],"c":"#6a6f66"},{"id":"shipin_hockey_mask","n":"曲棍球面具","s":"box","d":[0.315,0.312,0.289],"c":"#6a6f66"},{"id":"acc_hood_mask","n":"面罩兜帽","s":"box","d":[0.36,0.4,0.36],"c":"#6a6f66"},{"id":"acc_goggles_red","n":"战术护目镜(红)","s":"box","d":[0.34,0.14,0.24],"c":"#6a6f66"},{"id":"acc_goggles_green","n":"战术护目镜(绿)","s":"box","d":[0.34,0.14,0.24],"c":"#6a6f66"},{"id":"acc_goggles_white","n":"战术护目镜(白)","s":"box","d":[0.34,0.14,0.24],"c":"#6a6f66"},{"id":"acc_chef_hat","n":"厨师帽","s":"box","d":[0.327,0.433,0.329],"c":"#6a6f66"},{"id":"acc_plague_mask","n":"瘟疫医生面具","s":"box","d":[0.67,0.413,0.765],"c":"#6a6f66"},{"id":"acc_ushanka","n":"雷锋帽","s":"box","d":[0.442,0.407,0.412],"c":"#6a6f66"},{"id":"acc_gas_mask","n":"防毒面具","s":"box","d":[0.361,0.334,0.394],"c":"#6a6f66"},{"id":"acc_box_hood","n":"方块头套","s":"box","d":[0.315,0.318,0.315],"c":"#6a6f66"},{"id":"acc_army_cap","n":"军绿布帽","s":"box","d":[0.359,0.144,0.364],"c":"#6a6f66"},{"id":"acc_gasmask_heavy","n":"重型防毒面具","s":"box","d":[0.328,0.328,0.405],"c":"#6a6f66"},{"id":"acc_headphones","n":"耳机","s":"box","d":[0.38,0.304,0.238],"c":"#6a6f66"},{"id":"acc_santa_hat","n":"圣诞帽","s":"box","d":[0.315,0.256,0.392],"c":"#6a6f66"},{"id":"acc_dive_goggles","n":"潜水镜","s":"box","d":[0.342,0.322,0.317],"c":"#6a6f66"},{"id":"swimring_red","n":"红色游泳圈","s":"torus","d":[0.44,0.13],"c":"#c2493f"},{"id":"swimring_blue","n":"蓝色游泳圈","s":"torus","d":[0.44,0.13],"c":"#33459a"}];
+var GAME_GUNS = [{"id":"toolgun","n":"工具枪","cat":"other"},{"id":"gravgun","n":"重力枪","cat":"other"},{"id":"flashlight","n":"手电筒","cat":"other"},{"id":"pistol","n":"手枪","cat":"light"},{"id":"revolver","n":"左轮手枪","cat":"light"},{"id":"m1911","n":"M1911","cat":"light"},{"id":"smg","n":"冲锋枪","cat":"light"},{"id":"mp5","n":"MP5","cat":"light"},{"id":"ppsh","n":"波波沙","cat":"light"},{"id":"aa12","n":"AA-12","cat":"heavy"},{"id":"shotgun","n":"霰弹枪","cat":"heavy"},{"id":"spas","n":"SPAS 霰弹枪","cat":"heavy"},{"id":"rifle","n":"突击步枪","cat":"heavy"},{"id":"ak47","n":"AK-47","cat":"heavy"},{"id":"lightsniper","n":"轻型狙击枪","cat":"sniper"},{"id":"sniper","n":"狙击枪","cat":"sniper"},{"id":"m2010","n":"M2010 ESR","cat":"sniper"},{"id":"m107","n":"M107A1","cat":"sniper"},{"id":"nailgun","n":"钉枪","cat":"light"},{"id":"egggun","n":"彩蛋枪","cat":"other"},{"id":"grenade","n":"手雷","cat":"other"},{"id":"impactnade","n":"摔炮手榴弹","cat":"other"},{"id":"c4","n":"遥控炸弹","cat":"other"},{"id":"mine","n":"地雷","cat":"other"},{"id":"cleaver","n":"菜刀","cat":"melee"},{"id":"healkit","n":"回血药剂","cat":"other"},{"id":"poison","n":"毒药","cat":"other"},{"id":"styptic","n":"止血针剂","cat":"other"},{"id":"v5","n":"V5针剂","cat":"other"},{"id":"rifleb","n":"突击步枪B","cat":"heavy"},{"id":"m79","n":"M79 榴弹发射器","cat":"heavy"},{"id":"crowbar","n":"撬棍","cat":"melee"},{"id":"knife","n":"军刀","cat":"melee"},{"id":"baton","n":"警棍","cat":"melee"},{"id":"bandage","n":"绷带","cat":"other"},{"id":"medkit","n":"小医疗箱","cat":"other"}];
+
+var GUN_SIZE = {
+  light: [0.30, 0.20, 0.075],
+  heavy: [0.92, 0.24, 0.08],
+  sniper: [1.15, 0.20, 0.075],
+  melee: [0.42, 0.10, 0.05],
+  other: [0.34, 0.20, 0.09]
 };
+
+var ITEM_BY_ID = {};
+var GUN_BY_ID = {};
+var PROP_DEFS = {};
+(function() {
+  for (var i = 0; i < GAME_ITEMS.length; i++) {
+    var it = GAME_ITEMS[i];
+    ITEM_BY_ID[it.id] = it;
+    var shape = it.s === 'cyl' ? 'cylinder' : (it.s === 'torus' ? 'torus' : 'box');
+    var size = it.s === 'cyl' ? [it.d[1], it.d[0]] : it.d.slice();
+    PROP_DEFS[it.id] = { name: it.n, label: it.n, color: it.c, shape: shape, size: size };
+  }
+  for (var j = 0; j < GAME_GUNS.length; j++) GUN_BY_ID[GAME_GUNS[j].id] = GAME_GUNS[j];
+})();
 
 // ==================== 存档系统 ====================
 var SAVES_KEY = 'ragdollbox_saves';
@@ -1181,7 +1512,7 @@ var autoSaveTimer = null;
 var autoSavePendingData = null;
 
 function scheduleAutoSave(mapData) {
-  autoSavePendingData = mapData;
+  autoSavePendingData = null;
   if (autoSaveTimer) return;
   autoSaveTimer = setTimeout(function() {
     autoSaveTimer = null;
@@ -1269,6 +1600,14 @@ function refreshSavesList() {
     html += '</div></div>';
   }
   listEl.innerHTML = html;
+}
+
+function renameSaveDirect(id, name) {
+  var saves = getSaves();
+  for (var i = 0; i < saves.length; i++) {
+    if (saves[i].id === id) { saves[i].name = String(name).slice(0, 60); break; }
+  }
+  setSaves(saves);
 }
 
 function escapeHtml(text) {
@@ -1622,6 +1961,10 @@ function createProp(propType, data) {
     case 'triangle':
       geometry = makePrismGeometry([[-0.5, -0.5], [0.5, -0.5], [0, 0.5]]);
       break;
+    case 'torus':
+      geometry = new THREE.TorusGeometry(s[0], s[1], 10, 26);
+      geometry.rotateX(-Math.PI / 2);
+      break;
     default:
       geometry = new THREE.BoxGeometry(1, 1, 1);
   }
@@ -1685,6 +2028,12 @@ function geometryFor(type) {
 function applyObjectColor(root, hex) {
   root.userData.mapColor = hex;
   if (root.userData.mapType === 'spawn') return;
+  if (root.userData.mapType === 'light') { refreshLight(root); return; }
+  if (root.userData.mapType === 'water') {
+    root.userData.waterShallow = hex;
+    refreshWater(root);
+    return;
+  }
   if (root.userData.isProp) {
     root.traverse(function(o) {
       if (!o.isMesh || !o.material) return;
@@ -1797,20 +2146,26 @@ function createPrimitive(type, data) {
   var repRaw = Array.isArray(data.texRepeat) ? data.texRepeat[0] : data.texRepeat;
   mesh.userData.mapTexRepeat = Number.isFinite(+repRaw) ? +repRaw : 1;
   mesh.userData.mapOpacity = Number.isFinite(+data.opacity) ? +data.opacity : 1;
-  mesh.userData.mapCustom = data.customTex || null;
+  mesh.userData.mapCustom = data.texAsset ? assetUrl(data.texAsset) : (data.customTex || null);
   mesh.userData.mapPhysics = !!data.physics;
   mesh.userData.mapMass = Number.isFinite(+data.mass) ? +data.mass : 0;
   mesh.userData.mapBounce = Number.isFinite(+data.bounce) ? +data.bounce : 0.12;
+  mesh.userData.mapCollide = data.collide === undefined ? true : !!data.collide;
+  mesh.userData.mapAsset = data.texAsset || null;
+  mesh.userData.mapSounds = Array.isArray(data.sounds) ? JSON.parse(JSON.stringify(data.sounds)) : [];
   mesh.position.fromArray(data.position || placementPoint(type));
   mesh.rotation.fromArray(data.rotation || [0, 0, 0]);
   mesh.scale.fromArray(data.scale || [1, 1, 1]);
   applyObjectSurface(mesh);
+  applyCollideLook(mesh);
   objectsRoot.add(mesh);
   return mesh;
 }
 
+var PLACE_LIFT = { spawn: SPAWN_BODY_LIFT, water: 0.02, light: 2.6, gun: 0.24, model: 0 };
+
 function placementPoint(type) {
-  var lift = type === 'spawn' ? SPAWN_BODY_LIFT : 0.5;
+  var lift = PLACE_LIFT[type] !== undefined ? PLACE_LIFT[type] : 0.5;
   var dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
   var p = null;
   raycaster.set(camera.position, dir);
@@ -1826,7 +2181,9 @@ function placementPoint(type) {
   if (!p) { p = camera.position.clone().addScaledVector(dir, 6); p.y = lift; }
   p.x = Math.round(p.x * 2) / 2;
   p.z = Math.round(p.z * 2) / 2;
-  if (type !== 'spawn') p.y = Math.max(lift, Math.round(p.y * 2) / 2);
+  if (type !== 'spawn' && type !== 'water' && type !== 'light') {
+    p.y = Math.max(lift, Math.round(p.y * 2) / 2);
+  }
   return p.toArray();
 }
 
@@ -1869,6 +2226,7 @@ function syncProxyToSelection() {
 }
 
 function setSelection(objs) {
+  if (typeof refreshHierarchy === 'function') setTimeout(refreshHierarchy, 0);
   selection = objs.filter(function(o) { return !!o; });
   updateGroupHighlights();
   syncOutlinePassSelection();
@@ -1921,10 +2279,6 @@ function updateGroupHighlights() {
   }
 }
 
-// 只有当 selection 恰好等于某个组的全部成员时，才认为"选中了整组"，
-// 应作为一个整体联动变换。如果 selection 只是组内的一部分成员
-// （比如通过"穿透选中"单独选中了组内一个物体），必须返回 null，
-// 否则移动时会错误地带着整组一起动。
 function getCommonGroup() {
   if (!selection.length) return null;
   var firstGroup = groupManager.getGroupOfObject(selection[0]);
@@ -1974,9 +2328,11 @@ var propMass = document.getElementById('propMass');
 var propBounce = document.getElementById('propBounce');
 propTex.innerHTML = TEXTURES.map(function(t) { return '<option value="' + t.id + '">' + t.name + '</option>'; }).join('');
 
+var NON_SURFACE_TYPES = { model: 1, spawn: 1, water: 1, light: 1, gun: 1 };
+
 function physEditable(obj) {
   var t = obj && obj.userData.mapType;
-  return !!t && t !== 'model' && t !== 'spawn' && !obj.userData.isProp;
+  return !!t && !NON_SURFACE_TYPES[t] && !obj.userData.isProp;
 }
 
 function shapeVolume(obj) {
@@ -1996,7 +2352,7 @@ function defaultMass(obj) {
 
 function surfaceEditable(obj) {
   var t = obj && obj.userData.mapType;
-  return !!t && t !== 'model' && t !== 'spawn' && !obj.userData.isProp;
+  return !!t && !NON_SURFACE_TYPES[t] && !obj.userData.isProp;
 }
 
 function refreshProps() {
@@ -2004,6 +2360,7 @@ function refreshProps() {
   var groupInfo = document.getElementById('groupInfo');
   if (!selection.length) { bar.classList.remove('show'); return; }
   bar.classList.add('show');
+  if (typeof syncTextureOptions === 'function') syncTextureOptions();
 
   var commonGroup = getCommonGroup();
   var isGroupSelected = commonGroup !== null && selection.length === commonGroup.members.length;
@@ -2022,7 +2379,9 @@ function refreshProps() {
   }
   if (canSurface) {
     var s0 = surf[0];
-    if (s0.userData.mapCustom) { propTex.value = '__import__'; }
+    if (s0.userData.mapAsset && PROJECT.assets[s0.userData.mapAsset]) {
+      propTex.value = 'asset:' + s0.userData.mapAsset;
+    } else if (s0.userData.mapCustom) { propTex.value = '__import__'; }
     else { propTex.value = s0.userData.mapTex || ''; }
     propTexRep.value = s0.userData.mapTexRepeat || 1;
     propOpacity.value = s0.userData.mapOpacity === undefined ? 1 : s0.userData.mapOpacity;
@@ -2061,6 +2420,50 @@ function refreshProps() {
     document.getElementById('propScale').textContent = '多个';
     document.getElementById('propType').textContent = isGroupSelected ? '📦 ' + commonGroup.name : '多选';
   }
+  refreshPropsExtra();
+}
+
+function refreshPropsExtra() {
+  if (!propCollide) return;
+  var col = selection.filter(collideEditable);
+  var wrap = document.getElementById('collideWrap');
+  wrap.style.display = col.length ? 'inline-flex' : 'none';
+  if (col.length) propCollide.checked = col[0].userData.mapCollide !== false;
+
+  var snd = selection.filter(soundsCarrier);
+  propSoundBtn.style.display = snd.length === 1 ? '' : 'none';
+  if (snd.length === 1) {
+    var n = objectSounds(snd[0]).length;
+    propSoundBtn.textContent = n ? '🔊 声音 (' + n + ')' : '🔊 声音';
+  }
+
+  var wt = selection.filter(function(o) { return o.userData.mapType === 'water'; });
+  waterBox.style.display = wt.length ? 'flex' : 'none';
+  if (wt.length) {
+    var w0 = wt[0];
+    waterBox.querySelector('#wtShape').value = w0.userData.waterShape;
+    waterBox.querySelector('#wtDepth').value = w0.userData.waterDepth;
+    waterBox.querySelector('#wtDeep').value = w0.userData.waterDeep;
+    waterBox.querySelector('#wtShallow').value = w0.userData.waterShallow;
+    waterBox.querySelector('#wtOpacity').value = w0.userData.waterOpacity;
+    waterBox.querySelector('#wtCaustics').checked = !!w0.userData.waterCaustics;
+  }
+
+  var lt = selection.filter(function(o) { return o.userData.mapType === 'light'; });
+  lightBox.style.display = lt.length ? 'flex' : 'none';
+  if (lt.length) {
+    var l0 = lt[0];
+    lightBox.querySelector('#ltType').textContent = l0.userData.lightType === 'spot' ? '聚光灯' : '点光源';
+    lightBox.querySelector('#ltColor').value = l0.userData.mapColor;
+    lightBox.querySelector('#ltIntensity').value = l0.userData.lightIntensity;
+    lightBox.querySelector('#ltDistance').value = l0.userData.lightDistance;
+    lightBox.querySelector('#ltDecay').value = l0.userData.lightDecay;
+    lightBox.querySelector('#ltAngle').value = l0.userData.lightAngle;
+    lightBox.querySelector('#ltPenumbra').value = l0.userData.lightPenumbra;
+    lightBox.querySelector('#ltShadow').checked = !!l0.userData.lightShadow;
+    lightBox.querySelector('#ltSpotOnly').style.display =
+      l0.userData.lightType === 'spot' ? '' : 'none';
+  }
 }
 
 function suggestRepeat(obj) {
@@ -2081,10 +2484,16 @@ propTex.addEventListener('change', function() {
     propTex.value = s0 && s0.userData.mapCustom ? '__import__' : (s0 ? (s0.userData.mapTex || '') : '');
     return;
   }
+  if (name.indexOf('asset:') === 0) {
+    applyAssetTexture(name.slice(6));
+    refreshProps();
+    return;
+  }
   for (var i = 0; i < selection.length; i++) {
     var o = selection[i];
     if (!surfaceEditable(o)) continue;
     if (o.userData.mapCustom) { o.userData.mapCustom = null; }
+    o.userData.mapAsset = null;
     o.userData.mapTex = name;
     if (name && name !== 'clear' && name !== 'invisible' && (o.userData.mapTexRepeat || 1) === 1) {
       o.userData.mapTexRepeat = suggestRepeat(o);
@@ -2265,7 +2674,6 @@ function saveGroupToLibrary() {
   var commonGroup = getCommonGroup();
   if (!commonGroup) { toast('请选中一个组'); return; }
   if (commonGroup.members.length < 2) { toast('组内至少需要2个物体'); return; }
-  // 序列化组数据
   var libData = {
     id: commonGroup.id,
     name: commonGroup.name,
@@ -2287,7 +2695,6 @@ function placeGroupFromLibrary(libData) {
     if (obj) objects.push(obj);
   }
   if (objects.length < 2) { toast('组数据无效'); return; }
-  // 把组移动到摄像机前方
   var dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
   var pos = camera.position.clone().addScaledVector(dir, 6);
   pos.y = Math.max(0.5, pos.y);
@@ -2402,6 +2809,10 @@ function openSheet(sheet) {
   sheet.classList.add('show');
   if (sheet === panelSaves) { refreshSavesList(); }
   if (sheet === panelLibrary) { refreshLibraryList(); }
+  if (sheet === panelProject) { refreshProjectPanel(); }
+  if (sheet === panelAssets) { refreshAssets(); }
+  if (sheet === panelGameProps) { refreshGameProps(); }
+  if (sheet === panelSound) { refreshSoundPanel(); }
 }
 
 function closeSheet() {
@@ -2418,13 +2829,11 @@ document.getElementById('btnSaves').onclick = function() { openSheet(panelSaves)
 document.getElementById('btnLibrary').onclick = function() { openSheet(panelLibrary); };
 document.getElementById('btnSaveQuick').onclick = manualSave;
 
-// 组按钮
 document.getElementById('btnCreateGroup').onclick = createGroupFromSelection;
 document.getElementById('btnUngroup').onclick = ungroupSelected;
 document.getElementById('btnRenameGroup').onclick = renameGroupSelected;
 document.getElementById('btnSaveToLibrary').onclick = saveGroupToLibrary;
 
-// 菜单里的按钮
 var btnTutorial = document.getElementById('btnTutorial');
 if (btnTutorial) {
   btnTutorial.onclick = function() { closeSheet(); showTutorial(0); };
@@ -2434,7 +2843,6 @@ if (btnViewUpdate) {
   btnViewUpdate.onclick = function() { closeSheet(); showUpdateNotice(); };
 }
 
-// ===== 导入游戏教程按钮 =====
 document.getElementById('btnImportTutorial').onclick = function() {
   closeSheet();
   var overlay = document.getElementById('importTutorialOverlay');
@@ -2457,7 +2865,6 @@ document.getElementById('btnManualSave').onclick = function() {
   refreshSavesList();
 };
 
-// ===== 地形按钮 =====
 var addButtons = document.querySelectorAll('[data-add]');
 for (var i = 0; i < addButtons.length; i++) {
   addButtons[i].onclick = function() {
@@ -2469,9 +2876,9 @@ for (var i = 0; i < addButtons.length; i++) {
   };
 }
 
-// ===== 道具按钮自动生成 =====
 function generatePropButtons() {
   var container = document.getElementById('propButtonContainer');
+  if (!container) return;
   container.innerHTML = '';
   for (var id in PROP_DEFS) {
     var def = PROP_DEFS[id];
@@ -2795,11 +3202,6 @@ renderer.domElement.addEventListener('pointerup', function(e) {
     if (hitObj) {
       var group = groupManager.getGroupOfObject(hitObj);
       if (group && !additive) {
-        // 主流建模软件式交互：
-        // 第一次点组内物体 -> 选中整组（方便整体移动/查看）
-        // 已经在操作这个组（无论当前是整组选中还是组内单个物体）时，
-        // 再点组内任意一个物体 -> 直接单独选中那个物体，
-        // 可以在组内自由切换选中目标，不需要点两次同一个物体。
         if (_lastSelectedGroup === group) {
           selectObject(hitObj);
           toast('🔍 已单独选中: ' + (hitObj.userData.mapName || '物体'));
@@ -3058,6 +3460,35 @@ function duplicateSelected() {
       if (newProp) { newProp.quaternion.copy(q); newOnes.push(newProp); }
       continue;
     }
+    var kind = objKindOf(obj);
+    if (kind === 'gun') {
+      var ng = createGun(obj.userData.gunId, {
+        position: obj.position.toArray().map(function(v) { return v + 0.1; }),
+        name: obj.userData.mapName + ' 副本'
+      });
+      if (ng) { ng.quaternion.copy(obj.quaternion); newOnes.push(ng); }
+      continue;
+    }
+    if (kind === 'water') {
+      var wd = serializeWater(obj);
+      wd.name += ' 副本';
+      wd.position = [wd.position[0] + 0.5, wd.position[1], wd.position[2] + 0.5];
+      newOnes.push(createWater(wd));
+      continue;
+    }
+    if (kind === 'light') {
+      var ld = serializeLight(obj);
+      ld.name += ' 副本';
+      ld.position = [ld.position[0] + 0.5, ld.position[1], ld.position[2] + 0.5];
+      newOnes.push(createLight(ld));
+      continue;
+    }
+    if (kind === 'spawn') {
+      newOnes.push(createSpawn({
+        position: obj.position.toArray().map(function(v) { return v + 0.4; })
+      }));
+      continue;
+    }
     var data = serializeObject(obj);
     data.name += ' 副本';
     newOnes.push(restoreObject(data));
@@ -3068,7 +3499,8 @@ function duplicateSelected() {
 
 function disposeObject(root) {
   root.traverse(function(o) {
-    if (!o.isMesh) return;
+    if (o.isLight && o.parent) o.parent.remove(o);
+    if (!o.isMesh && !o.isLineSegments) return;
     if (o.geometry) o.geometry.dispose();
     var m = Array.isArray(o.material) ? o.material : [o.material];
     for (var i = 0; i < m.length; i++) { if (m[i]) m[i].dispose(); }
@@ -3164,6 +3596,10 @@ function serializeObject(o) {
     var modelData = serializeModel(o);
     result.meshes = modelData.meshes;
     result.bounds = modelData.bounds;
+    if (o.userData.mapAsset && PROJECT.assets[o.userData.mapAsset]) result.srcAsset = o.userData.mapAsset;
+    if (o.userData.mapCollide === false) result.collide = 0;
+    var msnd = o.userData.mapSounds;
+    if (msnd && msnd.length) result.sounds = JSON.parse(JSON.stringify(msnd));
     return result;
   }
   var b = {
@@ -3174,7 +3610,7 @@ function serializeObject(o) {
     rotation: roundArray([o.rotation.x, o.rotation.y, o.rotation.z]),
     scale: roundArray(o.scale.toArray())
   };
-  if (o.userData.mapPhysics) {
+  if (o.userData.mapPhysics && o.userData.mapCollide !== false) {
     b.physics = 1;
     b.mass = Math.max(0.2, Math.min(20000, +o.userData.mapMass || defaultMass(o)));
     b.bounce = o.userData.mapBounce === undefined ? 0.12 : +o.userData.mapBounce;
@@ -3200,7 +3636,49 @@ function serializeObject(o) {
     b.transparent = true;
     b.opacity = opacity;
   }
+  if (o.userData.mapAsset && PROJECT.assets[o.userData.mapAsset]) {
+    b.texAsset = o.userData.mapAsset;
+    delete b.customTex;
+  }
+  if (o.userData.mapCollide === false) b.collide = 0;
+  var snd = o.userData.mapSounds;
+  if (snd && snd.length) b.sounds = JSON.parse(JSON.stringify(snd));
   return b;
+}
+
+function serializeWater(o) {
+  return {
+    name: o.userData.mapName || '水体',
+    shape: o.userData.waterShape,
+    position: roundArray(o.position.toArray()),
+    sizeX: +Math.abs(o.scale.x).toFixed(4),
+    sizeZ: +Math.abs(o.userData.waterShape === 'round' ? o.scale.x : o.scale.z).toFixed(4),
+    depth: +(+o.userData.waterDepth).toFixed(4),
+    deep: o.userData.waterDeep,
+    shallow: o.userData.waterShallow,
+    opacity: +(+o.userData.waterOpacity).toFixed(3),
+    caustics: !!o.userData.waterCaustics
+  };
+}
+
+function serializeLight(o) {
+  var d = {
+    name: o.userData.mapName || '光源',
+    type: o.userData.lightType,
+    position: roundArray(o.position.toArray()),
+    rotation: roundArray([o.rotation.x, o.rotation.y, o.rotation.z]),
+    color: o.userData.mapColor,
+    intensity: +(+o.userData.lightIntensity).toFixed(3),
+    distance: +(+o.userData.lightDistance).toFixed(3),
+    decay: +(+o.userData.lightDecay).toFixed(3),
+    castShadow: !!o.userData.lightShadow
+  };
+  if (o.userData.lightType === 'spot') {
+    d.angle = +(+o.userData.lightAngle).toFixed(2);
+    d.penumbra = +(+o.userData.lightPenumbra).toFixed(3);
+    d.target = lightTargetWorld(o);
+  }
+  return d;
 }
 
 function spawnMarkers() {
@@ -3212,39 +3690,79 @@ function spawnMarkers() {
   return result;
 }
 
-function serializeMap() {
+function serializeMap(opt) {
+  opt = opt || {};
   var marks = spawnMarkers();
   var spawns = marks.map(function(o) { return roundArray(o.position.toArray()); });
   var objects = [];
   var props = [];
-  var objectItems = []; // 与 objects[] 同顺序的活体 THREE 物体，仅供 serializeGroups 用下标匹配
-  var propItems = [];   // 与 props[] 同顺序的活体 THREE 物体
+  var guns = [];
+  var waters = [];
+  var lights = [];
+  var lists = { object: [], prop: [], gun: [], water: [], light: [], spawn: [] };
   var children = objectsRoot.children;
   for (var i = 0; i < children.length; i++) {
     var child = children[i];
-    if (child.userData.isProp) {
+    if (!child.userData.mapObject) continue;
+    var kind = objKindOf(child);
+    if (kind === 'spawn') { lists.spawn.push(child); continue; }
+    if (kind === 'prop') {
       var q = new THREE.Quaternion().copy(child.quaternion);
-      props.push({ id: child.userData.propType, p: roundArray(child.position.toArray()), q: roundArray([q.x, q.y, q.z, q.w]) });
-      propItems.push(child);
-    } else if (child.userData.mapType !== 'spawn') {
+      var pd = {
+        id: child.userData.propType,
+        p: roundArray(child.position.toArray()),
+        q: roundArray([q.x, q.y, q.z, q.w])
+      };
+      props.push(pd);
+      lists.prop.push(child);
+    } else if (kind === 'gun') {
+      var gq = new THREE.Quaternion().copy(child.quaternion);
+      guns.push({
+        id: child.userData.gunId,
+        p: roundArray(child.position.toArray()),
+        q: roundArray([gq.x, gq.y, gq.z, gq.w])
+      });
+      lists.gun.push(child);
+    } else if (kind === 'water') {
+      waters.push(serializeWater(child));
+      lists.water.push(child);
+    } else if (kind === 'light') {
+      lights.push(serializeLight(child));
+      lists.light.push(child);
+    } else {
       objects.push(serializeObject(child));
-      objectItems.push(child);
+      lists.object.push(child);
     }
   }
-  // 序列化组：用活体物体在 objectItems/propItems 中的下标建立引用关系，
-  // 这个下标与 objects[]/props[] 的顺序一一对应，读档时可以准确还原。
-  var groupsData = groupManager.serializeGroups(objectItems, propItems);
+  var groupsData = groupManager.serializeGroups(lists);
   var mapData = {
     format: 'RagdollBoxMap',
     version: 3,
-    name: '自定义地图',
+    name: getCurrentSaveName(),
     spawn: spawns[0] || [0, 0.87, 9],
-    spawns: spawns.length ? spawns : undefined,
+    spawns: spawns,
     exportedAt: new Date().toISOString(),
+    env: JSON.parse(JSON.stringify(PROJECT.env)),
     objects: objects,
     props: props,
     groups: groupsData
   };
+  if (guns.length) mapData.guns = guns;
+  if (waters.length) mapData.waters = waters;
+  if (lights.length) mapData.lights = lights;
+  if (!opt.noAssets) {
+    if (opt.allAssets) {
+      mapData.assets = PROJECT.assets;
+    } else {
+      var keep = {};
+      for (var k in PROJECT.assets) {
+        var a = PROJECT.assets[k];
+        if (a && a.kind !== 'model') keep[k] = a;
+      }
+      mapData.assets = keep;
+    }
+    if (PROJECT.thumb) mapData.thumb = PROJECT.thumb;
+  }
   return mapData;
 }
 
@@ -3271,7 +3789,6 @@ function exportMap() {
   var d = serializeMap();
   var saveName = getCurrentSaveName();
   d.name = saveName;
-  // 导出时剥离组信息（如果需要纯净数据）
   var exportData = JSON.parse(JSON.stringify(d));
   delete exportData.groups;
   download(saveName + '.rbmap', JSON.stringify(exportData));
@@ -3363,19 +3880,16 @@ document.getElementById('btnUploadMap').onclick = uploadMapToGame;
 // ============================================================
 var TRANSFER_BASE = 'https://rdpmapeditor.pages.dev';
 
-// 显示转移弹窗
 document.getElementById('btnTransferMap').onclick = function() {
   closeSheet();
   var overlay = document.getElementById('transferOverlay');
   overlay.style.display = 'flex';
-  // 清空之前的状态
   document.getElementById('transferCodeInput').value = '';
   var result = document.getElementById('transferResult');
   result.style.display = 'none';
   result.querySelector('#transferResultContent').innerHTML = '';
 };
 
-// 关闭转移弹窗
 document.getElementById('transferCloseBtn').onclick = function() {
   document.getElementById('transferOverlay').style.display = 'none';
 };
@@ -3385,7 +3899,6 @@ document.getElementById('transferOverlay').onclick = function(e) {
   }
 };
 
-// 上传当前地图
 document.getElementById('transferUploadBtn').onclick = async function() {
   var btn = this;
   var result = document.getElementById('transferResult');
@@ -3399,12 +3912,10 @@ document.getElementById('transferUploadBtn').onclick = async function() {
   try {
     var mapData = serializeMap();
     var exportData = JSON.parse(JSON.stringify(mapData));
-    // 移除 groups 字段以减少数据量（可选）
     delete exportData.groups;
     var jsonStr = JSON.stringify(exportData);
     var raw = new TextEncoder().encode(jsonStr);
 
-    // 尝试 gzip 压缩
     var body = raw;
     var enc = 'raw';
     if (typeof CompressionStream === 'function') {
@@ -3454,7 +3965,6 @@ document.getElementById('transferUploadBtn').onclick = async function() {
   btn.textContent = '📤 上传当前地图';
 };
 
-// 下载地图
 document.getElementById('transferDownloadBtn').onclick = async function() {
   var input = document.getElementById('transferCodeInput');
   var code = input.value.trim().toUpperCase();
@@ -3491,39 +4001,32 @@ document.getElementById('transferDownloadBtn').onclick = async function() {
       return;
     }
 
-    // 获取原始数据（可能是 gzip 压缩的）
     var arrayBuffer = await response.arrayBuffer();
     var data = new Uint8Array(arrayBuffer);
     
-    // 尝试解压 gzip
     var jsonStr = null;
     if (data.length > 2 && data[0] === 0x1f && data[1] === 0x8b) {
-      // gzip 压缩
       try {
         var blob = new Blob([data]);
         var decompressed = await new Response(blob.stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
         jsonStr = new TextDecoder().decode(decompressed);
       } catch (_e) {
-        // 如果解压失败，尝试直接当作文本
         jsonStr = new TextDecoder().decode(data);
       }
     } else {
       jsonStr = new TextDecoder().decode(data);
     }
 
-    // 解析 JSON
     var mapData;
     try {
       mapData = JSON.parse(jsonStr);
     } catch (_e) {
-      // 尝试修复：可能是纯文本错误消息
       if (jsonStr.startsWith('{')) {
         throw new Error('JSON 解析失败: ' + jsonStr.slice(0, 100));
       }
       throw new Error('无效的地图数据格式');
     }
 
-    // 检查是否是错误响应
     if (mapData.ok === false) {
       content.innerHTML = '<div style="color:var(--danger);">❌ 下载失败：' + (mapData.msg || '未知错误') + '</div>';
       btn.disabled = false;
@@ -3531,7 +4034,6 @@ document.getElementById('transferDownloadBtn').onclick = async function() {
       return;
     }
 
-    // 加载地图
     if (objectsRoot.children.length > 0) {
       if (!confirm('⚠️ 这将清空当前舞台所有物体，确定要加载新地图吗？')) {
         content.innerHTML = '<div style="color:var(--muted);">已取消加载</div>';
@@ -3541,9 +4043,7 @@ document.getElementById('transferDownloadBtn').onclick = async function() {
       }
     }
 
-    // 确保 mapData 有必要的字段    
     if (!mapData.format) {
-      // 如果下载的数据缺少 format 字段，尝试包装
       mapData = {
         format: 'RagdollBoxMap',
         version: 3,
@@ -3557,7 +4057,7 @@ document.getElementById('transferDownloadBtn').onclick = async function() {
 
     clearObjects();
     loadMapData(mapData, false);
-    currentSaveId = null; // 不关联到本地存档
+    currentSaveId = null;
     content.innerHTML = '<div style="color:var(--accent);">✅ 地图加载成功！<br><span style="font-size:12px;color:var(--muted);">物体数：' + 
       (mapData.objects ? mapData.objects.length : 0) + 
       (mapData.props ? ' + ' + mapData.props.length + ' 个道具' : '') +
@@ -3574,14 +4074,12 @@ document.getElementById('transferDownloadBtn').onclick = async function() {
   btn.textContent = '📥 下载';
 };
 
-// 回车键触发下载
 document.getElementById('transferCodeInput').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') {
     document.getElementById('transferDownloadBtn').click();
   }
 });
 
-// 自动大写输入
 document.getElementById('transferCodeInput').addEventListener('input', function() {
   this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
 });
@@ -3646,6 +4144,8 @@ document.getElementById('mapInput').addEventListener('change', async function(e)
 function clearObjects() {
   clearSelection();
   if (groupManager) groupManager.clear();
+  if (waterList) waterList.length = 0;
+  if (lightList) lightList.length = 0;
   var children = objectsRoot.children.slice();
   for (var i = 0; i < children.length; i++) {
     objectsRoot.remove(children[i]);
@@ -3719,7 +4219,16 @@ function restoreObject(d) {
     }
     return mesh;
   }
-  if (d.type === 'model') return restoreModel(d);
+  if (d.type === 'model') {
+    var m = restoreModel(d);
+    if (m) {
+      m.userData.mapCollide = d.collide === undefined ? true : !!d.collide;
+      m.userData.mapSounds = Array.isArray(d.sounds) ? JSON.parse(JSON.stringify(d.sounds)) : [];
+      m.userData.mapAsset = d.srcAsset || null;
+      applyCollideLook(m);
+    }
+    return m;
+  }
   return createPrimitive(d.type, d);
 }
 
@@ -3728,36 +4237,75 @@ function loadMapData(d, rh) {
   if (!d || d.format !== 'RagdollBoxMap') throw new Error('不是RagdollBoxMap文件');
   var objs = Array.isArray(d.objects) ? d.objects : [];
   var props = Array.isArray(d.props) ? d.props : [];
-  var spawns = Array.isArray(d.spawns) && d.spawns.length ? d.spawns : (Array.isArray(d.spawn) ? [d.spawn] : []);
+  var guns = Array.isArray(d.guns) ? d.guns : [];
+  var waters = Array.isArray(d.waters) ? d.waters : [];
+  var lights = Array.isArray(d.lights) ? d.lights : [];
+  var spawns = Array.isArray(d.spawns) ? d.spawns : (Array.isArray(d.spawn) ? [d.spawn] : []);
   var groupsData = Array.isArray(d.groups) ? d.groups : [];
   historyLock = true;
   if (groupManager) groupManager.clear();
   clearObjects();
-  var allObjects = [];
-  var allProps = [];
+
+  if (d.assets && typeof d.assets === 'object') PROJECT.assets = JSON.parse(JSON.stringify(d.assets));
+  if (typeof d.thumb === 'string') PROJECT.thumb = d.thumb;
+  PROJECT.env = Object.assign({}, ENV_DEFAULTS, { sunDir: ENV_DEFAULTS.sunDir.slice() });
+  if (d.env && typeof d.env === 'object') {
+    for (var key in ENV_DEFAULTS) {
+      if (d.env[key] === undefined) continue;
+      PROJECT.env[key] = key === 'sunDir'
+        ? (Array.isArray(d.env.sunDir) ? d.env.sunDir.slice(0, 3).map(Number) : ENV_DEFAULTS.sunDir.slice())
+        : d.env[key];
+    }
+  }
+  applyEnv();
+
+  var lists = { object: [], prop: [], gun: [], water: [], light: [], spawn: [] };
   for (var i = 0; i < objs.length; i++) {
     var o = objs[i];
     if (!o || o.type === 'spawn') continue;
     var obj = restoreObject(o);
-    if (obj) allObjects.push(obj);
+    if (obj) lists.object.push(obj);
   }
-  for (var i = 0; i < props.length; i++) {
-    var p = props[i];
-    if (p.id && PROP_DEFS[p.id]) {
-      var obj = restoreObject(p);
-      if (obj) allProps.push(obj);
+  for (var i2 = 0; i2 < props.length; i2++) {
+    var p = props[i2];
+    if (!p || !p.id) continue;
+    if (p.id === 'water') {
+      createWater({ position: p.p || [0, 0, 0], sizeX: 10, sizeZ: 10, depth: 2.4 });
+      continue;
     }
+    if (!PROP_DEFS[p.id]) continue;
+    var pobj = restoreObject(p);
+    if (pobj) lists.prop.push(pobj);
   }
-  for (var i = 0; i < spawns.length; i++) {
-    var p = spawns[i];
-    if (!Array.isArray(p) || p.length < 3) continue;
-    createSpawn({ position: [+p[0] || 0, +p[1] || 0, +p[2] || 0] });
+  for (var i3 = 0; i3 < guns.length; i3++) {
+    var g = guns[i3];
+    if (!g || !g.id) continue;
+    var gobj = createGun(g.id, { position: g.p || [0, 0.5, 0] });
+    if (!gobj) continue;
+    if (g.q && g.q.length === 4) gobj.quaternion.set(g.q[0], g.q[1], g.q[2], g.q[3]);
+    lists.gun.push(gobj);
   }
-  // 恢复组：allObjects/allProps 是按 objs[]/props[] 顺序 restoreObject 出来的，
-  // 与写档时 objectItems/propItems 的顺序完全一致，deserializeGroups 用下标即可准确匹配。
+  for (var i4 = 0; i4 < waters.length; i4++) {
+    var w = createWater(waters[i4]);
+    if (w) lists.water.push(w);
+  }
+  for (var i5 = 0; i5 < lights.length; i5++) {
+    var l = createLight(lights[i5]);
+    if (l) lists.light.push(l);
+  }
+  for (var i6 = 0; i6 < spawns.length; i6++) {
+    var sp = spawns[i6];
+    if (!Array.isArray(sp) || sp.length < 3) continue;
+    var spo = createSpawn({ position: [+sp[0] || 0, +sp[1] || 0, +sp[2] || 0] });
+    lists.spawn.push(spo);
+  }
   if (groupsData.length > 0 && groupManager) {
-    groupManager.deserializeGroups(groupsData, allObjects, allProps);
+    groupManager.deserializeGroups(groupsData, lists);
   }
+  syncWaterLighting();
+  refreshHierarchy();
+  refreshProjectPanel();
+  rebuildTextureOptions();
   historyLock = false;
   if (rh) pushHistory(true);
 }
@@ -3765,7 +4313,8 @@ function loadMapData(d, rh) {
 function pushHistory(r) {
   r = r || false;
   if (historyLock) return;
-  var mapData = serializeMap();
+  if (typeof refreshHierarchy === 'function') refreshHierarchy();
+  var mapData = serializeMap({ noAssets: true });
   var s = JSON.stringify(mapData);
   if (r) { history = [s]; historyIndex = 0; return; }
   if (history[historyIndex] === s) return;
@@ -3773,7 +4322,7 @@ function pushHistory(r) {
   history.push(s);
   if (history.length > 40) history.shift();
   historyIndex = history.length - 1;
-  scheduleAutoSave(mapData);
+  scheduleAutoSave(null);
 }
 
 function restoreSnapshot(s) { loadMapData(JSON.parse(s), false); }
@@ -3941,11 +4490,16 @@ var _ray = new THREE.Raycaster();
 var _down = new THREE.Vector3(0, -1, 0);
 var _probe = new THREE.Vector3();
 
+var NON_SOLID_TYPES = { spawn: 1, water: 1, light: 1, gun: 1 };
+
 function solidTargets() {
   var result = [];
   var children = objectsRoot.children;
   for (var i = 0; i < children.length; i++) {
-    if (children[i].userData.mapType !== 'spawn') result.push(children[i]);
+    var o = children[i];
+    if (NON_SOLID_TYPES[o.userData.mapType]) continue;
+    if (o.userData.mapCollide === false) continue;
+    result.push(o);
   }
   return result;
 }
@@ -4075,8 +4629,8 @@ function stepPreview(dt) {
     st.grounded = false;
   }
 
-  if (st.pos.y < -40) {
-    toast('掉出地图了，回到出生点');
+  if (st.pos.y < PROJECT.env.voidY) {
+    toast('掉进虚空了，回到出生点');
     var marks = spawnMarkers();
     st.pos.copy(marks.length ? marks[0].position : new THREE.Vector3(0, PREVIEW.foot + 0.02, 0));
     st.vy = 0;
@@ -4084,6 +4638,2415 @@ function stepPreview(dt) {
 
   camera.position.set(st.pos.x, st.pos.y + PREVIEW.eye, st.pos.z);
 }
+
+// ============================================================
+// 项目设置 · 环境 · 资源
+// ============================================================
+var ENV_DEFAULTS = {
+  hemiSky: '#d8e8ff',
+  hemiGround: '#6b6b5a',
+  hemiIntensity: 0.75,
+  ambientColor: '#ffffff',
+  ambientIntensity: 0,
+  sunColor: '#fff2dd',
+  sunIntensity: 1.9,
+  sunDir: [18, 32, 14],
+  sunShadow: true,
+  fog: true,
+  fogColor: '#bdd3e6',
+  fogNear: 90,
+  fogFar: 240,
+  exposure: 1,
+  skyMode: 'gradient',
+  skyTop: '#2f68b0',
+  skyMid: '#bdd6ef',
+  skyBot: '#9a9482',
+  skyColor: '#9cbcd8',
+  skyImage: '',
+  voidY: -120
+};
+
+var PROJECT = {
+  env: Object.assign({}, ENV_DEFAULTS),
+  assets: {},
+  thumb: ''
+};
+
+function assetList(kind) {
+  var out = [];
+  for (var k in PROJECT.assets) {
+    var a = PROJECT.assets[k];
+    if (!a) continue;
+    if (kind && a.kind !== kind) continue;
+    out.push({ key: k, asset: a });
+  }
+  out.sort(function(a, b) { return (a.asset.name || '').localeCompare(b.asset.name || ''); });
+  return out;
+}
+
+function assetUrl(key) {
+  var a = PROJECT.assets[key];
+  return a ? a.url : '';
+}
+
+function newAssetKey(kind) {
+  var n = 1;
+  while (PROJECT.assets[kind.charAt(0) + n]) n++;
+  return kind.charAt(0) + n;
+}
+
+function assetBytes() {
+  var total = 0;
+  for (var k in PROJECT.assets) {
+    var a = PROJECT.assets[k];
+    if (a && a.url) total += a.url.length * 0.75;
+  }
+  return total;
+}
+
+// ============================================================
+// 天空 / 环境应用
+// ============================================================
+var skyMesh = null;
+var skyMat = null;
+var editorAmbient = null;
+var voidPlane = null;
+
+function buildEditorSky() {
+  skyMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    depthWrite: false,
+    fog: false,
+    uniforms: {
+      uTop: { value: new THREE.Color(ENV_DEFAULTS.skyTop) },
+      uMid: { value: new THREE.Color(ENV_DEFAULTS.skyMid) },
+      uBot: { value: new THREE.Color(ENV_DEFAULTS.skyBot) },
+      uSun: { value: new THREE.Vector3(0.4, 0.8, 0.3) },
+      uSunCol: { value: new THREE.Color(0xfff4d8) },
+      uTime: { value: 0 }
+    },
+    vertexShader: [
+      'varying vec3 vDir;',
+      'void main() {',
+      '  vDir = normalize(position);',
+      '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+      '}'
+    ].join('\n'),
+    fragmentShader: [
+      'precision highp float;',
+      'varying vec3 vDir;',
+      'uniform vec3 uTop, uMid, uBot, uSun, uSunCol;',
+      'uniform float uTime;',
+      'float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
+      'float noise(vec2 p){',
+      '  vec2 i = floor(p), f = fract(p);',
+      '  vec2 u = f * f * (3.0 - 2.0 * f);',
+      '  return mix(mix(hash(i), hash(i + vec2(1,0)), u.x),',
+      '             mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), u.x), u.y);',
+      '}',
+      'float fbm(vec2 p){',
+      '  float v = 0.0, a = 0.5;',
+      '  for(int i = 0; i < 4; i++){ v += a * noise(p); p *= 2.03; a *= 0.5; }',
+      '  return v;',
+      '}',
+      'void main(){',
+      '  vec3 d = normalize(vDir);',
+      '  float h = d.y;',
+      '  vec3 col = h > 0.0',
+      '    ? mix(uMid, uTop, sqrt(clamp(h, 0.0, 1.0)))',
+      '    : mix(uMid, uBot, clamp(-h * 3.0, 0.0, 1.0));',
+      '  if (h > 0.02) {',
+      '    vec2 uv = d.xz / (h + 0.35);',
+      '    float c = fbm(uv * 1.6 + vec2(uTime * 0.008, uTime * 0.004));',
+      '    c = smoothstep(0.55, 0.95, c) * smoothstep(0.02, 0.28, h);',
+      '    col = mix(col, vec3(1.0, 0.99, 0.97), clamp(c, 0.0, 1.0) * 0.6);',
+      '  }',
+      '  float sd = max(dot(d, normalize(uSun)), 0.0);',
+      '  col += uSunCol * pow(sd, 220.0) * 1.4;',
+      '  col += uSunCol * pow(sd, 8.0) * 0.06;',
+      '  gl_FragColor = vec4(min(max(col, vec3(0.0)), vec3(4.0)), 1.0);',
+      '}'
+    ].join('\n')
+  });
+  skyMesh = new THREE.Mesh(new THREE.SphereGeometry(340, 32, 16), skyMat);
+  skyMesh.frustumCulled = false;
+  skyMesh.renderOrder = 999;
+  scene.add(skyMesh);
+}
+
+function buildVoidPlane() {
+  var geo = new THREE.PlaneGeometry(600, 600);
+  geo.rotateX(-Math.PI / 2);
+  voidPlane = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+    color: 0xff4d5e, transparent: true, opacity: 0.09,
+    side: THREE.DoubleSide, depthWrite: false
+  }));
+  voidPlane.renderOrder = -1;
+  voidPlane.visible = false;
+  scene.add(voidPlane);
+}
+
+var envSkyTexture = null;
+
+function applyEnv() {
+  var e = PROJECT.env;
+  hemi.color.set(e.hemiSky);
+  hemi.groundColor.set(e.hemiGround);
+  hemi.intensity = e.hemiIntensity;
+
+  sun.color.set(e.sunColor);
+  sun.intensity = e.sunIntensity;
+  sun.position.set(e.sunDir[0], e.sunDir[1], e.sunDir[2]);
+  sun.castShadow = !!e.sunShadow;
+
+  if (e.ambientIntensity > 0) {
+    if (!editorAmbient) { editorAmbient = new THREE.AmbientLight(0xffffff, 1); scene.add(editorAmbient); }
+    editorAmbient.color.set(e.ambientColor);
+    editorAmbient.intensity = e.ambientIntensity;
+  } else if (editorAmbient) {
+    scene.remove(editorAmbient); editorAmbient = null;
+  }
+
+  if (e.fog) {
+    if (!scene.fog) scene.fog = new THREE.Fog(e.fogColor, e.fogNear, e.fogFar);
+    scene.fog.color.set(e.fogColor);
+    scene.fog.near = e.fogNear;
+    scene.fog.far = Math.max(e.fogNear + 1, e.fogFar);
+  } else {
+    scene.fog = null;
+  }
+
+  if (envSkyTexture) { envSkyTexture.dispose(); envSkyTexture = null; }
+  if (e.skyMode === 'image' && e.skyImage) {
+    skyMesh.visible = false;
+    envSkyTexture = new THREE.TextureLoader().load(resolveTexUrl(e.skyImage));
+    envSkyTexture.mapping = THREE.EquirectangularReflectionMapping;
+    envSkyTexture.colorSpace = THREE.SRGBColorSpace;
+    scene.background = envSkyTexture;
+  } else if (e.skyMode === 'color') {
+    skyMesh.visible = false;
+    scene.background = new THREE.Color(e.skyColor);
+  } else {
+    skyMesh.visible = true;
+    scene.background = null;
+    skyMat.uniforms.uTop.value.set(e.skyTop);
+    skyMat.uniforms.uMid.value.set(e.skyMid);
+    skyMat.uniforms.uBot.value.set(e.skyBot);
+    skyMat.uniforms.uSun.value.copy(sun.position).normalize();
+  }
+
+  renderer.toneMapping = Math.abs(e.exposure - 1) < 0.01 ? THREE.NoToneMapping : THREE.LinearToneMapping;
+  renderer.toneMappingExposure = e.exposure;
+
+  if (voidPlane) {
+    voidPlane.position.y = e.voidY;
+    voidPlane.visible = e.voidY > -60;
+  }
+  syncWaterLighting();
+}
+
+function resolveTexUrl(v) {
+  if (!v) return '';
+  if (v.indexOf('asset:') === 0) return assetUrl(v.slice(6));
+  return v;
+}
+
+// ============================================================
+// 游戏水体（着色器与游戏内同源）
+// ============================================================
+var WATER_VERT = `
+uniform mat4 uTextureMatrix;
+varying vec4 vMirror;
+varying vec3 vWorld;
+varying vec2 vLocal;
+#include <fog_pars_vertex>
+void main() {
+  vLocal = position.xy;
+  vec4 worldPos = modelMatrix * vec4(position, 1.0);
+  vWorld = worldPos.xyz;
+  vMirror = uTextureMatrix * vec4(position, 1.0);
+  vec4 mvPosition = viewMatrix * worldPos;
+  gl_Position = projectionMatrix * mvPosition;
+  #include <fog_vertex>
+}`;
+
+var WATER_FRAG = `
+precision highp float;
+
+uniform float uTime;
+uniform vec3 uDeep;
+uniform vec3 uShallow;
+uniform vec3 uSunDir;
+uniform vec3 uSunColor;
+uniform vec3 uSkyColor;
+uniform sampler2D uReflect;
+uniform float uHasReflect;
+uniform vec2 uHalf;
+uniform float uBowl;
+uniform float uDepth;
+uniform float uWave;
+uniform float uOpacity;
+uniform float uAmbient;
+
+varying vec4 vMirror;
+varying vec3 vWorld;
+varying vec2 vLocal;
+
+#include <fog_pars_fragment>
+
+float hash12(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+float vnoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), u.x),
+             mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+
+void addWave(inout vec2 acc, vec2 dir, float freq, float amp, float speed, vec2 p, float t) {
+  acc += dir * (cos(dot(dir, p) * freq + t * speed) * amp * freq);
+}
+
+vec3 rippleNormal(vec2 p, float t) {
+  vec2 acc = vec2(0.0);
+  addWave(acc, normalize(vec2(1.0, 0.32)), 1.35, 0.052, 1.05, p, t);
+  addWave(acc, normalize(vec2(-0.42, 1.0)), 1.85, 0.040, 1.32, p, t);
+  addWave(acc, normalize(vec2(0.75, -0.66)), 3.10, 0.020, 1.90, p, t);
+#if WATER_Q > 1
+  addWave(acc, normalize(vec2(-1.0, -0.18)), 4.60, 0.0125, 2.40, p, t);
+  addWave(acc, normalize(vec2(0.18, 1.0)), 6.90, 0.0068, 3.10, p, t);
+#endif
+#if WATER_Q > 2
+  addWave(acc, normalize(vec2(-0.62, 0.78)), 10.5, 0.0032, 4.20, p, t);
+  vec2 q = p * 2.7 + vec2(t * 0.21, -t * 0.16);
+  float e = 0.09;
+  float n0 = vnoise(q);
+  acc += vec2(vnoise(q + vec2(e, 0.0)) - n0, vnoise(q + vec2(0.0, e)) - n0) * (0.85 / e) * 0.030;
+#endif
+  acc *= uWave;
+  return normalize(vec3(-acc.x, 1.0, -acc.y));
+}
+
+void main() {
+  bool up = gl_FrontFacing;
+  vec3 n = rippleNormal(vWorld.xz, uTime);
+  if (!up) n.y = -n.y;
+
+  vec3 viewDir = normalize(cameraPosition - vWorld);
+  float ndv = clamp(dot(n, viewDir), 0.0, 1.0);
+  float fres = 0.021 + 0.979 * pow(1.0 - ndv, 4.2);
+
+  float depth = uDepth;
+  if (uBowl > 0.5) {
+    float r = clamp(length(vLocal) / max(uHalf.x, 0.001), 0.0, 1.0);
+    depth = uDepth * sqrt(max(0.0, 1.0 - r * r));
+  }
+
+  float depthK = clamp(depth / max(uDepth, 0.001), 0.0, 1.0);
+  vec3 body = mix(uShallow, uDeep, depthK * depthK) * uAmbient;
+
+  vec3 skyTint = mix(uSkyColor, vec3(1.0), 0.10 * uAmbient);
+  vec3 refl = skyTint;
+  if (uHasReflect > 0.5 && up) {
+    vec2 uv = vMirror.xy / max(vMirror.w, 0.0001);
+    uv += n.xz * (0.05 + 0.16 * (1.0 - ndv));
+    vec2 cl = clamp(uv, vec2(0.003), vec2(0.997));
+    float inside = 1.0 - step(0.0001, length(uv - cl));
+    refl = mix(skyTint, texture2D(uReflect, cl).rgb, inside * 0.94);
+  }
+
+  vec3 h = normalize(uSunDir + viewDir);
+  float nh = clamp(dot(n, h), 0.0, 1.0);
+  float spec = pow(nh, 220.0) * 2.4;
+#if WATER_Q > 1
+  spec += pow(nh, 26.0) * 0.14;
+#endif
+
+  vec3 col;
+  float alpha;
+  if (up) {
+    col = mix(body, refl, min(fres, 0.92));
+    col += uSunColor * spec;
+    alpha = mix(0.60, 0.965, clamp(depth / 1.5, 0.0, 1.0));
+    alpha = clamp(max(alpha, fres * 0.9), 0.0, 1.0) * uOpacity;
+  } else {
+    col = mix(uDeep * 0.9 * uAmbient, skyTint, 0.30 + 0.5 * (1.0 - ndv));
+    col += uSunColor * spec * 0.5;
+    alpha = clamp(0.34 + 0.5 * (1.0 - ndv), 0.0, 1.0) * uOpacity;
+  }
+
+  gl_FragColor = vec4(col, alpha);
+  #include <colorspace_fragment>
+  #include <fog_fragment>
+}`;
+
+var CAUSTIC_VERT = `
+varying vec3 vWorld;
+#include <fog_pars_vertex>
+void main() {
+  vec4 worldPos = modelMatrix * vec4(position, 1.0);
+  vWorld = worldPos.xyz;
+  vec4 mvPosition = viewMatrix * worldPos;
+  gl_Position = projectionMatrix * mvPosition;
+  #include <fog_vertex>
+}`;
+
+var CAUSTIC_FRAG = `
+precision highp float;
+uniform float uTime;
+uniform float uStrength;
+uniform vec3 uTint;
+varying vec3 vWorld;
+#include <fog_pars_fragment>
+
+void main() {
+  vec2 p = vWorld.xz * 0.95;
+  vec2 i = p;
+  float c = 1.0;
+  float inten = 0.0055;
+  for (int k = 0; k < 4; k++) {
+    float t = uTime * 0.42 * (1.0 + float(k) * 0.11);
+    i = p + vec2(cos(t - i.x) + sin(t + i.y), sin(t - i.y) + cos(t + i.x));
+    c += 1.0 / length(vec2(p.x / (sin(i.x + t) / inten), p.y / (cos(i.y + t) / inten)));
+  }
+  c = pow(clamp(1.20 - c / 4.0, 0.0, 1.0), 7.0);
+  gl_FragColor = vec4(uTint * c * uStrength, 1.0);
+  #include <colorspace_fragment>
+  #include <fog_fragment>
+}`;
+
+
+
+var WATER_BODY_VERT = `
+varying vec3 vWorld;
+#include <fog_pars_vertex>
+void main() {
+  vec4 worldPos = modelMatrix * vec4(position, 1.0);
+  vWorld = worldPos.xyz;
+  vec4 mvPosition = viewMatrix * worldPos;
+  gl_Position = projectionMatrix * mvPosition;
+  #include <fog_vertex>
+}`;
+
+var WATER_BODY_FRAG = `
+precision highp float;
+uniform vec3 uDeep;
+uniform vec3 uShallow;
+uniform float uSurfaceY;
+uniform float uDepth;
+uniform float uOpacity;
+uniform float uAmbient;
+varying vec3 vWorld;
+#include <fog_pars_fragment>
+
+void main() {
+  float k = clamp((uSurfaceY - vWorld.y) / max(uDepth, 0.001), 0.0, 1.0);
+  vec3 col = mix(uShallow, uDeep, k * k) * uAmbient;
+  float a = mix(0.30, 0.74, k) * uOpacity;
+  gl_FragColor = vec4(col, a);
+  #include <colorspace_fragment>
+  #include <fog_fragment>
+}`;
+
+var WATER_QUALITY = DESKTOP ? 3 : 2;
+var waterList = [];
+var waterTime = 0;
+
+var causticMat = new THREE.ShaderMaterial({
+  vertexShader: CAUSTIC_VERT,
+  fragmentShader: CAUSTIC_FRAG,
+  uniforms: THREE.UniformsUtils.merge([
+    THREE.UniformsLib.fog,
+    {
+      uTime: { value: 0 },
+      uStrength: { value: 0.5 },
+      uTint: { value: new THREE.Color(0x9fe0f2) }
+    }
+  ]),
+  transparent: true,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  fog: true
+});
+
+function makeWaterMaterial(round) {
+  return new THREE.ShaderMaterial({
+    vertexShader: WATER_VERT,
+    fragmentShader: WATER_FRAG,
+    defines: { WATER_Q: WATER_QUALITY },
+    uniforms: THREE.UniformsUtils.merge([
+      THREE.UniformsLib.fog,
+      {
+        uTime: { value: 0 },
+        uTextureMatrix: { value: new THREE.Matrix4() },
+        uReflect: { value: null },
+        uHasReflect: { value: 0 },
+        uDeep: { value: new THREE.Color(0x0b3644) },
+        uShallow: { value: new THREE.Color(0x2f93a4) },
+        uSunDir: { value: new THREE.Vector3(0.4, 0.8, 0.3) },
+        uSunColor: { value: new THREE.Color(1, 0.97, 0.9) },
+        uSkyColor: { value: new THREE.Color(0.72, 0.83, 0.94) },
+        uHalf: { value: new THREE.Vector2(0.5, 0.5) },
+        uBowl: { value: round ? 1 : 0 },
+        uDepth: { value: 2.4 },
+        uWave: { value: 1 },
+        uOpacity: { value: 1 },
+        uAmbient: { value: 1 }
+      }
+    ]),
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    fog: true
+  });
+}
+
+function makeWaterBodyMaterial() {
+  return new THREE.ShaderMaterial({
+    vertexShader: WATER_BODY_VERT,
+    fragmentShader: WATER_BODY_FRAG,
+    uniforms: THREE.UniformsUtils.merge([
+      THREE.UniformsLib.fog,
+      {
+        uDeep: { value: new THREE.Color(0x0b3644) },
+        uShallow: { value: new THREE.Color(0x2f93a4) },
+        uSurfaceY: { value: 0 },
+        uDepth: { value: 2.4 },
+        uOpacity: { value: 1 },
+        uAmbient: { value: 1 }
+      }
+    ]),
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    fog: true
+  });
+}
+
+function waterBodyGeometry(depth, round) {
+  if (round) {
+    var g = new THREE.SphereGeometry(1, 40, 20, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
+    g.scale(0.5, depth, 0.5);
+    return g;
+  }
+  var box = new THREE.BoxGeometry(1, depth, 1);
+  box.translate(0, -depth / 2, 0);
+  var pos = box.getAttribute('position');
+  var idx = box.index.array;
+  var keep = [];
+  for (var i = 0; i < idx.length; i += 3) {
+    var y0 = pos.getY(idx[i]), y1 = pos.getY(idx[i + 1]), y2 = pos.getY(idx[i + 2]);
+    if (y0 > -1e-4 && y1 > -1e-4 && y2 > -1e-4) continue;
+    keep.push(idx[i], idx[i + 1], idx[i + 2]);
+  }
+  box.setIndex(keep);
+  return box;
+}
+
+function waterEdgeGeometry(depth, round) {
+  if (round) {
+    var pts = [];
+    var seg = 40;
+    for (var i = 0; i < seg; i++) {
+      var a0 = i / seg * Math.PI * 2, a1 = (i + 1) / seg * Math.PI * 2;
+      pts.push(Math.cos(a0) * 0.5, 0, Math.sin(a0) * 0.5, Math.cos(a1) * 0.5, 0, Math.sin(a1) * 0.5);
+      pts.push(Math.cos(a0) * 0.5, -depth, Math.sin(a0) * 0.5, Math.cos(a1) * 0.5, -depth, Math.sin(a1) * 0.5);
+      if (i % 5 === 0) pts.push(Math.cos(a0) * 0.5, 0, Math.sin(a0) * 0.5, Math.cos(a0) * 0.5, -depth, Math.sin(a0) * 0.5);
+    }
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    return g;
+  }
+  var box = new THREE.BoxGeometry(1, depth, 1);
+  box.translate(0, -depth / 2, 0);
+  var edges = new THREE.EdgesGeometry(box);
+  box.dispose();
+  return edges;
+}
+
+function createWater(data) {
+  data = data || {};
+  var round = data.shape === 'round';
+  var root = new THREE.Group();
+  root.userData.mapObject = true;
+  root.userData.mapType = 'water';
+  root.userData.mapName = data.name || '水体';
+  root.userData.mapColor = data.shallow || '#2f93a4';
+  root.userData.waterShape = round ? 'round' : 'rect';
+  root.userData.waterDepth = Number.isFinite(+data.depth) ? +data.depth : 2.4;
+  root.userData.waterDeep = data.deep || '#0b3644';
+  root.userData.waterShallow = data.shallow || '#2f93a4';
+  root.userData.waterOpacity = Number.isFinite(+data.opacity) ? +data.opacity : 1;
+  root.userData.waterCaustics = data.caustics === undefined ? true : !!data.caustics;
+
+  var geo = round ? new THREE.CircleGeometry(0.5, 64) : new THREE.PlaneGeometry(1, 1, 1, 1);
+  var surf = new THREE.Mesh(geo, makeWaterMaterial(round));
+  surf.rotation.x = -Math.PI / 2;
+  surf.renderOrder = 6;
+  root.add(surf);
+  root.userData.waterSurface = surf;
+
+  var bodyMesh = new THREE.Mesh(waterBodyGeometry(root.userData.waterDepth, round), makeWaterBodyMaterial());
+  bodyMesh.renderOrder = 4;
+  root.add(bodyMesh);
+  root.userData.waterBody = bodyMesh;
+
+  var edge = new THREE.LineSegments(
+    waterEdgeGeometry(root.userData.waterDepth, round),
+    new THREE.LineBasicMaterial({ color: 0x5fd3f5, transparent: true, opacity: 0.28, depthWrite: false })
+  );
+  root.add(edge);
+  root.userData.waterEdge = edge;
+
+  var caustic = null;
+  if (root.userData.waterCaustics) {
+    var cg = round ? new THREE.CircleGeometry(0.492, 48) : new THREE.PlaneGeometry(0.985, 0.985, 1, 1);
+    caustic = new THREE.Mesh(cg, causticMat);
+    caustic.rotation.x = -Math.PI / 2;
+    caustic.renderOrder = 5;
+    root.add(caustic);
+    root.userData.waterCaustic = caustic;
+  }
+
+  var pos = data.position || placementPoint('water');
+  root.position.fromArray(pos);
+  var sx = Number.isFinite(+data.sizeX) ? +data.sizeX : 10;
+  var sz = round ? sx : (Number.isFinite(+data.sizeZ) ? +data.sizeZ : 10);
+  root.scale.set(sx, 1, sz);
+  objectsRoot.add(root);
+  waterList.push(root);
+  refreshWater(root);
+  return root;
+}
+
+function refreshWater(root) {
+  if (!root || root.userData.mapType !== 'water') return;
+  var round = root.userData.waterShape === 'round';
+  var depth = Math.max(0.15, +root.userData.waterDepth || 2.4);
+  root.userData.waterDepth = depth;
+  root.scale.y = 1;
+  root.rotation.set(0, 0, 0);
+  if (round) root.scale.z = root.scale.x;
+  var u = root.userData.waterSurface.material.uniforms;
+  u.uDepth.value = depth;
+  u.uDeep.value.set(root.userData.waterDeep);
+  u.uShallow.value.set(root.userData.waterShallow);
+  u.uOpacity.value = root.userData.waterOpacity;
+  u.uBowl.value = round ? 1 : 0;
+  root.userData.mapColor = root.userData.waterShallow;
+
+  var edge = root.userData.waterEdge;
+  if (edge) {
+    edge.geometry.dispose();
+    edge.geometry = waterEdgeGeometry(depth, round);
+  }
+  var bodyMesh = root.userData.waterBody;
+  if (bodyMesh) {
+    bodyMesh.geometry.dispose();
+    bodyMesh.geometry = waterBodyGeometry(depth, round);
+    var bu = bodyMesh.material.uniforms;
+    bu.uDeep.value.set(root.userData.waterDeep);
+    bu.uShallow.value.set(root.userData.waterShallow);
+    bu.uDepth.value = depth;
+    bu.uOpacity.value = root.userData.waterOpacity;
+    bu.uSurfaceY.value = root.position.y;
+  }
+  var caustic = root.userData.waterCaustic;
+  if (caustic) caustic.position.y = -depth + 0.04;
+}
+
+function syncWaterLighting() {
+  var e = PROJECT.env;
+  var dir = new THREE.Vector3(e.sunDir[0], e.sunDir[1], e.sunDir[2]).normalize();
+  var sunCol = new THREE.Color(e.sunColor).multiplyScalar(Math.max(0.1, e.sunIntensity * 0.5));
+  var skyCol = new THREE.Color(e.skyMode === 'gradient' ? e.skyMid : e.skyColor);
+  var irradiance = e.sunIntensity * 0.55 + e.hemiIntensity * 0.9;
+  var ambient = 0.07 + 0.93 * Math.pow(Math.max(0, Math.min(1, irradiance / 1.72)), 0.75);
+  for (var i = 0; i < waterList.length; i++) {
+    var w = waterList[i];
+    if (!w.parent) continue;
+    var u = w.userData.waterSurface.material.uniforms;
+    u.uSunDir.value.copy(dir);
+    u.uSunColor.value.copy(sunCol);
+    u.uSkyColor.value.copy(skyCol);
+    u.uAmbient.value = ambient;
+    if (w.userData.waterBody) w.userData.waterBody.material.uniforms.uAmbient.value = ambient;
+  }
+}
+
+function updateWater(dt) {
+  waterTime += dt;
+  causticMat.uniforms.uTime.value = waterTime;
+  for (var li = lightList.length - 1; li >= 0; li--) {
+    if (!lightList[li].parent) lightList.splice(li, 1);
+  }
+  for (var i = waterList.length - 1; i >= 0; i--) {
+    var w = waterList[i];
+    if (!w.parent) { waterList.splice(i, 1); continue; }
+    if (w.rotation.x || w.rotation.y || w.rotation.z) w.rotation.set(0, 0, 0);
+    if (w.scale.y !== 1) w.scale.y = 1;
+    if (w.userData.waterShape === 'round' && w.scale.z !== w.scale.x) w.scale.z = w.scale.x;
+    w.userData.waterSurface.material.uniforms.uTime.value = waterTime;
+    if (w.userData.waterBody) w.userData.waterBody.material.uniforms.uSurfaceY.value = w.position.y;
+    var cam = camera.position;
+    var under = cam.y < w.position.y;
+    if (w.userData.waterCaustic) w.userData.waterCaustic.visible = under;
+  }
+}
+
+// ===== 水面反射（照搬游戏的斜投影裁剪）=====
+var reflectRT = null;
+var reflectCam = new THREE.PerspectiveCamera();
+var _reflPos = new THREE.Vector3();
+var _reflCam = new THREE.Vector3();
+var _reflRot = new THREE.Matrix4();
+var _reflNormal = new THREE.Vector3();
+var _reflView = new THREE.Vector3();
+var _reflTarget = new THREE.Vector3();
+var _reflLook = new THREE.Vector3();
+var _reflPlane = new THREE.Plane();
+var _reflVec = new THREE.Vector4();
+var _reflQ = new THREE.Vector4();
+var _reflTexMat = new THREE.Matrix4();
+var _reflSize = new THREE.Vector2();
+var _reflHidden = [];
+var CLIP_BIAS = 0.0035;
+
+function ensureReflectTarget() {
+  var size = renderer.getDrawingBufferSize(_reflSize);
+  var w = Math.max(64, Math.floor(size.x * 0.62));
+  var h = Math.max(64, Math.floor(size.y * 0.62));
+  if (!reflectRT) {
+    reflectRT = new THREE.WebGLRenderTarget(w, h, {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      type: THREE.UnsignedByteType,
+      depthBuffer: true,
+      stencilBuffer: false
+    });
+    reflectRT.texture.generateMipmaps = false;
+  } else if (reflectRT.width !== w || reflectRT.height !== h) {
+    reflectRT.setSize(w, h);
+  }
+  return reflectRT;
+}
+
+function pickReflectVolume() {
+  var best = null, bestD = 100 * 100;
+  for (var i = 0; i < waterList.length; i++) {
+    var v = waterList[i];
+    if (!v.parent || !v.visible) continue;
+    if (camera.position.y <= v.position.y + 0.04) continue;
+    var hx = Math.abs(v.scale.x) * 0.5, hz = Math.abs(v.scale.z) * 0.5;
+    var dx = Math.max(0, Math.abs(camera.position.x - v.position.x) - hx);
+    var dz = Math.max(0, Math.abs(camera.position.z - v.position.z) - hz);
+    var d = dx * dx + dz * dz;
+    if (d >= bestD) continue;
+    bestD = d; best = v;
+  }
+  return best;
+}
+
+function renderWaterReflection() {
+  for (var i = 0; i < waterList.length; i++) {
+    var u0 = waterList[i].userData.waterSurface;
+    if (u0) u0.material.uniforms.uHasReflect.value = 0;
+  }
+  if (WATER_QUALITY < 2) return;
+  var vol = pickReflectVolume();
+  if (!vol) return;
+  var rt = ensureReflectTarget();
+  if (!rt) return;
+
+  var mesh = vol.userData.waterSurface;
+  mesh.updateMatrixWorld(true);
+  _reflPos.setFromMatrixPosition(mesh.matrixWorld);
+  _reflCam.setFromMatrixPosition(camera.matrixWorld);
+  _reflRot.extractRotation(mesh.matrixWorld);
+  _reflNormal.set(0, 0, 1).applyMatrix4(_reflRot).normalize();
+
+  _reflView.subVectors(_reflPos, _reflCam);
+  if (_reflView.dot(_reflNormal) > 0) return;
+  _reflView.reflect(_reflNormal).negate().add(_reflPos);
+
+  _reflRot.extractRotation(camera.matrixWorld);
+  _reflLook.set(0, 0, -1).applyMatrix4(_reflRot).add(_reflCam);
+  _reflTarget.subVectors(_reflPos, _reflLook);
+  _reflTarget.reflect(_reflNormal).negate().add(_reflPos);
+
+  reflectCam.position.copy(_reflView);
+  reflectCam.up.set(0, 1, 0).applyMatrix4(_reflRot).reflect(_reflNormal);
+  reflectCam.lookAt(_reflTarget);
+  reflectCam.near = camera.near;
+  reflectCam.far = camera.far;
+  reflectCam.aspect = camera.aspect;
+  reflectCam.updateMatrixWorld();
+  reflectCam.projectionMatrix.copy(camera.projectionMatrix);
+
+  _reflTexMat.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
+  _reflTexMat.multiply(reflectCam.projectionMatrix);
+  _reflTexMat.multiply(reflectCam.matrixWorldInverse);
+  _reflTexMat.multiply(mesh.matrixWorld);
+
+  _reflPlane.setFromNormalAndCoplanarPoint(_reflNormal, _reflPos);
+  _reflPlane.applyMatrix4(reflectCam.matrixWorldInverse);
+  _reflVec.set(_reflPlane.normal.x, _reflPlane.normal.y, _reflPlane.normal.z, _reflPlane.constant);
+  var pm = reflectCam.projectionMatrix;
+  _reflQ.set(
+    (Math.sign(_reflVec.x) + pm.elements[8]) / pm.elements[0],
+    (Math.sign(_reflVec.y) + pm.elements[9]) / pm.elements[5],
+    -1.0,
+    (1.0 + pm.elements[10]) / pm.elements[14]
+  );
+  _reflVec.multiplyScalar(2.0 / _reflVec.dot(_reflQ));
+  pm.elements[2] = _reflVec.x;
+  pm.elements[6] = _reflVec.y;
+  pm.elements[10] = _reflVec.z + 1.0 - CLIP_BIAS;
+  pm.elements[14] = _reflVec.w;
+
+  _reflHidden.length = 0;
+  for (var j = 0; j < waterList.length; j++) {
+    var s = waterList[j].userData.waterSurface;
+    if (s && s.visible) { _reflHidden.push(s); s.visible = false; }
+    var bm = waterList[j].userData.waterBody;
+    if (bm && bm.visible) { _reflHidden.push(bm); bm.visible = false; }
+  }
+  if (transform.visible) { _reflHidden.push(transform); transform.visible = false; }
+  if (grid.visible) { _reflHidden.push(grid); grid.visible = false; }
+
+  var prevTarget = renderer.getRenderTarget();
+  var prevShadowAuto = renderer.shadowMap.autoUpdate;
+  renderer.shadowMap.autoUpdate = false;
+  renderer.setRenderTarget(rt);
+  renderer.render(scene, reflectCam);
+  renderer.setRenderTarget(prevTarget);
+  renderer.shadowMap.autoUpdate = prevShadowAuto;
+
+  for (var k = 0; k < _reflHidden.length; k++) _reflHidden[k].visible = true;
+  _reflHidden.length = 0;
+
+  var u = mesh.material.uniforms;
+  u.uTextureMatrix.value.copy(_reflTexMat);
+  u.uReflect.value = rt.texture;
+  u.uHasReflect.value = 1;
+}
+
+// ============================================================
+// 光源
+// ============================================================
+var lightList = [];
+var LIGHT_GIZMO_GEO = new THREE.SphereGeometry(0.16, 12, 10);
+var LIGHT_CONE_MAT = new THREE.LineBasicMaterial({ color: 0xffd479, transparent: true, opacity: 0.6 });
+
+function lightConeGeometry(angleDeg, dist) {
+  var a = angleDeg * Math.PI / 180;
+  var r = Math.tan(a) * dist;
+  var pts = [];
+  var seg = 24;
+  for (var i = 0; i < seg; i++) {
+    var a0 = i / seg * Math.PI * 2, a1 = (i + 1) / seg * Math.PI * 2;
+    pts.push(Math.cos(a0) * r, -dist, Math.sin(a0) * r, Math.cos(a1) * r, -dist, Math.sin(a1) * r);
+    if (i % 6 === 0) pts.push(0, 0, 0, Math.cos(a0) * r, -dist, Math.sin(a0) * r);
+  }
+  var g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  return g;
+}
+
+function createLight(data) {
+  data = data || {};
+  var type = data.type === 'spot' ? 'spot' : 'point';
+  var root = new THREE.Group();
+  root.userData.mapObject = true;
+  root.userData.mapType = 'light';
+  root.userData.lightType = type;
+  root.userData.mapName = data.name || (type === 'spot' ? '聚光灯' : '点光源');
+  root.userData.mapColor = data.color || '#ffffff';
+  root.userData.lightIntensity = Number.isFinite(+data.intensity) ? +data.intensity : 8;
+  root.userData.lightDistance = Number.isFinite(+data.distance) ? +data.distance : 18;
+  root.userData.lightDecay = Number.isFinite(+data.decay) ? +data.decay : 2;
+  root.userData.lightAngle = Number.isFinite(+data.angle) ? +data.angle : 35;
+  root.userData.lightPenumbra = Number.isFinite(+data.penumbra) ? +data.penumbra : 0.35;
+  root.userData.lightShadow = !!data.castShadow;
+
+  var gizmo = new THREE.Mesh(LIGHT_GIZMO_GEO, new THREE.MeshBasicMaterial({ color: root.userData.mapColor }));
+  root.add(gizmo);
+  root.userData.lightGizmo = gizmo;
+
+  var light;
+  if (type === 'spot') {
+    light = new THREE.SpotLight(root.userData.mapColor, root.userData.lightIntensity,
+      root.userData.lightDistance, root.userData.lightAngle * Math.PI / 180,
+      root.userData.lightPenumbra, root.userData.lightDecay);
+    light.target.position.set(0, -1, 0);
+    root.add(light.target);
+    var cone = new THREE.LineSegments(
+      lightConeGeometry(root.userData.lightAngle, Math.min(root.userData.lightDistance || 12, 24)),
+      LIGHT_CONE_MAT);
+    root.add(cone);
+    root.userData.lightCone = cone;
+  } else {
+    light = new THREE.PointLight(root.userData.mapColor, root.userData.lightIntensity,
+      root.userData.lightDistance, root.userData.lightDecay);
+  }
+  root.add(light);
+  root.userData.light = light;
+
+  root.position.fromArray(data.position || placementPoint('light'));
+  if (data.rotation) root.rotation.fromArray(data.rotation);
+  objectsRoot.add(root);
+  lightList.push(root);
+  refreshLight(root);
+  return root;
+}
+
+function refreshLight(root) {
+  if (!root || root.userData.mapType !== 'light') return;
+  var l = root.userData.light;
+  l.color.set(root.userData.mapColor);
+  l.intensity = root.userData.lightIntensity;
+  l.distance = root.userData.lightDistance;
+  l.decay = root.userData.lightDecay;
+  root.userData.lightGizmo.material.color.set(root.userData.mapColor);
+  if (root.userData.lightType === 'spot') {
+    l.angle = root.userData.lightAngle * Math.PI / 180;
+    l.penumbra = root.userData.lightPenumbra;
+    var cone = root.userData.lightCone;
+    if (cone) {
+      cone.geometry.dispose();
+      cone.geometry = lightConeGeometry(root.userData.lightAngle, Math.min(root.userData.lightDistance || 12, 24));
+    }
+  }
+  l.castShadow = false;
+}
+
+function lightTargetWorld(root) {
+  var dir = new THREE.Vector3(0, -1, 0).applyQuaternion(root.quaternion);
+  var d = Math.max(1, root.userData.lightDistance * 0.6);
+  return [
+    +(root.position.x + dir.x * d).toFixed(4),
+    +(root.position.y + dir.y * d).toFixed(4),
+    +(root.position.z + dir.z * d).toFixed(4)
+  ];
+}
+
+// ============================================================
+// 缩略图渲染（放置面板用）
+// ============================================================
+var thumbCache = new Map();
+var thumbRenderer = null;
+var thumbScene = null;
+var thumbCam = null;
+
+function ensureThumbRenderer() {
+  if (thumbRenderer) return;
+  thumbRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  thumbRenderer.setSize(96, 96);
+  thumbRenderer.outputColorSpace = THREE.SRGBColorSpace;
+  thumbScene = new THREE.Scene();
+  thumbScene.add(new THREE.HemisphereLight(0xffffff, 0x555555, 2.0));
+  var d = new THREE.DirectionalLight(0xffffff, 2.2);
+  d.position.set(3, 5, 4);
+  thumbScene.add(d);
+  thumbCam = new THREE.PerspectiveCamera(35, 1, 0.05, 200);
+}
+
+function renderThumb(mesh) {
+  ensureThumbRenderer();
+  thumbScene.add(mesh);
+  var box = new THREE.Box3().setFromObject(mesh);
+  var c = box.getCenter(new THREE.Vector3());
+  var r = Math.max(0.06, box.getSize(new THREE.Vector3()).length() * 0.5);
+  var dist = r / Math.tan(35 * Math.PI / 360) * 1.25;
+  thumbCam.position.set(c.x + dist * 0.62, c.y + dist * 0.52, c.z + dist * 0.68);
+  thumbCam.lookAt(c);
+  thumbRenderer.render(thumbScene, thumbCam);
+  var url = thumbRenderer.domElement.toDataURL('image/png');
+  thumbScene.remove(mesh);
+  mesh.traverse(function(o) {
+    if (o.isMesh || o.isLineSegments) {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material && o.material.dispose) o.material.dispose();
+    }
+  });
+  return url;
+}
+
+function primitiveThumb(type) {
+  var key = 'p:' + type;
+  if (thumbCache.has(key)) return thumbCache.get(key);
+  var mesh;
+  if (type === 'spawn') mesh = makeSpawnMarker();
+  else if (type === 'water') {
+    mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 0.34, 1),
+      new THREE.MeshStandardMaterial({ color: 0x2f93a4, transparent: true, opacity: 0.75, roughness: 0.25 }));
+  } else if (type === 'light') {
+    mesh = new THREE.Mesh(new THREE.SphereGeometry(0.5, 18, 14),
+      new THREE.MeshStandardMaterial({ color: 0xffe08a, emissive: 0xffb733, emissiveIntensity: 0.9, roughness: 0.4 }));
+  } else if (type === 'spotlight') {
+    mesh = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1, 22),
+      new THREE.MeshStandardMaterial({ color: 0xffe08a, emissive: 0xffb733, emissiveIntensity: 0.7, roughness: 0.4 }));
+  } else {
+    mesh = new THREE.Mesh(geometryFor(type),
+      new THREE.MeshStandardMaterial({ color: 0xb9c0c8, roughness: 0.7, metalness: 0.05 }));
+  }
+  var url = renderThumb(mesh);
+  thumbCache.set(key, url);
+  return url;
+}
+
+function itemThumb(id) {
+  var key = 'i:' + id;
+  if (thumbCache.has(key)) return thumbCache.get(key);
+  var it = ITEM_BY_ID[id];
+  var geo;
+  if (!it) geo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+  else if (it.s === 'cyl') geo = new THREE.CylinderGeometry(it.d[1], it.d[1], it.d[0], 20);
+  else if (it.s === 'torus') geo = new THREE.TorusGeometry(it.d[0], it.d[1], 10, 24);
+  else geo = new THREE.BoxGeometry(it.d[0], it.d[1], it.d[2]);
+  if (it && it.s === 'torus') geo.rotateX(-Math.PI / 2);
+  var mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    color: it ? it.c : '#8d9299', roughness: 0.7, metalness: 0.06
+  }));
+  var url = renderThumb(mesh);
+  thumbCache.set(key, url);
+  return url;
+}
+
+function gunThumb(id) {
+  var key = 'g:' + id;
+  if (thumbCache.has(key)) return thumbCache.get(key);
+  var g = GUN_BY_ID[id];
+  var s = GUN_SIZE[(g && g.cat) || 'other'];
+  var root = new THREE.Group();
+  var mat = new THREE.MeshStandardMaterial({ color: 0x30353c, roughness: 0.55, metalness: 0.4 });
+  var body = new THREE.Mesh(new THREE.BoxGeometry(s[0], s[1] * 0.45, s[2]), mat);
+  root.add(body);
+  var grip = new THREE.Mesh(new THREE.BoxGeometry(s[0] * 0.22, s[1] * 0.85, s[2] * 0.9), mat);
+  grip.position.set(-s[0] * 0.24, -s[1] * 0.5, 0);
+  grip.rotation.z = 0.22;
+  root.add(grip);
+  var url = renderThumb(root);
+  thumbCache.set(key, url);
+  return url;
+}
+
+// ============================================================
+// 游戏枪械放置
+// ============================================================
+function createGun(gunId, data) {
+  data = data || {};
+  var g = GUN_BY_ID[gunId];
+  if (!g) return null;
+  var s = GUN_SIZE[g.cat || 'other'];
+  var root = new THREE.Group();
+  var mat = new THREE.MeshStandardMaterial({ color: 0x30353c, roughness: 0.55, metalness: 0.4 });
+  var body = new THREE.Mesh(new THREE.BoxGeometry(s[0], s[1] * 0.45, s[2]), mat);
+  body.castShadow = body.receiveShadow = true;
+  root.add(body);
+  var grip = new THREE.Mesh(new THREE.BoxGeometry(s[0] * 0.22, s[1] * 0.85, s[2] * 0.9), mat);
+  grip.position.set(-s[0] * 0.24, -s[1] * 0.5, 0);
+  grip.rotation.z = 0.22;
+  grip.castShadow = grip.receiveShadow = true;
+  root.add(grip);
+
+  root.userData.mapObject = true;
+  root.userData.mapType = 'gun';
+  root.userData.isGun = true;
+  root.userData.gunId = gunId;
+  root.userData.mapName = data.name || g.n;
+  root.userData.mapColor = '#30353c';
+  root.position.fromArray(data.position || placementPoint('gun'));
+  if (data.rotation) root.rotation.fromArray(data.rotation);
+  objectsRoot.add(root);
+  return root;
+}
+
+// ============================================================
+// 物体声音
+// ============================================================
+var SOUND_TRIGGERS = [
+  { id: 'fist', label: '被拳头攻击' },
+  { id: 'melee', label: '被近战武器攻击' },
+  { id: 'blunt', label: '被钝器攻击' },
+  { id: 'gun', label: '被枪械射击' },
+  { id: 'collide', label: '产生碰撞' },
+  { id: 'step', label: '在上面走路' },
+  { id: 'loop', label: '循环播放' }
+];
+var COLLIDE_SOURCES = [
+  { id: 'any', label: '任意' },
+  { id: 'doll', label: '布娃娃' },
+  { id: 'prop', label: '物品' },
+  { id: 'gun', label: '枪械' }
+];
+
+function objectSounds(o) {
+  if (!o.userData.mapSounds) o.userData.mapSounds = [];
+  return o.userData.mapSounds;
+}
+
+function soundsCarrier(o) {
+  var t = o && o.userData.mapType;
+  return t && t !== 'spawn' && t !== 'light' && t !== 'water' && t !== 'gun' && !o.userData.isProp;
+}
+
+// ============================================================
+// 层级结构面板（右侧 + 组树形折叠）
+// ============================================================
+var hierPanel = null;
+var hierList = null;
+var hierSearch = null;
+var hierCount = null;
+var hierCollapsed = false;
+var hierGroupState = {};
+
+function buildHierarchy() {
+  hierPanel = document.createElement('div');
+  hierPanel.id = 'hierPanel';
+  hierPanel.innerHTML =
+    '<div class="hierHead">' +
+    '<span class="hierTitle">📋 层级</span>' +
+    '<button id="hierToggle" title="折叠/展开">' + (hierCollapsed ? '▸' : '▾') + '</button>' +
+    '</div>' +
+    '<div class="hierBody">' +
+    '<input id="hierSearch" type="text" placeholder="🔍 搜索…" />' +
+    '<div id="hierList"></div>' +
+    '<div class="hierFoot"><span id="hierCount">0 个对象</span></div>' +
+    '</div>';
+  document.getElementById('app').appendChild(hierPanel);
+  hierList = hierPanel.querySelector('#hierList');
+  hierSearch = hierPanel.querySelector('#hierSearch');
+  hierCount = hierPanel.querySelector('#hierCount');
+
+  hierSearch.addEventListener('input', function() {
+    refreshHierarchy();
+  });
+  hierSearch.addEventListener('keydown', function(e) {
+    e.stopPropagation();
+  });
+
+  hierPanel.querySelector('#hierToggle').onclick = function() {
+    hierCollapsed = !hierCollapsed;
+    hierPanel.classList.toggle('collapsed', hierCollapsed);
+    this.textContent = hierCollapsed ? '▸' : '▾';
+    if (!hierCollapsed) refreshHierarchy();
+  };
+
+  if (hierCollapsed) hierPanel.classList.add('collapsed');
+}
+
+function objKindOf(o) {
+  if (!o || !o.userData) return 'object';
+  if (o.userData.isProp) return 'prop';
+  if (o.userData.isGun) return 'gun';
+  if (o.userData.mapType === 'water') return 'water';
+  if (o.userData.mapType === 'light') return 'light';
+  if (o.userData.mapType === 'spawn') return 'spawn';
+  return 'object';
+}
+
+function refreshHierarchy() {
+  if (!hierList) return;
+  var q = (hierSearch.value || '').toLowerCase();
+  var children = objectsRoot.children;
+  hierList.textContent = '';
+  hierList.style.maxHeight = 'calc(var(--hier-max-h) - 90px)';
+
+  var ungrouped = [];
+  var groupMap = new Map();
+
+  for (var i = 0; i < children.length; i++) {
+    var o = children[i];
+    if (!o.userData.mapObject) continue;
+    var group = groupManager.getGroupOfObject(o);
+    if (group) {
+      if (!groupMap.has(group.id)) {
+        groupMap.set(group.id, { group: group, members: [] });
+      }
+      groupMap.get(group.id).members.push(o);
+    } else {
+      ungrouped.push(o);
+    }
+  }
+
+  var totalShown = 0;
+
+  var groupEntries = Array.from(groupMap.values());
+  groupEntries.sort(function(a, b) {
+    return (a.group.name || '').localeCompare(b.group.name || '');
+  });
+
+  for (var gi = 0; gi < groupEntries.length; gi++) {
+    var entry = groupEntries[gi];
+    var group = entry.group;
+    var members = entry.members;
+
+    var nameMatches = !q || group.name.toLowerCase().indexOf(q) !== -1;
+    var memberMatches = false;
+    for (var mi = 0; mi < members.length; mi++) {
+      var mName = members[mi].userData.mapName || '';
+      if (mName.toLowerCase().indexOf(q) !== -1) { memberMatches = true; break; }
+    }
+    if (!nameMatches && !memberMatches) continue;
+
+    var isExpanded = hierGroupState[group.id] !== false;
+    if (q) isExpanded = true;
+
+    var parentRow = document.createElement('div');
+    parentRow.className = 'hierRow group-parent' + (isExpanded ? ' expanded' : '');
+    parentRow.dataset.groupId = group.id;
+
+    var icon = document.createElement('span');
+    icon.className = 'toggle-icon';
+    icon.textContent = isExpanded ? '▾' : '▸';
+    parentRow.appendChild(icon);
+
+    var nameSpan = document.createElement('span');
+    nameSpan.className = 'hn';
+    nameSpan.textContent = '📦 ' + group.name + ' (' + members.length + ')';
+    parentRow.appendChild(nameSpan);
+
+    parentRow.onclick = function(g, row) {
+      return function(e) {
+        e.stopPropagation();
+        var id = g.id;
+        hierGroupState[id] = !hierGroupState[id];
+        row.classList.toggle('expanded');
+        row.querySelector('.toggle-icon').textContent = hierGroupState[id] ? '▾' : '▸';
+        refreshHierarchy();
+        setTimeout(function() {
+          setSelection(g.members);
+        }, 10);
+      };
+    }(group, parentRow);
+
+    hierList.appendChild(parentRow);
+    totalShown++;
+
+    if (isExpanded) {
+      var sortedMembers = members.slice().sort(function(a, b) {
+        return (a.userData.mapName || '').localeCompare(b.userData.mapName || '');
+      });
+
+      for (var mi2 = 0; mi2 < sortedMembers.length; mi2++) {
+        var o = sortedMembers[mi2];
+        var name = o.userData.mapName || primitiveNames[o.userData.mapType] || o.userData.mapType;
+        if (q && name.toLowerCase().indexOf(q) === -1) continue;
+
+        var childRow = document.createElement('div');
+        childRow.className = 'hierRow group-child' + (isSelected(o) ? ' on' : '');
+        childRow.innerHTML =
+          '<span class="hi">' + KIND_ICON[objKindOf(o)] + '</span>' +
+          '<span class="hn">' + escapeHtml(name) + '</span>';
+        childRow.onclick = (function(obj) {
+          return function(ev) {
+            ev.stopPropagation();
+            if (ev.shiftKey || multiSelectMode) toggleInSelection(obj);
+            else selectObject(obj);
+          };
+        })(o);
+        hierList.appendChild(childRow);
+        totalShown++;
+      }
+    }
+  }
+
+  if (ungrouped.length) {
+    var filteredUngrouped = ungrouped;
+    if (q) {
+      filteredUngrouped = ungrouped.filter(function(o) {
+        var name = o.userData.mapName || primitiveNames[o.userData.mapType] || o.userData.mapType;
+        return name.toLowerCase().indexOf(q) !== -1;
+      });
+    }
+    filteredUngrouped.sort(function(a, b) {
+      return (a.userData.mapName || '').localeCompare(b.userData.mapName || '');
+    });
+
+    for (var ui = 0; ui < filteredUngrouped.length; ui++) {
+      var o2 = filteredUngrouped[ui];
+      var name2 = o2.userData.mapName || primitiveNames[o2.userData.mapType] || o2.userData.mapType;
+      var row = document.createElement('div');
+      row.className = 'hierRow' + (isSelected(o2) ? ' on' : '');
+      row.innerHTML =
+        '<span class="hi">' + KIND_ICON[objKindOf(o2)] + '</span>' +
+        '<span class="hn">' + escapeHtml(name2) + '</span>';
+      row.onclick = (function(obj) {
+        return function(ev) {
+          if (ev.shiftKey || multiSelectMode) toggleInSelection(obj);
+          else selectObject(obj);
+        };
+      })(o2);
+      hierList.appendChild(row);
+      totalShown++;
+    }
+  }
+
+  if (!totalShown) {
+    var empty = document.createElement('div');
+    empty.className = 'hierEmpty';
+    empty.textContent = q ? '没有匹配的对象' : '场景还是空的';
+    hierList.appendChild(empty);
+  }
+
+  hierCount.textContent = (children.length || 0) + ' 个对象';
+}
+
+// ============================================================
+// 放置面板
+// ============================================================
+var panelGameProps = null;
+var gamePropsTab = 'item';
+var gamePropsSearch = '';
+
+function tileButton(label, thumbUrl, onClick) {
+  var b = document.createElement('button');
+  b.className = 'tile';
+  b.innerHTML = '<img src="' + thumbUrl + '" alt="" /><span>' + escapeHtml(label) + '</span>';
+  b.onclick = onClick;
+  return b;
+}
+
+function placeAndSelect(obj, name) {
+  if (!obj) return;
+  selectObject(obj);
+  setTool('translate');
+  closeSheet();
+  pushHistory();
+  if (name) toast('已放置' + name);
+}
+
+function buildPlacePanel() {
+  var host = document.getElementById('panelPlace');
+  host.innerHTML =
+    '<div class="handle"></div><div class="title">放置物体</div>' +
+    '<div class="placeSec">地形</div><div class="tileGrid" id="tilesPrim"></div>' +
+    '<div class="placeSec">场景</div><div class="tileGrid" id="tilesScene"></div>' +
+    '<div class="placeSec">游戏内容</div>' +
+    '<button id="btnGameProps" class="accent" style="text-align:center">🎮 游戏道具 / 枪械</button>' +
+    '<button id="btnPlaceAsset" style="text-align:center">📦 从项目资源放模型</button>';
+
+  var prim = host.querySelector('#tilesPrim');
+  var prims = ['box', 'sphere', 'cylinder', 'cone', 'hex', 'ramp', 'triangle'];
+  for (var i = 0; i < prims.length; i++) {
+    (function(t) {
+      prim.appendChild(tileButton(primitiveNames[t] || t, primitiveThumb(t), function() {
+        placeAndSelect(createPrimitive(t));
+      }));
+    })(prims[i]);
+  }
+
+  var sc = host.querySelector('#tilesScene');
+  sc.appendChild(tileButton('出生点', primitiveThumb('spawn'), function() {
+    placeAndSelect(createPrimitive('spawn'));
+  }));
+  sc.appendChild(tileButton('水体', primitiveThumb('water'), function() {
+    placeAndSelect(createWater(), '水体');
+  }));
+  sc.appendChild(tileButton('点光源', primitiveThumb('light'), function() {
+    placeAndSelect(createLight({ type: 'point' }), '点光源');
+  }));
+  sc.appendChild(tileButton('聚光灯', primitiveThumb('spotlight'), function() {
+    placeAndSelect(createLight({ type: 'spot' }), '聚光灯');
+  }));
+
+  host.querySelector('#btnGameProps').onclick = function() { openSheet(panelGameProps); };
+  host.querySelector('#btnPlaceAsset').onclick = function() { openSheet(panelAssets); };
+}
+
+function buildGamePropsPanel() {
+  panelGameProps = document.createElement('div');
+  panelGameProps.id = 'panelGameProps';
+  panelGameProps.className = 'sheet';
+  panelGameProps.innerHTML =
+    '<div class="handle"></div>' +
+    '<div class="sheetTop"><button id="gpBack" class="btn-small">← 返回</button>' +
+    '<div class="title" style="flex:1;margin:0">游戏道具</div></div>' +
+    '<div class="row" style="margin-bottom:8px">' +
+    '<button id="gpTabItem" class="active">道具（' + GAME_ITEMS.length + '）</button>' +
+    '<button id="gpTabGun">枪械（' + GAME_GUNS.length + '）</button></div>' +
+    '<input id="gpSearch" type="text" placeholder="🔍 搜索名称……" />' +
+    '<div class="tileGrid" id="gpGrid" style="max-height:46vh;overflow-y:auto"></div>';
+  document.body.appendChild(panelGameProps);
+
+  panelGameProps.querySelector('#gpBack').onclick = function() { openSheet(panelPlace); };
+  panelGameProps.querySelector('#gpTabItem').onclick = function() { gamePropsTab = 'item'; refreshGameProps(); };
+  panelGameProps.querySelector('#gpTabGun').onclick = function() { gamePropsTab = 'gun'; refreshGameProps(); };
+  var si = panelGameProps.querySelector('#gpSearch');
+  si.addEventListener('input', function() { gamePropsSearch = this.value.toLowerCase(); refreshGameProps(); });
+  si.addEventListener('keydown', function(e) { e.stopPropagation(); });
+}
+
+function refreshGameProps() {
+  if (!panelGameProps) return;
+  panelGameProps.querySelector('#gpTabItem').classList.toggle('active', gamePropsTab === 'item');
+  panelGameProps.querySelector('#gpTabGun').classList.toggle('active', gamePropsTab === 'gun');
+  var grid = panelGameProps.querySelector('#gpGrid');
+  grid.textContent = '';
+  var list = gamePropsTab === 'item' ? GAME_ITEMS : GAME_GUNS;
+  for (var i = 0; i < list.length; i++) {
+    var e = list[i];
+    if (gamePropsSearch && e.n.toLowerCase().indexOf(gamePropsSearch) < 0 &&
+      e.id.indexOf(gamePropsSearch) < 0) continue;
+    (function(entry, isItem) {
+      grid.appendChild(tileButton(entry.n, isItem ? itemThumb(entry.id) : gunThumb(entry.id), function() {
+        placeAndSelect(isItem ? createProp(entry.id) : createGun(entry.id), entry.n);
+      }));
+    })(e, gamePropsTab === 'item');
+  }
+  if (!grid.children.length) {
+    var d = document.createElement('div');
+    d.style.cssText = 'grid-column:1/-1;text-align:center;color:var(--muted);padding:18px';
+    d.textContent = '没有匹配的内容';
+    grid.appendChild(d);
+  }
+}
+
+// ============================================================
+// 项目资源
+// ============================================================
+var panelAssets = null;
+var assetFileInput = null;
+var assetPendingKind = 'texture';
+
+var ASSET_ACCEPT = {
+  texture: 'image/*',
+  sound: 'audio/*',
+  model: '.glb,.gltf,.fbx'
+};
+
+function buildAssetsPanel() {
+  panelAssets = document.createElement('div');
+  panelAssets.id = 'panelAssets';
+  panelAssets.className = 'sheet';
+  panelAssets.innerHTML =
+    '<div class="handle"></div>' +
+    '<div class="sheetTop"><button id="asBack" class="btn-small">← 返回</button>' +
+    '<div class="title" style="flex:1;margin:0">项目资源</div></div>' +
+    '<div class="row" style="margin-bottom:10px">' +
+    '<button id="asAddTex">🖼 添加贴图</button>' +
+    '<button id="asAddSnd">🔊 添加声音</button>' +
+    '<button id="asAddMdl">📦 添加模型</button></div>' +
+    '<div id="asList" style="max-height:42vh;overflow-y:auto"></div>' +
+    '<div id="asSize" style="font-size:11px;color:var(--muted);margin-top:8px"></div>';
+  document.body.appendChild(panelAssets);
+
+  assetFileInput = document.createElement('input');
+  assetFileInput.type = 'file';
+  assetFileInput.multiple = true;
+  assetFileInput.hidden = true;
+  document.body.appendChild(assetFileInput);
+  assetFileInput.addEventListener('change', function(e) {
+    var files = Array.prototype.slice.call(e.target.files || []);
+    e.target.value = '';
+    importAssets(files, assetPendingKind);
+  });
+
+  panelAssets.querySelector('#asBack').onclick = function() { openSheet(panelProject); };
+  panelAssets.querySelector('#asAddTex').onclick = function() { pickAssets('texture'); };
+  panelAssets.querySelector('#asAddSnd').onclick = function() { pickAssets('sound'); };
+  panelAssets.querySelector('#asAddMdl').onclick = function() { pickAssets('model'); };
+}
+
+function pickAssets(kind) {
+  assetPendingKind = kind;
+  assetFileInput.accept = ASSET_ACCEPT[kind] || '';
+  assetFileInput.click();
+}
+
+function readAsDataURL(file) {
+  return new Promise(function(res, rej) {
+    var r = new FileReader();
+    r.onload = function() { res(r.result); };
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+async function importAssets(files, kind) {
+  var added = 0;
+  for (var i = 0; i < files.length; i++) {
+    try {
+      var url = await readAsDataURL(files[i]);
+      var key = newAssetKey(kind);
+      PROJECT.assets[key] = {
+        kind: kind,
+        name: files[i].name,
+        mime: files[i].type || '',
+        url: url
+      };
+      added++;
+    } catch (err) {
+      console.error(err);
+    }
+  }
+  if (added) {
+    refreshAssets();
+    rebuildTextureOptions();
+    pushHistory();
+    toast('已添加 ' + added + ' 个资源');
+  }
+}
+
+function refreshAssets() {
+  if (!panelAssets) return;
+  var host = panelAssets.querySelector('#asList');
+  host.textContent = '';
+  var all = assetList(null);
+  if (!all.length) {
+    host.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px">还没有资源</div>';
+  }
+  for (var i = 0; i < all.length; i++) {
+    (function(entry) {
+      var a = entry.asset;
+      var row = document.createElement('div');
+      row.className = 'assetRow';
+      var preview = a.kind === 'texture'
+        ? '<span class="apv" style="background-image:url(' + a.url + ')"></span>'
+        : '<span class="apv">' + (a.kind === 'sound' ? '🔊' : '📦') + '</span>';
+      row.innerHTML = preview +
+        '<div class="ainfo"><div class="an">' + escapeHtml(a.name || entry.key) + '</div>' +
+        '<div class="am">' + entry.key + ' · ' + a.kind + ' · ' +
+        (a.url.length / 1400 | 0) + ' KB</div></div>';
+      var acts = document.createElement('div');
+      acts.className = 'aacts';
+      if (a.kind === 'texture') {
+        var useBtn = document.createElement('button');
+        useBtn.className = 'btn-small';
+        useBtn.textContent = '贴到选中';
+        useBtn.onclick = function() { applyAssetTexture(entry.key); };
+        acts.appendChild(useBtn);
+      }
+      if (a.kind === 'model') {
+        var mdlBtn = document.createElement('button');
+        mdlBtn.className = 'btn-small';
+        mdlBtn.textContent = '放置';
+        mdlBtn.onclick = function() { placeAssetModel(entry.key); };
+        acts.appendChild(mdlBtn);
+      }
+      if (a.kind === 'sound') {
+        var playBtn = document.createElement('button');
+        playBtn.className = 'btn-small';
+        playBtn.textContent = '试听';
+        playBtn.onclick = function() {
+          var au = new Audio(a.url);
+          au.play().catch(function() { });
+        };
+        acts.appendChild(playBtn);
+      }
+      var del = document.createElement('button');
+      del.className = 'btn-small danger';
+      del.textContent = '删除';
+      del.onclick = function() {
+        var used = assetUsage(entry.key);
+        var note = used.total
+          ? '\n\n有 ' + used.total + ' 处在用（贴图 ' + used.tex + ' · 声音 ' + used.snd +
+            (used.sky ? ' · 天空盒' : '') + '），会一起清掉。'
+          : '';
+        if (!confirm('删除资源「' + (a.name || entry.key) + '」？' + note)) return;
+        dropAssetRefs(entry.key);
+        delete PROJECT.assets[entry.key];
+        refreshAssets();
+        rebuildTextureOptions();
+        refreshProjectPanel();
+        refreshProps();
+        pushHistory();
+      };
+      acts.appendChild(del);
+      row.appendChild(acts);
+      host.appendChild(row);
+    })(all[i]);
+  }
+  panelAssets.querySelector('#asSize').textContent =
+    '共 ' + all.length + ' 个资源，约 ' + (assetBytes() / 1048576).toFixed(2) + ' MB' +
+    '（资源会一起打进 .rbmap，太大会存不进浏览器）';
+}
+
+function assetUsage(key) {
+  var tex = 0, snd = 0;
+  var children = objectsRoot.children;
+  for (var i = 0; i < children.length; i++) {
+    var o = children[i];
+    if (o.userData.mapAsset === key) tex++;
+    var list = o.userData.mapSounds || [];
+    for (var j = 0; j < list.length; j++) if (list[j].a === key) snd++;
+  }
+  var sky = PROJECT.env.skyImage === 'asset:' + key;
+  return { tex: tex, snd: snd, sky: sky, total: tex + snd + (sky ? 1 : 0) };
+}
+
+function dropAssetRefs(key) {
+  var children = objectsRoot.children;
+  for (var i = 0; i < children.length; i++) {
+    var o = children[i];
+    if (o.userData.mapAsset === key) {
+      o.userData.mapAsset = null;
+      o.userData.mapCustom = null;
+      applyObjectSurface(o);
+    }
+    var list = o.userData.mapSounds;
+    if (!list || !list.length) continue;
+    o.userData.mapSounds = list.filter(function(x) { return x.a !== key; });
+  }
+  if (PROJECT.env.skyImage === 'asset:' + key) {
+    PROJECT.env.skyImage = '';
+    if (PROJECT.env.skyMode === 'image') PROJECT.env.skyMode = 'gradient';
+    applyEnv();
+  }
+}
+
+function applyAssetTexture(key) {
+  if (!selection.length) { toast('先选中一个物体'); return; }
+  var url = assetUrl(key);
+  var n = 0;
+  for (var i = 0; i < selection.length; i++) {
+    var o = selection[i];
+    if (!surfaceEditable(o)) continue;
+    o.userData.mapTex = '';
+    o.userData.mapCustom = url;
+    o.userData.mapAsset = key;
+    applyObjectSurface(o);
+    n++;
+  }
+  if (n) { pushHistory(); toast('已贴到 ' + n + ' 个物体'); }
+  else toast('选中的物体不能贴图');
+}
+
+async function placeAssetModel(key) {
+  var a = PROJECT.assets[key];
+  if (!a) return;
+  closeSheet();
+  try {
+    var res = await fetch(a.url);
+    var buf = await res.arrayBuffer();
+    var root;
+    if (/\.fbx$/i.test(a.name)) {
+      var url = URL.createObjectURL(new Blob([buf]));
+      root = await new FBXLoader().loadAsync(url);
+      URL.revokeObjectURL(url);
+      root.scale.multiplyScalar(fitImportedScale(root));
+    } else {
+      var gltf = await new GLTFLoader().parseAsync(buf, '');
+      root = gltf.scene;
+    }
+    root.userData.mapObject = true;
+    root.userData.mapType = 'model';
+    root.userData.mapName = a.name.replace(/\.(gltf|glb|fbx)$/i, '');
+    root.userData.mapColor = '#ffffff';
+    root.userData.mapAsset = key;
+    root.position.fromArray(placementPoint('model'));
+    root.traverse(function(o) { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
+    objectsRoot.add(root);
+    placeAndSelect(root, a.name);
+  } catch (err) {
+    console.error(err);
+    alert('放置失败：' + err.message);
+  }
+}
+
+// ============================================================
+// 声音编辑
+// ============================================================
+var panelSound = null;
+var soundTargetObj = null;
+
+function buildSoundPanel() {
+  panelSound = document.createElement('div');
+  panelSound.id = 'panelSound';
+  panelSound.className = 'sheet';
+  panelSound.innerHTML =
+    '<div class="handle"></div><div class="title">🔊 物体声音</div>' +
+    '<div id="sndTarget" style="font-size:11px;color:var(--muted);margin-bottom:10px"></div>' +
+    '<div id="sndList" style="max-height:40vh;overflow-y:auto"></div>' +
+    '<button id="sndAdd" class="accent" style="text-align:center;margin-top:8px">＋ 添加声音</button>' +
+    '<button id="sndGoAssets" style="text-align:center">📦 去项目资源导入声音</button>';
+  document.body.appendChild(panelSound);
+  panelSound.querySelector('#sndAdd').onclick = function() {
+    var snds = assetList('sound');
+    if (!snds.length) { toast('先在项目资源里导入声音'); return; }
+    if (!soundTargetObj) return;
+    objectSounds(soundTargetObj).push({ a: snds[0].key, t: 'gun', from: 'any', v: 1, r: 22, cd: 0.12, p: 1 });
+    refreshSoundPanel();
+    pushHistory();
+  };
+  panelSound.querySelector('#sndGoAssets').onclick = function() { openSheet(panelAssets); };
+}
+
+function openSoundPanel() {
+  if (!selection.length) { toast('先选中一个物体'); return; }
+  soundTargetObj = selection[0];
+  if (!soundsCarrier(soundTargetObj)) { toast('这个类型不支持挂声音'); return; }
+  openSheet(panelSound);
+  refreshSoundPanel();
+}
+
+function refreshSoundPanel() {
+  if (!panelSound || !soundTargetObj) return;
+  panelSound.querySelector('#sndTarget').textContent =
+    '当前物体：' + (soundTargetObj.userData.mapName || soundTargetObj.userData.mapType);
+  var host = panelSound.querySelector('#sndList');
+  host.textContent = '';
+  var list = objectSounds(soundTargetObj);
+  if (!list.length) {
+    host.innerHTML = '<div style="text-align:center;color:var(--muted);padding:16px">还没有声音</div>';
+  }
+  var snds = assetList('sound');
+  for (var i = 0; i < list.length; i++) {
+    (function(s, idx) {
+      var row = document.createElement('div');
+      row.className = 'sndRow';
+      if (!PROJECT.assets[s.a]) row.style.borderColor = 'var(--danger)';
+      var opts = snds.map(function(e) {
+        return '<option value="' + e.key + '"' + (e.key === s.a ? ' selected' : '') + '>' +
+          escapeHtml(e.asset.name || e.key) + '</option>';
+      }).join('');
+      var trg = SOUND_TRIGGERS.map(function(t) {
+        return '<option value="' + t.id + '"' + (t.id === s.t ? ' selected' : '') + '>' + t.label + '</option>';
+      }).join('');
+      var frm = COLLIDE_SOURCES.map(function(t) {
+        return '<option value="' + t.id + '"' + (t.id === s.from ? ' selected' : '') + '>' + t.label + '</option>';
+      }).join('');
+      row.innerHTML =
+        '<div class="sr1"><select class="sA">' + opts + '</select>' +
+        '<select class="sT">' + trg + '</select>' +
+        '<button class="btn-small danger sDel">删</button></div>' +
+        '<div class="sr2">' +
+        '<label>碰撞来源</label><select class="sF"' + (s.t === 'collide' ? '' : ' disabled') + '>' + frm + '</select>' +
+        '<label>音量</label><input class="sV" type="number" min="0" max="4" step="0.1" value="' + s.v + '" />' +
+        '<label>半径</label><input class="sR" type="number" min="1" max="300" step="1" value="' + s.r + '" />' +
+        '<label>间隔</label><input class="sC" type="number" min="0" max="30" step="0.05" value="' + s.cd + '" />' +
+        '<label>音调</label><input class="sP" type="number" min="0.2" max="4" step="0.05" value="' + s.p + '" />' +
+        '<button class="btn-small sPlay">试听</button></div>';
+      row.querySelector('.sA').onchange = function() { s.a = this.value; pushHistory(); };
+      row.querySelector('.sT').onchange = function() { s.t = this.value; refreshSoundPanel(); pushHistory(); };
+      row.querySelector('.sF').onchange = function() { s.from = this.value; pushHistory(); };
+      row.querySelector('.sV').onchange = function() { s.v = +this.value || 0; pushHistory(); };
+      row.querySelector('.sR').onchange = function() { s.r = +this.value || 22; pushHistory(); };
+      row.querySelector('.sC').onchange = function() { s.cd = +this.value || 0; pushHistory(); };
+      row.querySelector('.sP').onchange = function() { s.p = +this.value || 1; pushHistory(); };
+      row.querySelector('.sPlay').onclick = function() {
+        var u = assetUrl(s.a);
+        if (u) new Audio(u).play().catch(function() { });
+      };
+      row.querySelector('.sDel').onclick = function() {
+        list.splice(idx, 1);
+        refreshSoundPanel();
+        pushHistory();
+      };
+      host.appendChild(row);
+    })(list[i], i);
+  }
+}
+
+// ============================================================
+// 项目设置
+// ============================================================
+var panelProject = null;
+
+function envRow(label, html) {
+  return '<div class="envRow"><label>' + label + '</label>' + html + '</div>';
+}
+
+function buildProjectPanel() {
+  panelProject = document.createElement('div');
+  panelProject.id = 'panelProject';
+  panelProject.className = 'sheet';
+  panelProject.innerHTML =
+    '<div class="handle"></div><div class="title">⚙️ 项目设置</div>' +
+    '<div class="envSec">环境光</div>' +
+    envRow('天空光颜色', '<input id="pvHemiSky" type="color" />') +
+    envRow('地面反光颜色', '<input id="pvHemiGnd" type="color" />') +
+    envRow('环境光强度', '<input id="pvHemiI" type="number" min="0" max="6" step="0.05" />') +
+    envRow('全局补光颜色', '<input id="pvAmbC" type="color" />') +
+    envRow('全局补光强度', '<input id="pvAmbI" type="number" min="0" max="6" step="0.05" />') +
+    envRow('太阳颜色', '<input id="pvSunC" type="color" />') +
+    envRow('太阳强度', '<input id="pvSunI" type="number" min="0" max="8" step="0.05" />') +
+    envRow('太阳方向 X/Y/Z',
+      '<input id="pvSunX" type="number" step="1" /><input id="pvSunY" type="number" step="1" />' +
+      '<input id="pvSunZ" type="number" step="1" />') +
+    envRow('太阳投影', '<input id="pvSunS" type="checkbox" />') +
+    envRow('曝光', '<input id="pvExp" type="number" min="0.1" max="4" step="0.05" />') +
+    '<div class="envSec">雾</div>' +
+    envRow('开启雾', '<input id="pvFogOn" type="checkbox" />') +
+    envRow('雾颜色', '<input id="pvFogC" type="color" />') +
+    envRow('雾起点 / 终点',
+      '<input id="pvFogN" type="number" min="0" step="1" /><input id="pvFogF" type="number" min="1" step="1" />') +
+    '<div class="envSec">天空盒</div>' +
+    envRow('模式', '<select id="pvSkyMode"><option value="gradient">渐变天空</option>' +
+      '<option value="color">纯色</option><option value="image">自定义全景图</option></select>') +
+    envRow('渐变 顶 / 中 / 底',
+      '<input id="pvSkyTop" type="color" /><input id="pvSkyMid" type="color" /><input id="pvSkyBot" type="color" />') +
+    envRow('纯色', '<input id="pvSkyColor" type="color" />') +
+    envRow('全景图资源', '<select id="pvSkyImage"></select>') +
+    '<div class="envSec">世界</div>' +
+    envRow('地图下限（低于此高度＝虚空）', '<input id="pvVoidY" type="number" min="-145" max="400" step="1" />') +
+    '<div class="envSec">资源与预览图</div>' +
+    '<button id="pvAssets" style="text-align:center">📦 项目资源</button>' +
+    '<div class="thumbBox"><div id="pvThumb" class="thumbPv"></div>' +
+    '<div class="thumbActs">' +
+    '<button id="pvShot" class="btn-small accent">📷 用当前视角截图</button>' +
+    '<button id="pvThumbFile" class="btn-small">🖼 选图片</button>' +
+    '<button id="pvThumbClear" class="btn-small danger">清除</button></div></div>' +
+    '<div class="envSec">项目文件夹</div>' +
+    '<button id="pvExportFolder" style="text-align:center">📁 导出项目文件夹（.zip）</button>' +
+    '<button id="pvImportFolder" style="text-align:center">📂 导入项目文件夹（.zip）</button>' +
+    '<button id="pvReset" class="danger" style="text-align:center">↺ 环境恢复默认</button>';
+  document.body.appendChild(panelProject);
+
+  var bind = function(id, get, set, ev) {
+    var el = panelProject.querySelector('#' + id);
+    el.addEventListener(ev || 'change', function() {
+      set(el);
+      applyEnv();
+      pushHistory();
+    });
+    el.addEventListener('keydown', function(e) { e.stopPropagation(); });
+    return el;
+  };
+  var E = function() { return PROJECT.env; };
+  bind('pvHemiSky', 0, function(el) { E().hemiSky = el.value; }, 'input');
+  bind('pvHemiGnd', 0, function(el) { E().hemiGround = el.value; }, 'input');
+  bind('pvHemiI', 0, function(el) { E().hemiIntensity = +el.value || 0; });
+  bind('pvAmbC', 0, function(el) { E().ambientColor = el.value; }, 'input');
+  bind('pvAmbI', 0, function(el) { E().ambientIntensity = +el.value || 0; });
+  bind('pvSunC', 0, function(el) { E().sunColor = el.value; }, 'input');
+  bind('pvSunI', 0, function(el) { E().sunIntensity = +el.value || 0; });
+  bind('pvSunX', 0, function(el) { E().sunDir[0] = +el.value || 0; });
+  bind('pvSunY', 0, function(el) { E().sunDir[1] = +el.value || 0; });
+  bind('pvSunZ', 0, function(el) { E().sunDir[2] = +el.value || 0; });
+  bind('pvSunS', 0, function(el) { E().sunShadow = el.checked; });
+  bind('pvExp', 0, function(el) { E().exposure = +el.value || 1; });
+  bind('pvFogOn', 0, function(el) { E().fog = el.checked; });
+  bind('pvFogC', 0, function(el) { E().fogColor = el.value; }, 'input');
+  bind('pvFogN', 0, function(el) { E().fogNear = +el.value || 0; });
+  bind('pvFogF', 0, function(el) { E().fogFar = +el.value || 1; });
+  bind('pvSkyMode', 0, function(el) { E().skyMode = el.value; });
+  bind('pvSkyTop', 0, function(el) { E().skyTop = el.value; }, 'input');
+  bind('pvSkyMid', 0, function(el) { E().skyMid = el.value; }, 'input');
+  bind('pvSkyBot', 0, function(el) { E().skyBot = el.value; }, 'input');
+  bind('pvSkyColor', 0, function(el) { E().skyColor = el.value; }, 'input');
+  bind('pvSkyImage', 0, function(el) { E().skyImage = el.value ? 'asset:' + el.value : ''; });
+  bind('pvVoidY', 0, function(el) {
+    E().voidY = Math.max(-145, Math.min(400, +el.value || -120));
+  });
+
+  panelProject.querySelector('#pvAssets').onclick = function() { openSheet(panelAssets); };
+  panelProject.querySelector('#pvShot').onclick = function() { captureThumb(); };
+  panelProject.querySelector('#pvThumbFile').onclick = function() { thumbFileInput.click(); };
+  panelProject.querySelector('#pvThumbClear').onclick = function() {
+    PROJECT.thumb = '';
+    refreshProjectPanel();
+    pushHistory();
+  };
+  panelProject.querySelector('#pvExportFolder').onclick = exportProjectFolder;
+  panelProject.querySelector('#pvImportFolder').onclick = function() { folderInput.click(); };
+  panelProject.querySelector('#pvReset').onclick = function() {
+    PROJECT.env = Object.assign({}, ENV_DEFAULTS, { sunDir: ENV_DEFAULTS.sunDir.slice() });
+    applyEnv();
+    refreshProjectPanel();
+    pushHistory();
+    toast('环境已恢复默认');
+  };
+}
+
+function refreshProjectPanel() {
+  if (!panelProject) return;
+  var e = PROJECT.env;
+  var q = function(id) { return panelProject.querySelector('#' + id); };
+  q('pvHemiSky').value = e.hemiSky;
+  q('pvHemiGnd').value = e.hemiGround;
+  q('pvHemiI').value = e.hemiIntensity;
+  q('pvAmbC').value = e.ambientColor;
+  q('pvAmbI').value = e.ambientIntensity;
+  q('pvSunC').value = e.sunColor;
+  q('pvSunI').value = e.sunIntensity;
+  q('pvSunX').value = e.sunDir[0];
+  q('pvSunY').value = e.sunDir[1];
+  q('pvSunZ').value = e.sunDir[2];
+  q('pvSunS').checked = !!e.sunShadow;
+  q('pvExp').value = e.exposure;
+  q('pvFogOn').checked = !!e.fog;
+  q('pvFogC').value = e.fogColor;
+  q('pvFogN').value = e.fogNear;
+  q('pvFogF').value = e.fogFar;
+  q('pvSkyMode').value = e.skyMode;
+  q('pvSkyTop').value = e.skyTop;
+  q('pvSkyMid').value = e.skyMid;
+  q('pvSkyBot').value = e.skyBot;
+  q('pvSkyColor').value = e.skyColor;
+  q('pvVoidY').value = e.voidY;
+
+  var sel = q('pvSkyImage');
+  var cur = e.skyImage && e.skyImage.indexOf('asset:') === 0 ? e.skyImage.slice(6) : '';
+  sel.innerHTML = '<option value="">（未选择）</option>' + assetList('texture').map(function(a) {
+    return '<option value="' + a.key + '"' + (a.key === cur ? ' selected' : '') + '>' +
+      escapeHtml(a.asset.name || a.key) + '</option>';
+  }).join('');
+
+  var tb = q('pvThumb');
+  if (PROJECT.thumb) {
+    tb.style.backgroundImage = 'url(' + PROJECT.thumb + ')';
+    tb.textContent = '';
+  } else {
+    tb.style.backgroundImage = '';
+    tb.textContent = '还没有预览图';
+  }
+}
+
+// ============================================================
+// 地图预览图
+// ============================================================
+var thumbFileInput = null;
+var folderInput = null;
+
+function captureThumb() {
+  var sel = selection.slice();
+  clearSelection();
+  transform.visible = false;
+  var gridWas = grid.visible;
+  grid.visible = false;
+  composer.render();
+  var src = renderer.domElement;
+  var cv = document.createElement('canvas');
+  cv.width = 480; cv.height = 300;
+  var g = cv.getContext('2d');
+  var sr = src.width / src.height;
+  var dr = 480 / 300;
+  var sw, sh, sx, sy;
+  if (sr > dr) { sh = src.height; sw = sh * dr; sx = (src.width - sw) / 2; sy = 0; }
+  else { sw = src.width; sh = sw / dr; sx = 0; sy = (src.height - sh) / 2; }
+  g.drawImage(src, sx, sy, sw, sh, 0, 0, 480, 300);
+  PROJECT.thumb = cv.toDataURL('image/jpeg', 0.72);
+  grid.visible = gridWas;
+  setSelection(sel);
+  refreshProjectPanel();
+  pushHistory();
+  toast('已生成预览图');
+}
+
+function buildThumbInputs() {
+  thumbFileInput = document.createElement('input');
+  thumbFileInput.type = 'file';
+  thumbFileInput.accept = 'image/*';
+  thumbFileInput.hidden = true;
+  document.body.appendChild(thumbFileInput);
+  thumbFileInput.addEventListener('change', async function(e) {
+    var f = e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    var url = await readAsDataURL(f);
+    var img = new Image();
+    img.onload = function() {
+      var cv = document.createElement('canvas');
+      cv.width = 480; cv.height = 300;
+      var g = cv.getContext('2d');
+      var sr = img.width / img.height, dr = 1.6;
+      var sw, sh, sx, sy;
+      if (sr > dr) { sh = img.height; sw = sh * dr; sx = (img.width - sw) / 2; sy = 0; }
+      else { sw = img.width; sh = sw / dr; sx = 0; sy = (img.height - sh) / 2; }
+      g.drawImage(img, sx, sy, sw, sh, 0, 0, 480, 300);
+      PROJECT.thumb = cv.toDataURL('image/jpeg', 0.72);
+      refreshProjectPanel();
+      pushHistory();
+      toast('预览图已更新');
+    };
+    img.src = url;
+  });
+
+  folderInput = document.createElement('input');
+  folderInput.type = 'file';
+  folderInput.accept = '.zip,.rdproj';
+  folderInput.hidden = true;
+  document.body.appendChild(folderInput);
+  folderInput.addEventListener('change', async function(e) {
+    var f = e.target.files[0];
+    e.target.value = '';
+    if (f) await importProjectFolder(f);
+  });
+}
+
+// ============================================================
+// ZIP（仅 store，读的时候顺带支持 deflate）
+// ============================================================
+var CRC_TABLE = (function() {
+  var t = new Uint32Array(256);
+  for (var n = 0; n < 256; n++) {
+    var c = n;
+    for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(bytes) {
+  var c = 0xFFFFFFFF;
+  for (var i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 1);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function zipCreate(entries) {
+  var enc = new TextEncoder();
+  var parts = [];
+  var central = [];
+  var offset = 0;
+  for (var i = 0; i < entries.length; i++) {
+    var name = enc.encode(entries[i].name);
+    var data = entries[i].data;
+    var crc = crc32(data);
+    var local = new Uint8Array(30 + name.length);
+    var dv = new DataView(local.buffer);
+    dv.setUint32(0, 0x04034b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint16(6, 0, true);
+    dv.setUint16(8, 0, true);
+    dv.setUint16(10, 0, true);
+    dv.setUint16(12, 0, true);
+    dv.setUint32(14, crc, true);
+    dv.setUint32(18, data.length, true);
+    dv.setUint32(22, data.length, true);
+    dv.setUint16(26, name.length, true);
+    dv.setUint16(28, 0, true);
+    local.set(name, 30);
+    parts.push(local, data);
+
+    var cen = new Uint8Array(46 + name.length);
+    var cv = new DataView(cen.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0, true);
+    cv.setUint16(10, 0, true);
+    cv.setUint16(12, 0, true);
+    cv.setUint16(14, 0, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, data.length, true);
+    cv.setUint32(24, data.length, true);
+    cv.setUint16(28, name.length, true);
+    cv.setUint32(42, offset, true);
+    cen.set(name, 46);
+    central.push(cen);
+    offset += local.length + data.length;
+  }
+  var centralSize = 0;
+  for (var j = 0; j < central.length; j++) centralSize += central[j].length;
+  var end = new Uint8Array(22);
+  var ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, entries.length, true);
+  ev.setUint16(10, entries.length, true);
+  ev.setUint32(12, centralSize, true);
+  ev.setUint32(16, offset, true);
+  return new Blob(parts.concat(central, [end]), { type: 'application/zip' });
+}
+
+async function zipRead(buffer) {
+  var bytes = new Uint8Array(buffer);
+  var dv = new DataView(bytes.buffer);
+  var eocd = -1;
+  for (var i = bytes.length - 22; i >= 0 && i > bytes.length - 66000; i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('不是有效的 zip 文件');
+  var count = dv.getUint16(eocd + 10, true);
+  var start = dv.getUint32(eocd + 16, true);
+  var dec = new TextDecoder();
+  var out = new Map();
+  var p = start;
+  for (var n = 0; n < count; n++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    var method = dv.getUint16(p + 10, true);
+    var compSize = dv.getUint32(p + 20, true);
+    var nameLen = dv.getUint16(p + 28, true);
+    var extraLen = dv.getUint16(p + 30, true);
+    var cmtLen = dv.getUint16(p + 32, true);
+    var localOff = dv.getUint32(p + 42, true);
+    var name = dec.decode(bytes.subarray(p + 46, p + 46 + nameLen));
+    var lNameLen = dv.getUint16(localOff + 26, true);
+    var lExtraLen = dv.getUint16(localOff + 28, true);
+    var dataStart = localOff + 30 + lNameLen + lExtraLen;
+    var raw = bytes.subarray(dataStart, dataStart + compSize);
+    if (method === 0) {
+      out.set(name, raw.slice());
+    } else if (method === 8 && typeof DecompressionStream !== 'undefined') {
+      var ds = new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+      out.set(name, new Uint8Array(await new Response(ds).arrayBuffer()));
+    } else {
+      throw new Error('压缩方式不支持：' + name);
+    }
+    p += 46 + nameLen + extraLen + cmtLen;
+  }
+  return out;
+}
+
+function dataUrlToBytes(url) {
+  var i = url.indexOf(',');
+  var head = url.slice(0, i);
+  var body = url.slice(i + 1);
+  if (head.indexOf(';base64') < 0) return new TextEncoder().encode(decodeURIComponent(body));
+  var bin = atob(body);
+  var out = new Uint8Array(bin.length);
+  for (var k = 0; k < bin.length; k++) out[k] = bin.charCodeAt(k);
+  return out;
+}
+
+function bytesToDataUrl(bytes, mime) {
+  var bin = '';
+  var chunk = 0x8000;
+  for (var i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return 'data:' + (mime || 'application/octet-stream') + ';base64,' + btoa(bin);
+}
+
+var ASSET_EXT = {
+  'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/gif': '.gif',
+  'audio/mpeg': '.mp3', 'audio/wav': '.wav', 'audio/ogg': '.ogg', 'audio/mp4': '.m4a',
+  'model/gltf-binary': '.glb', 'model/gltf+json': '.gltf'
+};
+
+function assetFileName(key, a) {
+  var base = (a.name || key).replace(/[\\/:*?"<>|]/g, '_');
+  if (/\.[a-z0-9]{2,5}$/i.test(base)) return key + '_' + base;
+  return key + '_' + base + (ASSET_EXT[a.mime] || '.bin');
+}
+
+async function exportProjectFolder() {
+  try {
+    var map = serializeMap({ allAssets: true });
+    var entries = [];
+    var manifest = {};
+    for (var key in PROJECT.assets) {
+      var a = PROJECT.assets[key];
+      if (!a || !a.url) continue;
+      var fn = 'assets/' + assetFileName(key, a);
+      entries.push({ name: fn, data: dataUrlToBytes(a.url) });
+      manifest[key] = { kind: a.kind, name: a.name, mime: a.mime, file: fn };
+    }
+    var slim = JSON.parse(JSON.stringify(map));
+    slim.assets = manifest;
+    if (slim.thumb) {
+      entries.push({ name: 'thumb.jpg', data: dataUrlToBytes(slim.thumb) });
+      slim.thumb = 'thumb.jpg';
+    }
+    var enc = new TextEncoder();
+    entries.unshift({ name: 'map.rbmap', data: enc.encode(JSON.stringify(slim, null, 1)) });
+    entries.push({
+      name: 'project.json',
+      data: enc.encode(JSON.stringify({
+        format: 'RagdollBoxProject',
+        version: 1,
+        name: getCurrentSaveName(),
+        editor: APP_VERSION,
+        exportedAt: new Date().toISOString()
+      }, null, 1))
+    });
+    var blob = zipCreate(entries);
+    var a2 = document.createElement('a');
+    a2.href = URL.createObjectURL(blob);
+    a2.download = getCurrentSaveName().replace(/[\\/:*?"<>|]/g, '_') + '.zip';
+    a2.click();
+    setTimeout(function() { URL.revokeObjectURL(a2.href); }, 1500);
+    toast('项目文件夹已导出');
+  } catch (err) {
+    console.error(err);
+    alert('导出失败：' + err.message);
+  }
+}
+
+async function importProjectFolder(file) {
+  try {
+    var files = await zipRead(await file.arrayBuffer());
+    var mapFile = null;
+    files.forEach(function(v, k) {
+      if (!mapFile && /(^|\/)map\.rbmap$/i.test(k)) mapFile = v;
+    });
+    if (!mapFile) {
+      files.forEach(function(v, k) {
+        if (!mapFile && /\.(rbmap|json)$/i.test(k) && !/project\.json$/i.test(k)) mapFile = v;
+      });
+    }
+    if (!mapFile) throw new Error('压缩包里没找到 map.rbmap');
+    var map = JSON.parse(new TextDecoder().decode(mapFile));
+    if (map.format !== 'RagdollBoxMap') throw new Error('map.rbmap 不是地图文件');
+
+    var assets = {};
+    var src = map.assets || {};
+    for (var key in src) {
+      var a = src[key];
+      if (!a) continue;
+      if (a.url) { assets[key] = a; continue; }
+      var bytes = files.get(a.file) || files.get(a.file && a.file.replace(/^\.\//, ''));
+      if (!bytes) {
+        files.forEach(function(v, k) {
+          if (!bytes && a.file && k.slice(-a.file.length) === a.file) bytes = v;
+        });
+      }
+      if (!bytes) continue;
+      assets[key] = { kind: a.kind, name: a.name, mime: a.mime, url: bytesToDataUrl(bytes, a.mime) };
+    }
+    map.assets = assets;
+    if (typeof map.thumb === 'string' && map.thumb && map.thumb.indexOf('data:') !== 0) {
+      var tb = files.get(map.thumb);
+      map.thumb = tb ? bytesToDataUrl(tb, 'image/jpeg') : '';
+    }
+    var projName = '';
+    var pj = files.get('project.json');
+    if (pj) {
+      try { projName = (JSON.parse(new TextDecoder().decode(pj)) || {}).name || ''; } catch (_e) { }
+    }
+    if (!projName) projName = map.name || '';
+    currentSaveId = null;
+    loadMapData(map, true);
+    if (projName) {
+      var save = persistMapData(serializeMap());
+      if (save) { renameSaveDirect(save.id, projName); refreshSavesList(); }
+    }
+    closeSheet();
+    toast('项目文件夹已导入');
+  } catch (err) {
+    console.error(err);
+    alert('导入失败：' + err.message);
+  }
+}
+
+// ============================================================
+// 属性栏扩展
+// ============================================================
+var propCollide = null;
+var propSoundBtn = null;
+var waterBox = null;
+var lightBox = null;
+
+function buildPropsExtras() {
+  var bar = document.getElementById('propsBar');
+
+  var collideWrap = document.createElement('span');
+  collideWrap.id = 'collideWrap';
+  collideWrap.innerHTML = '<label>碰撞</label>';
+  propCollide = document.createElement('input');
+  propCollide.type = 'checkbox';
+  propCollide.id = 'propCollide';
+  collideWrap.appendChild(propCollide);
+  bar.insertBefore(collideWrap, document.getElementById('groupInfo'));
+
+  propSoundBtn = document.createElement('button');
+  propSoundBtn.id = 'btnSounds';
+  propSoundBtn.textContent = '🔊 声音';
+  propSoundBtn.onclick = openSoundPanel;
+  bar.insertBefore(propSoundBtn, document.getElementById('groupInfo'));
+
+  propCollide.addEventListener('change', function() {
+    var on = propCollide.checked;
+    for (var i = 0; i < selection.length; i++) {
+      var o = selection[i];
+      if (!collideEditable(o)) continue;
+      o.userData.mapCollide = on;
+      applyCollideLook(o);
+    }
+    pushHistory();
+  });
+
+  waterBox = document.createElement('div');
+  waterBox.id = 'waterBox';
+  waterBox.style.cssText = 'display:none;width:100%;gap:6px;flex-wrap:wrap;align-items:center;' +
+    'border-top:1px solid var(--line);padding-top:6px;margin-top:4px';
+  waterBox.innerHTML =
+    '<span class="group-badge" style="border-color:#5fd3f5;color:#5fd3f5;background:rgba(95,211,245,.14)">💧 水体</span>' +
+    '<label>形状</label><select id="wtShape"><option value="rect">矩形</option><option value="round">圆形</option></select>' +
+    '<label>深度</label><input id="wtDepth" type="number" min="0.15" max="200" step="0.1" />' +
+    '<label>深水色</label><input id="wtDeep" type="color" />' +
+    '<label>浅水色</label><input id="wtShallow" type="color" />' +
+    '<label>不透明</label><input id="wtOpacity" type="range" min="0.1" max="1" step="0.05" />' +
+    '<label>焦散</label><input id="wtCaustics" type="checkbox" />';
+  bar.appendChild(waterBox);
+
+  lightBox = document.createElement('div');
+  lightBox.id = 'lightBox';
+  lightBox.style.cssText = 'display:none;width:100%;gap:6px;flex-wrap:wrap;align-items:center;' +
+    'border-top:1px solid var(--line);padding-top:6px;margin-top:4px';
+  lightBox.innerHTML =
+    '<span class="group-badge" style="border-color:#ffd479;color:#ffd479;background:rgba(255,212,121,.14)">💡 光源</span>' +
+    '<span class="prop-info">类型:<b id="ltType">-</b></span>' +
+    '<label>颜色</label><input id="ltColor" type="color" />' +
+    '<label>亮度</label><input id="ltIntensity" type="number" min="0" max="400" step="0.5" />' +
+    '<label>范围</label><input id="ltDistance" type="number" min="0" max="400" step="0.5" />' +
+    '<label>衰减</label><input id="ltDecay" type="number" min="0" max="4" step="0.1" />' +
+    '<span id="ltSpotOnly"><label>张角</label><input id="ltAngle" type="number" min="1" max="89" step="1" />' +
+    '<label>边缘柔化</label><input id="ltPenumbra" type="range" min="0" max="1" step="0.05" /></span>' +
+    '<label>投影</label><input id="ltShadow" type="checkbox" />';
+  bar.appendChild(lightBox);
+
+  var wq = function(id) { return waterBox.querySelector('#' + id); };
+  var setWater = function(fn) {
+    for (var i = 0; i < selection.length; i++) {
+      if (selection[i].userData.mapType !== 'water') continue;
+      fn(selection[i]);
+      refreshWater(selection[i]);
+    }
+    syncWaterLighting();
+    pushHistory();
+  };
+  wq('wtShape').onchange = function() { var v = this.value; setWater(function(o) { rebuildWaterShape(o, v); }); refreshProps(); };
+  wq('wtDepth').onchange = function() { var v = +this.value; setWater(function(o) { o.userData.waterDepth = v; }); };
+  wq('wtDeep').oninput = function() { var v = this.value; setWater(function(o) { o.userData.waterDeep = v; }); };
+  wq('wtShallow').oninput = function() { var v = this.value; setWater(function(o) { o.userData.waterShallow = v; }); };
+  wq('wtOpacity').oninput = function() { var v = +this.value; setWater(function(o) { o.userData.waterOpacity = v; }); };
+  wq('wtCaustics').onchange = function() { var v = this.checked; setWater(function(o) { setWaterCaustics(o, v); }); };
+
+  var lq = function(id) { return lightBox.querySelector('#' + id); };
+  var setLight = function(fn) {
+    for (var i = 0; i < selection.length; i++) {
+      if (selection[i].userData.mapType !== 'light') continue;
+      fn(selection[i]);
+      refreshLight(selection[i]);
+    }
+    pushHistory();
+  };
+  lq('ltColor').oninput = function() { var v = this.value; setLight(function(o) { o.userData.mapColor = v; }); };
+  lq('ltIntensity').onchange = function() { var v = +this.value; setLight(function(o) { o.userData.lightIntensity = v; }); };
+  lq('ltDistance').onchange = function() { var v = +this.value; setLight(function(o) { o.userData.lightDistance = v; }); };
+  lq('ltDecay').onchange = function() { var v = +this.value; setLight(function(o) { o.userData.lightDecay = v; }); };
+  lq('ltAngle').onchange = function() { var v = +this.value; setLight(function(o) { o.userData.lightAngle = v; }); };
+  lq('ltPenumbra').oninput = function() { var v = +this.value; setLight(function(o) { o.userData.lightPenumbra = v; }); };
+  lq('ltShadow').onchange = function() { var v = this.checked; setLight(function(o) { o.userData.lightShadow = v; }); };
+}
+
+function setWaterCaustics(root, on) {
+  root.userData.waterCaustics = on;
+  var c = root.userData.waterCaustic;
+  if (on && !c) {
+    var round = root.userData.waterShape === 'round';
+    var cg = round ? new THREE.CircleGeometry(0.492, 48) : new THREE.PlaneGeometry(0.985, 0.985, 1, 1);
+    c = new THREE.Mesh(cg, causticMat);
+    c.rotation.x = -Math.PI / 2;
+    c.renderOrder = 5;
+    root.add(c);
+    root.userData.waterCaustic = c;
+  } else if (!on && c) {
+    root.remove(c);
+    c.geometry.dispose();
+    root.userData.waterCaustic = null;
+  }
+}
+
+function rebuildWaterShape(root, shape) {
+  if (root.userData.waterShape === shape) return;
+  root.userData.waterShape = shape;
+  var round = shape === 'round';
+  var surf = root.userData.waterSurface;
+  surf.geometry.dispose();
+  surf.geometry = round ? new THREE.CircleGeometry(0.5, 64) : new THREE.PlaneGeometry(1, 1, 1, 1);
+  surf.material.uniforms.uBowl.value = round ? 1 : 0;
+  var bm2 = root.userData.waterBody;
+  if (bm2) {
+    bm2.geometry.dispose();
+    bm2.geometry = waterBodyGeometry(root.userData.waterDepth, round);
+  }
+  var c = root.userData.waterCaustic;
+  if (c) {
+    c.geometry.dispose();
+    c.geometry = round ? new THREE.CircleGeometry(0.492, 48) : new THREE.PlaneGeometry(0.985, 0.985, 1, 1);
+  }
+  if (round) root.scale.z = root.scale.x;
+}
+
+function collideEditable(o) {
+  var t = o && o.userData.mapType;
+  return t === 'box' || t === 'sphere' || t === 'cylinder' || t === 'cone' ||
+    t === 'hex' || t === 'ramp' || t === 'triangle' || t === 'model';
+}
+
+function applyCollideLook(o) {
+  var off = o.userData.mapCollide === false;
+  o.traverse(function(m) {
+    if (!m.isMesh || !m.material) return;
+    var mats = Array.isArray(m.material) ? m.material : [m.material];
+    for (var i = 0; i < mats.length; i++) {
+      if (off) {
+        if (mats[i].userData.solidOpacity === undefined) {
+          mats[i].userData.solidOpacity = mats[i].opacity;
+          mats[i].userData.solidTransparent = mats[i].transparent;
+        }
+        mats[i].transparent = true;
+        mats[i].opacity = Math.min(mats[i].userData.solidOpacity, 0.55);
+      } else if (mats[i].userData.solidOpacity !== undefined) {
+        mats[i].opacity = mats[i].userData.solidOpacity;
+        mats[i].transparent = mats[i].userData.solidTransparent;
+        delete mats[i].userData.solidOpacity;
+        delete mats[i].userData.solidTransparent;
+      }
+      mats[i].needsUpdate = true;
+    }
+  });
+}
+
+var _texOptionsKey = '';
+
+function syncTextureOptions() {
+  var key = assetList('texture').map(function(a) { return a.key + a.asset.name; }).join('|');
+  if (key === _texOptionsKey) return;
+  _texOptionsKey = key;
+  rebuildTextureOptions();
+}
+
+function rebuildTextureOptions() {
+  var cur = propTex.value;
+  var html = TEXTURES.map(function(t) {
+    return '<option value="' + t.id + '">' + t.name + '</option>';
+  }).join('');
+  var texs = assetList('texture');
+  if (texs.length) {
+    html += '<optgroup label="项目资源">' + texs.map(function(a) {
+      return '<option value="asset:' + a.key + '">' + escapeHtml(a.asset.name || a.key) + '</option>';
+    }).join('') + '</optgroup>';
+  }
+  propTex.innerHTML = html;
+  propTex.value = cur;
+}
+
+// ============================================================
+// 新面板初始化
+// ============================================================
+buildEditorSky();
+buildVoidPlane();
+buildHierarchy();
+buildGamePropsPanel();
+buildAssetsPanel();
+buildSoundPanel();
+buildProjectPanel();
+buildThumbInputs();
+buildPlacePanel();
+buildPropsExtras();
+refreshGameProps();
+rebuildTextureOptions();
+applyEnv();
+refreshProjectPanel();
+
+(function() {
+  var topbar = document.getElementById('topbar');
+  var gear = document.createElement('button');
+  gear.id = 'btnProject';
+  gear.title = '项目设置';
+  gear.textContent = '⚙️';
+  gear.onclick = function() { openSheet(panelProject); };
+  topbar.insertBefore(gear, document.getElementById('btnMenu'));
+
+  var menuBtn = document.createElement('button');
+  menuBtn.textContent = '⚙️ 项目设置（环境光 / 天空盒 / 资源 / 预览图）';
+  menuBtn.style.borderColor = 'var(--accent)';
+  menuBtn.style.color = 'var(--accent)';
+  menuBtn.onclick = function() { openSheet(panelProject); };
+  var menu = document.getElementById('panelMenu');
+  menu.insertBefore(menuBtn, document.getElementById('btnOpenMap'));
+
+  var folderBtn = document.createElement('button');
+  folderBtn.textContent = '📁 导入项目文件夹（.zip）';
+  folderBtn.onclick = function() { folderInput.click(); };
+  menu.insertBefore(folderBtn, document.getElementById('btnImportGltf'));
+})();
 
 // ============================================================
 // 主循环
@@ -4099,8 +7062,13 @@ function frame(now) {
   camera.rotation.order = 'YXZ';
   camera.rotation.set(pitch, yaw, 0);
 
+  updateWater(dt);
+  if (skyMat) skyMat.uniforms.uTime.value = (skyMat.uniforms.uTime.value + dt) % 600;
+
   if (previewOn) {
     stepPreview(dt);
+    camera.updateMatrixWorld(true);
+    renderWaterReflection();
     composer.render();
     return;
   }
@@ -4133,6 +7101,8 @@ function frame(now) {
     camera.position.addScaledVector(move.normalize(), speed * dt);
   }
 
+  camera.updateMatrixWorld(true);
+  renderWaterReflection();
   composer.render();
 }
 requestAnimationFrame(frame);
@@ -4157,12 +7127,10 @@ pushHistory(true);
 checkForUpdates();
 checkTutorial();
 
-// 保存窗口关闭前自动存档
 window.addEventListener('beforeunload', function() {
   autoSave();
 });
 
-// resize
 function resize() {
   var w = viewport.clientWidth;
   var h = viewport.clientHeight;
@@ -4174,6 +7142,20 @@ function resize() {
 }
 window.addEventListener('resize', resize);
 resize();
+
+window.RDPMAP = {
+  PROJECT: PROJECT,
+  serializeMap: serializeMap,
+  loadMapData: loadMapData,
+  zipCreate: zipCreate,
+  zipRead: zipRead,
+  importProjectFolder: importProjectFolder,
+  dataUrlToBytes: dataUrlToBytes,
+  bytesToDataUrl: bytesToDataUrl,
+  objectsRoot: objectsRoot,
+  waterList: waterList,
+  lightList: lightList
+};
 
 console.log('🎮 RagdollBox 地图编辑器 v' + APP_VERSION + ' · 组功能已加载！');
 console.log('📦 组操作: 选中多个物体 → 建组 | 点击组内物体穿透选中 | 组旋转以组中心为轴');
@@ -4212,7 +7194,6 @@ uiScaleInput.addEventListener('keydown', function(e) {
   }
 });
 
-// 恢复上次保存的大小
 var savedScale = localStorage.getItem('ragdollbox_ui_scale');
 if (savedScale) {
   var val = parseFloat(savedScale);
