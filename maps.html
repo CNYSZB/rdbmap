@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>精选地图 · RagdollBox</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: Inter, "Microsoft YaHei", system-ui, sans-serif;
+      padding: 16px;
+    }
+
+    .modal {
+      background: rgba(22, 28, 36, 0.97);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 24px;
+      max-width: 540px;
+      width: 100%;
+      padding: 22px 18px 24px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(101, 169, 255, 0.10);
+      color: #eef4fb;
+      animation: modalIn 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    @keyframes modalIn {
+      0% { opacity: 0; transform: translateY(20px) scale(0.97); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #2a3440;
+    }
+
+    .modal-header h2 {
+      font-size: clamp(18px, 4vw, 22px);
+      font-weight: 700;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-header h2 small {
+      font-size: 11px;
+      font-weight: 400;
+      color: #6a7a8b;
+      background: #1b222c;
+      padding: 0 10px;
+      border-radius: 20px;
+      line-height: 22px;
+      border: 1px solid #2a3440;
+    }
+
+    .close-btn {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid #2a3440;
+      border-radius: 50%;
+      width: 38px;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      color: #9baabc;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      padding: 0;
+      flex-shrink: 0;
+    }
+
+    .close-btn:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: #45617d;
+    }
+    .close-btn:active { transform: scale(0.94); }
+
+    .modal-body {
+      padding: 12px 0 4px;
+      max-height: 60dvh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      scrollbar-width: thin;
+      scrollbar-color: #2a3440 transparent;
+    }
+    .modal-body::-webkit-scrollbar { width: 4px; }
+    .modal-body::-webkit-scrollbar-thumb { background: #2a3440; border-radius: 8px; }
+
+    .map-card {
+      display: flex;
+      flex-direction: column;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid #2a3440;
+      border-radius: 14px;
+      padding: 14px 16px;
+      cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+      gap: 6px;
+    }
+
+    .map-card:hover {
+      background: rgba(101, 169, 255, 0.06);
+      border-color: #3d5575;
+    }
+    .map-card:active { transform: scale(0.98); }
+
+    .map-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .map-name {
+      font-weight: 600;
+      font-size: clamp(15px, 2.8vw, 18px);
+      color: #eef4fb;
+    }
+
+    .map-desc {
+      font-size: 13px;
+      color: #9baabc;
+      line-height: 1.4;
+      padding-right: 4px;
+    }
+
+    .map-action {
+      background: transparent;
+      border: 1px solid #2a3440;
+      border-radius: 30px;
+      padding: 4px 16px;
+      font-size: 13px;
+      color: #9baabc;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.12s;
+      flex-shrink: 0;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      height: 32px;
+    }
+
+    .map-action:hover {
+      background: #65a9ff;
+      border-color: #65a9ff;
+      color: #fff;
+    }
+    .map-action:active { transform: scale(0.94); }
+    .map-action .arrow { font-size: 14px; line-height: 1; }
+
+    .modal-footer {
+      border-top: 1px solid #1b222c;
+      margin-top: 10px;
+      padding-top: 12px;
+      display: flex;
+      justify-content: flex-end;
+      font-size: 12px;
+      color: #6a7a8b;
+      gap: 16px;
+    }
+
+    .modal-footer .hint {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .modal-footer .hint kbd {
+      background: #121821;
+      border: 1px solid #2a3440;
+      padding: 1px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      color: #9baabc;
+    }
+
+    @media (max-width: 480px) {
+      .modal { padding: 16px 14px 18px; border-radius: 20px; max-height: 90dvh; }
+      .map-card { padding: 12px 14px; }
+      .map-row { flex-wrap: wrap; }
+      .map-action { width: 100%; justify-content: center; padding: 6px; height: auto; }
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 30px 10px;
+      color: #6a7a8b;
+    }
+    .empty-state .icon { font-size: 28px; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+
+<div class="modal" role="dialog" aria-modal="true">
+  <div class="modal-header">
+    <h2>🗺️ 精选地图 <small>快捷下载</small></h2>
+    <button class="close-btn" id="closeModalBtn" aria-label="关闭">✕</button>
+  </div>
+
+  <div class="modal-body" id="mapListContainer"></div>
+
+  <div class="modal-footer">
+    <span class="hint"><kbd>点击</kbd> 跳转下载</span>
+    <span>更多地图持续更新</span>
+  </div>
+</div>
+
+<script>
+  (function() {
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+    // ★ 地图数据 — 复制下面整行改 name / desc / url  ★
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+    const MAPS = [
+      { name: '余晖', desc: '地图编辑器作者粗略还原了gorebox中的余晖', url: 'https://mods.riftcrown.com/mod?slug=%E4%BD%99%E6%99%96-e5f23f' },
+      { name: '试炼场', desc: '地图编辑器作者粗略还原了gorebox 27中的试炼场', url: 'https://mods.riftcrown.com/mod?slug=%E8%AF%95%E7%82%BC%E5%9C%BA-27ec43' }
+      // ↓ 新增地图直接复制下面一行，改 name / desc / url
+      // { name: '地图名', desc: '地图简介，随便写。', url: 'https://你的链接' },
+    ];
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+
+    const container = document.getElementById('mapListContainer');
+    const closeBtn = document.getElementById('closeModalBtn');
+
+    function renderMaps() {
+      if (!container) return;
+      container.innerHTML = '';
+
+      if (!MAPS || MAPS.length === 0) {
+        container.innerHTML = `<div class="empty-state"><div class="icon">🗺️</div><p style="margin:4px 0 0;font-size:14px;">精选地图正在筹备中</p></div>`;
+        return;
+      }
+
+      MAPS.forEach((map) => {
+        const card = document.createElement('div');
+        card.className = 'map-card';
+        card.setAttribute('role', 'button');
+        card.setAttribute('tabindex', '0');
+
+        const row = document.createElement('div');
+        row.className = 'map-row';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'map-name';
+        nameSpan.textContent = map.name;
+
+        const actionBtn = document.createElement('button');
+        actionBtn.className = 'map-action';
+        actionBtn.innerHTML = `<span class="arrow">➜</span> 下载`;
+
+        row.appendChild(nameSpan);
+        row.appendChild(actionBtn);
+        card.appendChild(row);
+
+        // 介绍文字
+        if (map.desc) {
+          const descP = document.createElement('div');
+          descP.className = 'map-desc';
+          descP.textContent = map.desc;
+          card.appendChild(descP);
+        }
+
+        const handleJump = (e) => {
+          e.stopPropagation();
+          if (map.url) {
+            window.open(map.url, '_blank');
+            actionBtn.style.transform = 'scale(0.94)';
+            setTimeout(() => { actionBtn.style.transform = ''; }, 150);
+          } else {
+            alert('该地图暂无下载链接');
+          }
+        };
+
+        card.addEventListener('click', handleJump);
+        actionBtn.addEventListener('click', handleJump);
+        card.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleJump(e); }
+        });
+
+        container.appendChild(card);
+      });
+    }
+
+    function closeModal() {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'closeFeaturedMaps' }, '*');
+      } else {
+        if (window.history.length > 1) {
+          window.history.back();
+        } else {
+          document.body.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:center;height:100dvh;background:rgba(0,0,0,0.7);color:#eef4fb;font-family:system-ui;flex-direction:column;gap:12px;">
+              <div style="font-size:32px;">👋</div>
+              <p style="font-size:16px;margin:0;">弹窗已关闭</p>
+              <button onclick="window.close()" style="background:#65a9ff;border:none;color:#fff;padding:10px 28px;border-radius:40px;font-size:15px;cursor:pointer;">关闭页面</button>
+            </div>
+          `;
+        }
+      }
+    }
+
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    document.body.addEventListener('click', (e) => { if (e.target === document.body) closeModal(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'closeFeaturedMaps') closeModal();
+    });
+
+    renderMaps();
+    window.__featuredMaps = { refresh: renderMaps, close: closeModal, list: MAPS };
+    console.log('[精选地图] 已加载，共 ' + MAPS.length + ' 张');
+  })();
+</script>
+
+</body>
+</html>
