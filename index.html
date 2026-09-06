@@ -789,7 +789,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 4.1.0</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 4.2.0</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
@@ -928,10 +928,10 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">4.1.0</div>
+    <div class="version" id="updateVersion">4.2.0</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li>增加了精选地图</li>
+      <li>把那该死的复制自动偏移给做掉了😈</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -984,7 +984,7 @@ import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // ==================== 版本号 ====================
-const APP_VERSION = '4.1.0';
+const APP_VERSION = '4.2.0';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
@@ -3442,7 +3442,7 @@ function duplicateSelected() {
       if (!def) continue;
       var q = new THREE.Quaternion().copy(obj.quaternion);
       var newProp = createProp(obj.userData.propType, {
-        position: obj.position.toArray().map(function(v) { return v + 0.1; }),
+        position: obj.position.toArray().map(function(v) { return v + 0; }),
         rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z],
         color: obj.userData.mapColor,
         name: obj.userData.mapName + ' 副本'
@@ -3453,7 +3453,7 @@ function duplicateSelected() {
     var kind = objKindOf(obj);
     if (kind === 'gun') {
       var ng = createGun(obj.userData.gunId, {
-        position: obj.position.toArray().map(function(v) { return v + 0.1; }),
+        position: obj.position.toArray().map(function(v) { return v + 0; }),
         name: obj.userData.mapName + ' 副本'
       });
       if (ng) { ng.quaternion.copy(obj.quaternion); newOnes.push(ng); }
@@ -3462,20 +3462,20 @@ function duplicateSelected() {
     if (kind === 'water') {
       var wd = serializeWater(obj);
       wd.name += ' 副本';
-      wd.position = [wd.position[0] + 0.5, wd.position[1], wd.position[2] + 0.5];
+      wd.position = [wd.position[0] + 0, wd.position[1], wd.position[2] + 0];
       newOnes.push(createWater(wd));
       continue;
     }
     if (kind === 'light') {
       var ld = serializeLight(obj);
       ld.name += ' 副本';
-      ld.position = [ld.position[0] + 0.5, ld.position[1], ld.position[2] + 0.5];
+      ld.position = [ld.position[0] + 0, ld.position[1], ld.position[2] + 0];
       newOnes.push(createLight(ld));
       continue;
     }
     if (kind === 'spawn') {
       newOnes.push(createSpawn({
-        position: obj.position.toArray().map(function(v) { return v + 0.4; })
+        position: obj.position.toArray().map(function(v) { return v + 0; })
       }));
       continue;
     }
