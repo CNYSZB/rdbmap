@@ -690,6 +690,18 @@
 
     #propsBar #collideWrap { display: inline-flex; align-items: center; gap: 4px; }
     #propsBar optgroup { color: var(--muted); }
+
+    /* 精确数值调整面板 */
+    #btnPreciseToggle.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; background: #20344d; }
+    .precise-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
+    .precise-label { font-size: 10px; color: var(--muted); width: 40px; flex-shrink: 0; }
+    .precise-input {
+      width: 64px; border: 1px solid var(--line); background: #121821;
+      color: var(--text); border-radius: 6px; padding: 4px 6px; font-size: 11px;
+    }
+    .precise-apply { flex: 1; padding: 5px 8px; font-size: 10px; border-radius: 6px; text-align: center; }
+    #precisePanel[data-disabled="1"] .precise-input,
+    #precisePanel[data-disabled="1"] .precise-apply { opacity: .45; pointer-events: none; }
   </style>
 </head>
 <body>
@@ -725,6 +737,33 @@
     <button id="btnFocus">🎯 聚焦</button>
     <button id="btnDuplicate">📋复制</button>
     <button id="btnDelete" class="danger">🗑删除</button>
+    <button id="btnPreciseToggle">🎯 精确调整</button>
+    <div id="precisePanel" style="display:none;width:100%;border-top:1px solid var(--line);padding-top:8px;margin-top:6px;">
+      <div class="precise-row">
+        <span class="precise-label">位置</span>
+        <input id="preciseX" type="number" step="0.1" class="precise-input" />
+        <input id="preciseY" type="number" step="0.1" class="precise-input" />
+        <input id="preciseZ" type="number" step="0.1" class="precise-input" />
+      </div>
+      <div class="precise-row">
+        <span class="precise-label">旋转°</span>
+        <input id="preciseRX" type="number" step="1" class="precise-input" />
+        <input id="preciseRY" type="number" step="1" class="precise-input" />
+        <input id="preciseRZ" type="number" step="1" class="precise-input" />
+      </div>
+      <div class="precise-row">
+        <span class="precise-label">缩放</span>
+        <input id="preciseSX" type="number" step="0.05" min="0.05" class="precise-input" />
+        <input id="preciseSY" type="number" step="0.05" min="0.05" class="precise-input" />
+        <input id="preciseSZ" type="number" step="0.05" min="0.05" class="precise-input" />
+      </div>
+      <div class="precise-row">
+        <button id="precisePosApply" class="precise-apply">应用位置</button>
+        <button id="preciseRotApply" class="precise-apply">应用旋转</button>
+        <button id="preciseScaleApply" class="precise-apply">应用缩放</button>
+      </div>
+      <div id="preciseHint" style="font-size:10px;color:var(--muted);margin-top:4px;">仅支持单个物体的精确输入（回车即可应用）</div>
+    </div>
     <div id="groupInfo" style="display:none;width:100%;border-top:1px solid var(--line);padding-top:6px;margin-top:4px;gap:6px;flex-wrap:wrap;align-items:center;">
       <span class="group-badge">📦 组</span>
       <span class="group-member-count" id="groupMemberCount">成员: 0</span>
@@ -789,7 +828,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 4.2.0</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 4.3.0</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
@@ -928,10 +967,11 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">4.2.0</div>
+    <div class="version" id="updateVersion">4.3.0</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li>把那该死的复制自动偏移给做掉了😈</li>
+      <li>把那该死的复制自动偏移从代码层面做掉了😈</li>
+      <li>增加了精确调整功能，调整更精确了，总算不会被折磨</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -984,7 +1024,7 @@ import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // ==================== 版本号 ====================
-const APP_VERSION = '4.2.0';
+const APP_VERSION = '4.3.0';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
@@ -2348,7 +2388,12 @@ function surfaceEditable(obj) {
 function refreshProps() {
   var bar = document.getElementById('propsBar');
   var groupInfo = document.getElementById('groupInfo');
-  if (!selection.length) { bar.classList.remove('show'); return; }
+  if (!selection.length) {
+    bar.classList.remove('show');
+    var pp = document.getElementById('precisePanel');
+    if (pp) pp.dataset.disabled = '1';
+    return;
+  }
   bar.classList.add('show');
   if (typeof syncTextureOptions === 'function') syncTextureOptions();
 
@@ -2411,7 +2456,123 @@ function refreshProps() {
     document.getElementById('propType').textContent = isGroupSelected ? '📦 ' + commonGroup.name : '多选';
   }
   refreshPropsExtra();
+  refreshPrecisePanel();
 }
+
+// ============================================================
+// 精确数值调整（附加功能，默认折叠）
+// ============================================================
+var RAD2DEG = 180 / Math.PI;
+var DEG2RAD = Math.PI / 180;
+
+function refreshPrecisePanel() {
+  var panel = document.getElementById('precisePanel');
+  var hint = document.getElementById('preciseHint');
+  if (!panel) return;
+  var single = selection.length === 1 ? selection[0] : null;
+  if (!single) {
+    panel.dataset.disabled = '1';
+    hint.textContent = selection.length > 1 ? '多选/组暂不支持精确输入，请使用拖拽手柄调整' : '请先选中一个物体';
+    return;
+  }
+  panel.dataset.disabled = '0';
+  hint.textContent = '仅支持单个物体的精确输入（回车即可应用）';
+  var pos = single.position;
+  var rot = single.rotation;
+  var scl = single.scale;
+  document.getElementById('preciseX').value = +pos.x.toFixed(3);
+  document.getElementById('preciseY').value = +pos.y.toFixed(3);
+  document.getElementById('preciseZ').value = +pos.z.toFixed(3);
+  document.getElementById('preciseRX').value = +(rot.x * RAD2DEG).toFixed(2);
+  document.getElementById('preciseRY').value = +(rot.y * RAD2DEG).toFixed(2);
+  document.getElementById('preciseRZ').value = +(rot.z * RAD2DEG).toFixed(2);
+  document.getElementById('preciseSX').value = +scl.x.toFixed(3);
+  document.getElementById('preciseSY').value = +scl.y.toFixed(3);
+  document.getElementById('preciseSZ').value = +scl.z.toFixed(3);
+}
+
+function getPreciseTargetObject() {
+  return selection.length === 1 ? selection[0] : null;
+}
+
+function applyPrecisePosition() {
+  var obj = getPreciseTargetObject();
+  if (!obj) return;
+  var x = parseFloat(document.getElementById('preciseX').value);
+  var y = parseFloat(document.getElementById('preciseY').value);
+  var z = parseFloat(document.getElementById('preciseZ').value);
+  if (isNaN(x) || isNaN(y) || isNaN(z)) { toast('请输入有效数值'); return; }
+  obj.position.set(x, y, z);
+  afterPreciseTransform(obj);
+}
+
+function applyPreciseRotation() {
+  var obj = getPreciseTargetObject();
+  if (!obj) return;
+  var rx = parseFloat(document.getElementById('preciseRX').value);
+  var ry = parseFloat(document.getElementById('preciseRY').value);
+  var rz = parseFloat(document.getElementById('preciseRZ').value);
+  if (isNaN(rx) || isNaN(ry) || isNaN(rz)) { toast('请输入有效数值'); return; }
+  obj.rotation.set(rx * DEG2RAD, ry * DEG2RAD, rz * DEG2RAD);
+  afterPreciseTransform(obj);
+}
+
+function applyPreciseScale() {
+  var obj = getPreciseTargetObject();
+  if (!obj) return;
+  if (obj.userData.isProp) { toast('该道具不支持缩放'); return; }
+  var sx = parseFloat(document.getElementById('preciseSX').value);
+  var sy = parseFloat(document.getElementById('preciseSY').value);
+  var sz = parseFloat(document.getElementById('preciseSZ').value);
+  if (isNaN(sx) || isNaN(sy) || isNaN(sz)) { toast('请输入有效数值'); return; }
+  var MIN_SCALE = 0.05;
+  obj.scale.set(Math.max(MIN_SCALE, sx), Math.max(MIN_SCALE, sy), Math.max(MIN_SCALE, sz));
+  afterPreciseTransform(obj);
+}
+
+function afterPreciseTransform(obj) {
+  var group = groupManager.getGroupOfObject(obj);
+  if (group) {
+    groupManager._updateBounds(group);
+    groupManager._hideBounds(group);
+    groupManager._showBounds(group);
+  }
+  if (typeof syncProxyToSelection === 'function') syncProxyToSelection();
+  refreshProps();
+  pushHistory();
+}
+
+(function setupPrecisePanel() {
+  var toggleBtn = document.getElementById('btnPreciseToggle');
+  var panel = document.getElementById('precisePanel');
+  if (!toggleBtn || !panel) return;
+
+  toggleBtn.onclick = function() {
+    var showing = panel.style.display !== 'none';
+    panel.style.display = showing ? 'none' : 'block';
+    toggleBtn.classList.toggle('active', !showing);
+    if (!showing) refreshPrecisePanel();
+  };
+
+  document.getElementById('precisePosApply').onclick = applyPrecisePosition;
+  document.getElementById('preciseRotApply').onclick = applyPreciseRotation;
+  document.getElementById('preciseScaleApply').onclick = applyPreciseScale;
+
+  var enterMap = {
+    preciseX: applyPrecisePosition, preciseY: applyPrecisePosition, preciseZ: applyPrecisePosition,
+    preciseRX: applyPreciseRotation, preciseRY: applyPreciseRotation, preciseRZ: applyPreciseRotation,
+    preciseSX: applyPreciseScale, preciseSY: applyPreciseScale, preciseSZ: applyPreciseScale
+  };
+  for (var id in enterMap) {
+    (function(inputId, fn) {
+      var el = document.getElementById(inputId);
+      if (!el) return;
+      el.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); fn(); }
+      });
+    })(id, enterMap[id]);
+  }
+})();
 
 function refreshPropsExtra() {
   if (!propCollide) return;
@@ -3432,57 +3593,82 @@ function removeSelected() {
   pushHistory();
 }
 
+function duplicateOneObject(obj) {
+  if (obj.userData.isProp) {
+    var def = PROP_DEFS[obj.userData.propType];
+    if (!def) return null;
+    var q = new THREE.Quaternion().copy(obj.quaternion);
+    var newProp = createProp(obj.userData.propType, {
+      position: obj.position.toArray(),
+      rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z],
+      color: obj.userData.mapColor,
+      name: obj.userData.mapName + ' 副本'
+    });
+    if (newProp) newProp.quaternion.copy(q);
+    return newProp;
+  }
+  var kind = objKindOf(obj);
+  if (kind === 'gun') {
+    var ng = createGun(obj.userData.gunId, {
+      position: obj.position.toArray(),
+      name: obj.userData.mapName + ' 副本'
+    });
+    if (ng) ng.quaternion.copy(obj.quaternion);
+    return ng;
+  }
+  if (kind === 'water') {
+    var wd = serializeWater(obj);
+    wd.name += ' 副本';
+    return createWater(wd);
+  }
+  if (kind === 'light') {
+    var ld = serializeLight(obj);
+    ld.name += ' 副本';
+    return createLight(ld);
+  }
+  if (kind === 'spawn') {
+    return createSpawn({ position: obj.position.toArray() });
+  }
+  var data = serializeObject(obj);
+  data.name += ' 副本';
+  return restoreObject(data);
+}
+
 function duplicateSelected() {
   if (!selection.length) return;
   var newOnes = [];
+  var handled = new Set();
+  var newGroupsInfo = [];
+
   for (var i = 0; i < selection.length; i++) {
     var obj = selection[i];
-    if (obj.userData.isProp) {
-      var def = PROP_DEFS[obj.userData.propType];
-      if (!def) continue;
-      var q = new THREE.Quaternion().copy(obj.quaternion);
-      var newProp = createProp(obj.userData.propType, {
-        position: obj.position.toArray().map(function(v) { return v + 0; }),
-        rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z],
-        color: obj.userData.mapColor,
-        name: obj.userData.mapName + ' 副本'
-      });
-      if (newProp) { newProp.quaternion.copy(q); newOnes.push(newProp); }
+    if (handled.has(obj)) continue;
+
+    var srcGroup = groupManager.getGroupOfObject(obj);
+    if (srcGroup) {
+      // 整组复制：复制组内全部成员，并在新对象之间重建同一个组
+      var newMembers = [];
+      for (var j = 0; j < srcGroup.members.length; j++) {
+        var member = srcGroup.members[j];
+        handled.add(member);
+        var copy = duplicateOneObject(member);
+        if (copy) { newMembers.push(copy); newOnes.push(copy); }
+      }
+      if (newMembers.length >= 2) {
+        newGroupsInfo.push({ members: newMembers, name: srcGroup.name });
+      }
       continue;
     }
-    var kind = objKindOf(obj);
-    if (kind === 'gun') {
-      var ng = createGun(obj.userData.gunId, {
-        position: obj.position.toArray().map(function(v) { return v + 0; }),
-        name: obj.userData.mapName + ' 副本'
-      });
-      if (ng) { ng.quaternion.copy(obj.quaternion); newOnes.push(ng); }
-      continue;
-    }
-    if (kind === 'water') {
-      var wd = serializeWater(obj);
-      wd.name += ' 副本';
-      wd.position = [wd.position[0] + 0, wd.position[1], wd.position[2] + 0];
-      newOnes.push(createWater(wd));
-      continue;
-    }
-    if (kind === 'light') {
-      var ld = serializeLight(obj);
-      ld.name += ' 副本';
-      ld.position = [ld.position[0] + 0, ld.position[1], ld.position[2] + 0];
-      newOnes.push(createLight(ld));
-      continue;
-    }
-    if (kind === 'spawn') {
-      newOnes.push(createSpawn({
-        position: obj.position.toArray().map(function(v) { return v + 0; })
-      }));
-      continue;
-    }
-    var data = serializeObject(obj);
-    data.name += ' 副本';
-    newOnes.push(restoreObject(data));
+
+    handled.add(obj);
+    var single = duplicateOneObject(obj);
+    if (single) newOnes.push(single);
   }
+
+  for (var g = 0; g < newGroupsInfo.length; g++) {
+    groupManager.createGroup(newGroupsInfo[g].members, newGroupsInfo[g].name);
+  }
+
   setSelection(newOnes);
   pushHistory();
 }
