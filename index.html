@@ -206,6 +206,27 @@
     body.preview #topbar, body.preview #bottomBar, body.preview #propsBar, body.preview #selectBox { display: none !important; }
     body.preview.touch #dpadMove { display: block; }
 
+    /* 视野(FOV)调整模式：隐藏其他所有按键，只留一个滑块面板 */
+    body.fovAdjust #topbar, body.fovAdjust #bottomBar, body.fovAdjust #propsBar,
+    body.fovAdjust #selectBox, body.fovAdjust #dpadMove, body.fovAdjust #hintBar,
+    body.fovAdjust #hierPanel { display: none !important; }
+
+    #fovPanel {
+      display: none; position: absolute; left: 50%; bottom: max(6%, calc(20px + env(safe-area-inset-bottom, 0px)));
+      transform: translateX(-50%); z-index: 60;
+      width: min(420px, 92vw); padding: 16px 18px calc(16px + env(safe-area-inset-bottom, 0px));
+      border-radius: 16px; background: rgba(18,24,32,.92); backdrop-filter: blur(10px);
+      border: 1px solid var(--line); flex-direction: column; gap: 10px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.5);
+    }
+    body.fovAdjust #fovPanel { display: flex; }
+    #fovPanel .fovTitle { font-size: 13px; font-weight: 600; text-align: center; color: var(--text); }
+    #fovPanel .fovRow { display: flex; align-items: center; gap: 10px; }
+    #fovPanel input[type="range"] { flex: 1; accent-color: var(--accent); height: 26px; }
+    #fovPanel .fovVal { width: 44px; text-align: center; font-size: 13px; color: var(--accent); font-weight: 600; flex-shrink: 0; }
+    #fovPanel .fovBtns { display: flex; gap: 8px; }
+    #fovPanel .fovBtns button { flex: 1; text-align: center; }
+
     #previewHud {
       display: none; position: absolute; left: 50%; bottom: 4%;
       transform: translateX(-50%); z-index: 55; gap: 8px;
@@ -699,9 +720,8 @@
       width: 64px; border: 1px solid var(--line); background: #121821;
       color: var(--text); border-radius: 6px; padding: 4px 6px; font-size: 11px;
     }
-    .precise-apply { flex: 1; padding: 5px 8px; font-size: 10px; border-radius: 6px; text-align: center; }
-    #precisePanel[data-disabled="1"] .precise-input,
-    #precisePanel[data-disabled="1"] .precise-apply { opacity: .45; pointer-events: none; }
+    #precisePanel[data-disabled="1"] .precise-input { opacity: .45; pointer-events: none; }
+    #precisePanel[data-mixed="1"] .precise-input::placeholder { color: var(--accent); opacity: .7; }
   </style>
 </head>
 <body>
@@ -757,12 +777,7 @@
         <input id="preciseSY" type="number" step="0.05" min="0.05" class="precise-input" />
         <input id="preciseSZ" type="number" step="0.05" min="0.05" class="precise-input" />
       </div>
-      <div class="precise-row">
-        <button id="precisePosApply" class="precise-apply">应用位置</button>
-        <button id="preciseRotApply" class="precise-apply">应用旋转</button>
-        <button id="preciseScaleApply" class="precise-apply">应用缩放</button>
-      </div>
-      <div id="preciseHint" style="font-size:10px;color:var(--muted);margin-top:4px;">仅支持单个物体的精确输入（回车即可应用）</div>
+      <div id="preciseHint" style="font-size:10px;color:var(--muted);margin-top:4px;">改了就立即生效</div>
     </div>
     <div id="groupInfo" style="display:none;width:100%;border-top:1px solid var(--line);padding-top:6px;margin-top:4px;gap:6px;flex-wrap:wrap;align-items:center;">
       <span class="group-badge">📦 组</span>
@@ -779,6 +794,20 @@
   <div id="previewHud">
     <span>预览中 · <b id="previewHint">WASD 移动 · 空格 跳 · Shift 跑</b></span>
     <button id="previewExit">退出预览 (Esc)</button>
+  </div>
+
+  <div id="fovPanel">
+    <div class="fovTitle">🔭 视野调整（拖动滑块实时预览，方便制作项目封面）</div>
+    <div class="fovRow">
+      <span style="font-size:11px;color:var(--muted);flex-shrink:0;">窄</span>
+      <input id="fovSlider" type="range" min="20" max="120" step="1" value="65" />
+      <span style="font-size:11px;color:var(--muted);flex-shrink:0;">宽</span>
+      <span class="fovVal" id="fovVal">65°</span>
+    </div>
+    <div class="fovBtns">
+      <button id="fovCancel">取消</button>
+      <button id="fovConfirm" class="accent">✅ 确定并保存</button>
+    </div>
   </div>
 
   <div id="dpadMove"><canvas id="canvasMove"></canvas></div>
@@ -828,7 +857,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 4.3.0</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 4.4.1</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
@@ -839,6 +868,7 @@
   <button id="btnImportGltf">📥 导入 GLTF / GLB</button>
   <button id="btnImportFbx">📥 导入 FBX</button>
   <button id="btnRedo">↪️ 重做</button>
+  <button id="btnFovAdjust" style="border-color:var(--accent);color:var(--accent);">🔭 视野调整（用于制作封面）</button>
   <button id="btnTutorial">📖 重新看新手教程</button>
   <button id="btnViewUpdate">📋 查看更新历史</button>
   <button id="btnKeys">⌨️ 快捷键一览</button>
@@ -967,11 +997,13 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">4.3.0</div>
+    <div class="version" id="updateVersion">4.4.1</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li>把那该死的复制自动偏移从代码层面做掉了😈</li>
-      <li>增加了精确调整功能，调整更精确了，总算不会被折磨</li>
+      <li>精确调整面板去掉了多余的"应用"按钮，改数值就立即生效，不用再点</li>
+      <li>初步让精确调整功能可以用于多选和组功能，但是bug仍然严重，建议不要尝试</li>
+      <li>修复了水体拾取判定范围过大的问题，现在只有点到水面才会选中水，不会再误触</li>
+      <li>菜单新增「视野调整」，专门用来调 FOV 做项目封面，调整时只留一个滑块，清爽</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -1024,7 +1056,7 @@ import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // ==================== 版本号 ====================
-const APP_VERSION = '4.3.0';
+const APP_VERSION = '4.4.1';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
@@ -1136,7 +1168,9 @@ viewport.prepend(renderer.domElement);
 var scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9cbcd8);
 scene.fog = new THREE.Fog(0x9cbcd8, 70, 220);
-var camera = new THREE.PerspectiveCamera(65, 1, 0.05, 500);
+var DEFAULT_FOV = 65;
+var savedFov = parseFloat(localStorage.getItem('ragdollbox_fov'));
+var camera = new THREE.PerspectiveCamera((!isNaN(savedFov) && savedFov >= 20 && savedFov <= 120) ? savedFov : DEFAULT_FOV, 1, 0.05, 500);
 camera.position.set(8, 7, 12);
 var yaw = -0.58, pitch = -0.28;
 
@@ -1195,6 +1229,7 @@ var selection = [];
 var multiSelectMode = false;
 var currentTool = 'select';
 var scaleStart = null;
+var scaleBoxStart = null;
 var historyLock = false;
 var history = [];
 var historyIndex = -1;
@@ -2460,74 +2495,186 @@ function refreshProps() {
 }
 
 // ============================================================
-// 精确数值调整（附加功能，默认折叠）
+// 精确数值调整（支持单个物体 / 多选 / 组，改了就立即生效）
 // ============================================================
 var RAD2DEG = 180 / Math.PI;
 var DEG2RAD = Math.PI / 180;
+var preciseSuppress = false; // 刷新面板数值时临时挂起，避免刷新触发input事件形成回环
+
+// 精确面板的操作目标：单个物体 -> 该物体；多选/组 -> 以 transformProxy(组/多选中心) 为基准整体变换
+function getPreciseTarget() {
+  if (!selection.length) return null;
+  if (selection.length === 1) {
+    return { mode: 'single', obj: selection[0] };
+  }
+  var commonGroup = getCommonGroup();
+  return { mode: 'multi', members: commonGroup ? commonGroup.members.slice() : selection.slice(), group: commonGroup };
+}
 
 function refreshPrecisePanel() {
   var panel = document.getElementById('precisePanel');
   var hint = document.getElementById('preciseHint');
   if (!panel) return;
-  var single = selection.length === 1 ? selection[0] : null;
-  if (!single) {
+  var target = getPreciseTarget();
+  preciseSuppress = true;
+  if (!target) {
     panel.dataset.disabled = '1';
-    hint.textContent = selection.length > 1 ? '多选/组暂不支持精确输入，请使用拖拽手柄调整' : '请先选中一个物体';
+    panel.dataset.mixed = '0';
+    hint.textContent = '请先选中一个物体';
+    preciseSuppress = false;
     return;
   }
   panel.dataset.disabled = '0';
-  hint.textContent = '仅支持单个物体的精确输入（回车即可应用）';
-  var pos = single.position;
-  var rot = single.rotation;
-  var scl = single.scale;
-  document.getElementById('preciseX').value = +pos.x.toFixed(3);
-  document.getElementById('preciseY').value = +pos.y.toFixed(3);
-  document.getElementById('preciseZ').value = +pos.z.toFixed(3);
-  document.getElementById('preciseRX').value = +(rot.x * RAD2DEG).toFixed(2);
-  document.getElementById('preciseRY').value = +(rot.y * RAD2DEG).toFixed(2);
-  document.getElementById('preciseRZ').value = +(rot.z * RAD2DEG).toFixed(2);
-  document.getElementById('preciseSX').value = +scl.x.toFixed(3);
-  document.getElementById('preciseSY').value = +scl.y.toFixed(3);
-  document.getElementById('preciseSZ').value = +scl.z.toFixed(3);
+
+  if (target.mode === 'single') {
+    panel.dataset.mixed = '0';
+    hint.textContent = '改了就立即生效';
+    var single = target.obj;
+    var pos = single.position, rot = single.rotation, scl = single.scale;
+    document.getElementById('preciseX').value = +pos.x.toFixed(3);
+    document.getElementById('preciseY').value = +pos.y.toFixed(3);
+    document.getElementById('preciseZ').value = +pos.z.toFixed(3);
+    document.getElementById('preciseRX').value = +(rot.x * RAD2DEG).toFixed(2);
+    document.getElementById('preciseRY').value = +(rot.y * RAD2DEG).toFixed(2);
+    document.getElementById('preciseRZ').value = +(rot.z * RAD2DEG).toFixed(2);
+    document.getElementById('preciseSX').value = +scl.x.toFixed(3);
+    document.getElementById('preciseSY').value = +scl.y.toFixed(3);
+    document.getElementById('preciseSZ').value = +scl.z.toFixed(3);
+  } else {
+    // 多选 / 组：显示的是中心点坐标，旋转/缩放显示为相对增量基准（0 / 1），每次改动都是相对当前状态的整体变换
+    panel.dataset.mixed = '1';
+    hint.textContent = (target.group ? '📦 组' : '多选') + '整体调整 · 位置=中心坐标 · 旋转缩放=相对当前的整体变换 · 改了就立即生效';
+    syncProxyToSelection();
+    var c = transformProxy.position;
+    document.getElementById('preciseX').value = +c.x.toFixed(3);
+    document.getElementById('preciseY').value = +c.y.toFixed(3);
+    document.getElementById('preciseZ').value = +c.z.toFixed(3);
+    document.getElementById('preciseRX').value = 0;
+    document.getElementById('preciseRY').value = 0;
+    document.getElementById('preciseRZ').value = 0;
+    document.getElementById('preciseSX').value = 1;
+    document.getElementById('preciseSY').value = 1;
+    document.getElementById('preciseSZ').value = 1;
+  }
+  preciseSuppress = false;
 }
 
-function getPreciseTargetObject() {
-  return selection.length === 1 ? selection[0] : null;
+// 共用：对一组物体做"世界坐标包围盒整体缩放"（跟拖拽手柄组缩放用的是同一套算法）
+// center: 缩放锚点（世界坐标）；ratio: 三轴缩放比例（世界轴）
+function scaleMembersAroundWorldPoint(members, center, ratio, minScale) {
+  minScale = minScale || 0.05;
+  for (var i = 0; i < members.length; i++) {
+    var o = members[i];
+    if (o.userData.isProp) continue;
+    var parent = o.parent;
+
+    var worldPos = o.position.clone();
+    if (parent) parent.localToWorld(worldPos);
+    worldPos.sub(center).multiply(ratio).add(center);
+    if (parent) parent.worldToLocal(worldPos);
+    o.position.copy(worldPos);
+
+    var worldQuat = new THREE.Quaternion();
+    o.getWorldQuaternion(worldQuat);
+    var invWorldQuat = worldQuat.clone().invert();
+    var scaleVec = o.scale.clone();
+    scaleVec.applyQuaternion(worldQuat).multiply(ratio).applyQuaternion(invWorldQuat);
+    o.scale.set(
+      Math.max(minScale, Math.abs(scaleVec.x)),
+      Math.max(minScale, Math.abs(scaleVec.y)),
+      Math.max(minScale, Math.abs(scaleVec.z))
+    );
+  }
 }
 
 function applyPrecisePosition() {
-  var obj = getPreciseTargetObject();
-  if (!obj) return;
+  if (preciseSuppress) return;
+  var target = getPreciseTarget();
+  if (!target) return;
   var x = parseFloat(document.getElementById('preciseX').value);
   var y = parseFloat(document.getElementById('preciseY').value);
   var z = parseFloat(document.getElementById('preciseZ').value);
-  if (isNaN(x) || isNaN(y) || isNaN(z)) { toast('请输入有效数值'); return; }
-  obj.position.set(x, y, z);
-  afterPreciseTransform(obj);
+  if (isNaN(x) || isNaN(y) || isNaN(z)) return;
+
+  if (target.mode === 'single') {
+    target.obj.position.set(x, y, z);
+    afterPreciseTransform(target.obj);
+  } else {
+    syncProxyToSelection();
+    var center = transformProxy.position;
+    var delta = new THREE.Vector3(x - center.x, y - center.y, z - center.z);
+    if (delta.lengthSq() < 1e-12) return;
+    for (var i = 0; i < target.members.length; i++) {
+      target.members[i].position.add(delta);
+    }
+    afterPreciseTransformMulti(target);
+  }
 }
 
 function applyPreciseRotation() {
-  var obj = getPreciseTargetObject();
-  if (!obj) return;
+  if (preciseSuppress) return;
+  var target = getPreciseTarget();
+  if (!target) return;
   var rx = parseFloat(document.getElementById('preciseRX').value);
   var ry = parseFloat(document.getElementById('preciseRY').value);
   var rz = parseFloat(document.getElementById('preciseRZ').value);
-  if (isNaN(rx) || isNaN(ry) || isNaN(rz)) { toast('请输入有效数值'); return; }
-  obj.rotation.set(rx * DEG2RAD, ry * DEG2RAD, rz * DEG2RAD);
-  afterPreciseTransform(obj);
+  if (isNaN(rx) || isNaN(ry) || isNaN(rz)) return;
+
+  if (target.mode === 'single') {
+    target.obj.rotation.set(rx * DEG2RAD, ry * DEG2RAD, rz * DEG2RAD);
+    afterPreciseTransform(target.obj);
+  } else {
+    if (rx === 0 && ry === 0 && rz === 0) return;
+    syncProxyToSelection();
+    var center = transformProxy.position.clone();
+    var euler = new THREE.Euler(rx * DEG2RAD, ry * DEG2RAD, rz * DEG2RAD, 'XYZ');
+    var spin = new THREE.Quaternion().setFromEuler(euler);
+    for (var i = 0; i < target.members.length; i++) {
+      var o = target.members[i];
+      var arm = new THREE.Vector3().subVectors(o.position, center).applyQuaternion(spin);
+      o.position.copy(center).add(arm);
+      o.quaternion.premultiply(spin);
+    }
+    // 用完立即把面板旋转框归零，因为这是"相对增量"而非绝对值
+    document.getElementById('preciseRX').value = 0;
+    document.getElementById('preciseRY').value = 0;
+    document.getElementById('preciseRZ').value = 0;
+    afterPreciseTransformMulti(target);
+  }
 }
 
+// 组/多选缩放：按世界坐标包围盒统一缩放（跟拖拽手柄用的是同一套算法，也是主流建模软件的做法），
+// 支持三轴分别输入不同比例。
 function applyPreciseScale() {
-  var obj = getPreciseTargetObject();
-  if (!obj) return;
-  if (obj.userData.isProp) { toast('该道具不支持缩放'); return; }
+  if (preciseSuppress) return;
+  var target = getPreciseTarget();
+  if (!target) return;
   var sx = parseFloat(document.getElementById('preciseSX').value);
   var sy = parseFloat(document.getElementById('preciseSY').value);
   var sz = parseFloat(document.getElementById('preciseSZ').value);
-  if (isNaN(sx) || isNaN(sy) || isNaN(sz)) { toast('请输入有效数值'); return; }
+  if (isNaN(sx) || isNaN(sy) || isNaN(sz)) return;
   var MIN_SCALE = 0.05;
-  obj.scale.set(Math.max(MIN_SCALE, sx), Math.max(MIN_SCALE, sy), Math.max(MIN_SCALE, sz));
-  afterPreciseTransform(obj);
+
+  if (target.mode === 'single') {
+    var obj = target.obj;
+    if (obj.userData.isProp) { toast('该道具不支持缩放'); return; }
+    obj.scale.set(Math.max(MIN_SCALE, sx), Math.max(MIN_SCALE, sy), Math.max(MIN_SCALE, sz));
+    afterPreciseTransform(obj);
+  } else {
+    if (sx === 1 && sy === 1 && sz === 1) return;
+    var members = target.members.filter(function(o) { return !o.userData.isProp; });
+    if (!members.length) return;
+    var box = new THREE.Box3();
+    for (var i = 0; i < members.length; i++) box.expandByObject(members[i]);
+    if (box.isEmpty()) return;
+    var boxCenter = box.getCenter(new THREE.Vector3());
+    var ratio = new THREE.Vector3(Math.max(0.001, sx), Math.max(0.001, sy), Math.max(0.001, sz));
+    scaleMembersAroundWorldPoint(members, boxCenter, ratio, MIN_SCALE);
+    document.getElementById('preciseSX').value = 1;
+    document.getElementById('preciseSY').value = 1;
+    document.getElementById('preciseSZ').value = 1;
+    afterPreciseTransformMulti(target);
+  }
 }
 
 function afterPreciseTransform(obj) {
@@ -2538,6 +2685,17 @@ function afterPreciseTransform(obj) {
     groupManager._showBounds(group);
   }
   if (typeof syncProxyToSelection === 'function') syncProxyToSelection();
+  refreshProps();
+  pushHistory();
+}
+
+function afterPreciseTransformMulti(target) {
+  if (target.group) {
+    groupManager._updateBounds(target.group);
+    groupManager._hideBounds(target.group);
+    groupManager._showBounds(target.group);
+  }
+  syncProxyToSelection();
   refreshProps();
   pushHistory();
 }
@@ -2554,23 +2712,23 @@ function afterPreciseTransform(obj) {
     if (!showing) refreshPrecisePanel();
   };
 
-  document.getElementById('precisePosApply').onclick = applyPrecisePosition;
-  document.getElementById('preciseRotApply').onclick = applyPreciseRotation;
-  document.getElementById('preciseScaleApply').onclick = applyPreciseScale;
-
-  var enterMap = {
+  // 改了就立即生效：input 事件（拖动/输入过程中也会持续触发），
+  // 同时保留回车键，方便习惯回车确认的用户
+  var fnMap = {
     preciseX: applyPrecisePosition, preciseY: applyPrecisePosition, preciseZ: applyPrecisePosition,
     preciseRX: applyPreciseRotation, preciseRY: applyPreciseRotation, preciseRZ: applyPreciseRotation,
     preciseSX: applyPreciseScale, preciseSY: applyPreciseScale, preciseSZ: applyPreciseScale
   };
-  for (var id in enterMap) {
+  for (var id in fnMap) {
     (function(inputId, fn) {
       var el = document.getElementById(inputId);
       if (!el) return;
+      el.addEventListener('input', function() { fn(); });
+      el.addEventListener('change', function() { fn(); });
       el.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') { e.preventDefault(); fn(); }
+        if (e.key === 'Enter') { e.preventDefault(); fn(); el.blur(); }
       });
-    })(id, enterMap[id]);
+    })(id, fnMap[id]);
   }
 })();
 
@@ -3063,26 +3221,27 @@ transform.addEventListener('mouseDown', function() {
   proxyStart.quat.copy(transformProxy.quaternion);
   perObjectStart.clear();
   var commonGroup = getCommonGroup();
-  if (commonGroup) {
-    for (var i = 0; i < commonGroup.members.length; i++) {
-      var o = commonGroup.members[i];
-      perObjectStart.set(o, {
-        pos: o.position.clone(),
-        scale: o.scale.clone(),
-        quat: o.quaternion.clone()
-      });
-    }
-  } else {
-    for (var i = 0; i < selection.length; i++) {
-      var o = selection[i];
-      perObjectStart.set(o, {
-        pos: o.position.clone(),
-        scale: o.scale.clone(),
-        quat: o.quaternion.clone()
-      });
+  var members = commonGroup ? commonGroup.members : selection;
+  for (var i = 0; i < members.length; i++) {
+    var o = members[i];
+    perObjectStart.set(o, {
+      pos: o.position.clone(),
+      scale: o.scale.clone(),
+      quat: o.quaternion.clone()
+    });
+  }
+  if (currentTool === 'scale') {
+    scaleStart = transformProxy.scale.clone();
+    // 记录整体的世界坐标包围盒（AABB），组/多选缩放以这个盒子为基准整体拉伸，
+    // 而不是让每个物体各自算一遍——这样效果才会跟建模软件里的"缩放选中物体"一致。
+    if (members.length > 1) {
+      var box = new THREE.Box3();
+      for (var i = 0; i < members.length; i++) box.expandByObject(members[i]);
+      scaleBoxStart = box;
+    } else {
+      scaleBoxStart = null;
     }
   }
-  if (currentTool === 'scale') scaleStart = transformProxy.scale.clone();
 });
 
 transform.addEventListener('objectChange', function() {
@@ -3119,7 +3278,45 @@ transform.addEventListener('objectChange', function() {
     transformProxy.scale.z / Math.max(0.0001, proxyStart.scale.z)
   );
 
-  if (commonGroup) {
+  if (members.length > 1 && currentTool === 'scale' && scaleBoxStart && !scaleBoxStart.isEmpty()) {
+    // ===== 组/多选缩放：以整体世界坐标包围盒为基准的"整体缩放"（Prisma 3D / 主流建模软件那种效果）=====
+    // 缩放锚点固定用包围盒中心（对应 transformProxy 用中心点做轴心的设定），
+    // 每个物体的世界坐标位置、以及它自身的世界向缩放，都按同一套世界轴比例整体拉伸。
+    var boxCenter = scaleBoxStart.getCenter(new THREE.Vector3());
+    for (var i = 0; i < members.length; i++) {
+      var o = members[i];
+      var st = perObjectStart.get(o);
+      if (!st || o.userData.isProp) continue;
+      var parent = o.parent;
+
+      // --- 位置：把物体的世界坐标相对包围盒中心，按世界轴比例缩放 ---
+      var worldPos = st.pos.clone();
+      if (parent) parent.localToWorld(worldPos);
+      worldPos.sub(boxCenter).multiply(ratio).add(boxCenter);
+      if (parent) parent.worldToLocal(worldPos);
+      o.position.copy(worldPos);
+
+      // --- 缩放：把物体自身的缩放（在世界坐标系下的等效缩放）按同样的世界轴比例拉伸 ---
+      // 先取出物体在拖拽开始时的世界旋转，得到"物体局部轴"与"世界轴"的映射关系，
+      // 把局部 scale 转换到世界轴分量上叠加 ratio，再转换回物体自己的局部轴。
+      var worldQuat = new THREE.Quaternion();
+      o.getWorldQuaternion(worldQuat); // 用当前四元数即可（本帧还未被旋转工具改动）
+      var invWorldQuat = worldQuat.clone().invert();
+      var scaleVec = new THREE.Vector3(st.scale.x, st.scale.y, st.scale.z);
+      // 物体局部轴 -> 世界轴 -> 乘以世界比例 -> 转回物体局部轴
+      scaleVec.applyQuaternion(worldQuat).multiply(ratio).applyQuaternion(invWorldQuat);
+      o.scale.set(
+        Math.max(0.05, Math.abs(scaleVec.x)),
+        Math.max(0.05, Math.abs(scaleVec.y)),
+        Math.max(0.05, Math.abs(scaleVec.z))
+      );
+    }
+    if (commonGroup) {
+      groupManager._updateBounds(commonGroup);
+      groupManager._hideBounds(commonGroup);
+      groupManager._showBounds(commonGroup);
+    }
+  } else if (commonGroup) {
     for (var i = 0; i < commonGroup.members.length; i++) {
       var o = commonGroup.members[i];
       var st = perObjectStart.get(o);
@@ -3130,17 +3327,8 @@ transform.addEventListener('objectChange', function() {
         var arm = new THREE.Vector3().subVectors(st.pos, proxyStart.pos).applyQuaternion(spin);
         o.position.copy(proxyStart.pos).add(arm);
         o.quaternion.copy(spin).multiply(st.quat);
-      } else if (currentTool === 'scale') {
-        if (o.userData.isProp) continue;
-        var arm = new THREE.Vector3().subVectors(st.pos, proxyStart.pos);
-        arm.multiply(ratio);
-        o.position.copy(proxyStart.pos).add(arm);
-        o.scale.set(
-          Math.max(0.05, st.scale.x * ratio.x),
-          Math.max(0.05, st.scale.y * ratio.y),
-          Math.max(0.05, st.scale.z * ratio.z)
-        );
       }
+      // 注：组的缩放(scale)总是走上面的整体包围盒分支（组成员数恒 ≥ 2），这里不会进入 scale 分支
     }
     groupManager._updateBounds(commonGroup);
     groupManager._hideBounds(commonGroup);
@@ -3157,10 +3345,8 @@ transform.addEventListener('objectChange', function() {
         o.position.copy(proxyStart.pos).add(arm);
         o.quaternion.copy(spin).multiply(st.quat);
       } else if (currentTool === 'scale') {
+        // 单个物体缩放：沿物体自身局部轴缩放（跟以前一样，Transform控件本身就是按物体局部轴走的）
         if (o.userData.isProp) continue;
-        var arm = new THREE.Vector3().subVectors(st.pos, proxyStart.pos);
-        arm.multiply(ratio);
-        o.position.copy(proxyStart.pos).add(arm);
         o.scale.set(
           Math.max(0.05, st.scale.x * ratio.x),
           Math.max(0.05, st.scale.y * ratio.y),
@@ -3174,6 +3360,7 @@ transform.addEventListener('objectChange', function() {
 
 transform.addEventListener('mouseUp', function() {
   scaleStart = null;
+  scaleBoxStart = null;
   perObjectStart.clear();
   syncProxyToSelection();
   pushHistory();
@@ -5366,6 +5553,7 @@ function createWater(data) {
 
   var bodyMesh = new THREE.Mesh(waterBodyGeometry(root.userData.waterDepth, round), makeWaterBodyMaterial());
   bodyMesh.renderOrder = 4;
+  bodyMesh.raycast = function() {}; // 水体的可视化"水箱"体积不参与拾取判定，避免碰到旁边物体时误选中水
   root.add(bodyMesh);
   root.userData.waterBody = bodyMesh;
 
@@ -5373,6 +5561,7 @@ function createWater(data) {
     waterEdgeGeometry(root.userData.waterDepth, round),
     new THREE.LineBasicMaterial({ color: 0x5fd3f5, transparent: true, opacity: 0.28, depthWrite: false })
   );
+  edge.raycast = function() {}; // 纯装饰线框，不参与拾取
   root.add(edge);
   root.userData.waterEdge = edge;
 
@@ -5382,6 +5571,7 @@ function createWater(data) {
     caustic = new THREE.Mesh(cg, causticMat);
     caustic.rotation.x = -Math.PI / 2;
     caustic.renderOrder = 5;
+    caustic.raycast = function() {}; // 光斑特效，不参与拾取
     root.add(caustic);
     root.userData.waterCaustic = caustic;
   }
@@ -7419,6 +7609,62 @@ if (savedScale) {
     applyUIScale(val);
   }
 }
+
+// ============================================================
+// 视野(FOV)调整 —— 用于制作项目封面，隐藏其他按键只留一个滑块
+// ============================================================
+(function setupFovAdjust() {
+  var btnFovAdjust = document.getElementById('btnFovAdjust');
+  var fovSlider = document.getElementById('fovSlider');
+  var fovVal = document.getElementById('fovVal');
+  var fovCancel = document.getElementById('fovCancel');
+  var fovConfirm = document.getElementById('fovConfirm');
+  if (!btnFovAdjust || !fovSlider) return;
+
+  var fovBeforeAdjust = null; // 进入调整模式前的 fov，取消时用于还原
+
+  function setFov(v) {
+    v = Math.max(20, Math.min(120, v));
+    camera.fov = v;
+    camera.updateProjectionMatrix();
+    fovSlider.value = v;
+    fovVal.textContent = Math.round(v) + '°';
+  }
+
+  function enterFovAdjust() {
+    if (previewOn) return; // 预览模式下不进入
+    fovBeforeAdjust = camera.fov;
+    closeSheet();
+    setFov(camera.fov);
+    document.body.classList.add('fovAdjust');
+  }
+
+  function exitFovAdjust(save) {
+    document.body.classList.remove('fovAdjust');
+    if (save) {
+      localStorage.setItem('ragdollbox_fov', camera.fov.toFixed(1));
+      toast('视野已保存：' + Math.round(camera.fov) + '°');
+    } else if (fovBeforeAdjust !== null) {
+      setFov(fovBeforeAdjust);
+    }
+    fovBeforeAdjust = null;
+  }
+
+  btnFovAdjust.onclick = enterFovAdjust;
+
+  fovSlider.addEventListener('input', function() {
+    setFov(parseFloat(fovSlider.value));
+  });
+
+  fovConfirm.onclick = function() { exitFovAdjust(true); };
+  fovCancel.onclick = function() { exitFovAdjust(false); };
+
+  document.addEventListener('keydown', function(e) {
+    if (document.body.classList.contains('fovAdjust') && e.key === 'Escape') {
+      exitFovAdjust(false);
+    }
+  });
+})();
 </script>
 </body>
 </html>
