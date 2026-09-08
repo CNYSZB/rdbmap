@@ -108,7 +108,6 @@
     #propsBar .prop-info { font-size: 10px; color: var(--muted); white-space: nowrap; }
     #propsBar button { padding: 4px 8px; font-size: 10px; border-radius: 6px; }
 
-    /* 组属性 */
     .group-badge {
       font-size: 10px; background: rgba(180,122,255,.2); 
       padding: 2px 10px; border-radius: 10px; color: var(--group-color);
@@ -160,7 +159,6 @@
     .sheet .row { display: flex; gap: 8px; }
     .sheet .row button { flex: 1; text-align: center; }
 
-    /* 组库面板 */
     .library-item {
       background: var(--panel2);
       border: 1px solid var(--line);
@@ -183,7 +181,6 @@
       font-size: 20px;
     }
 
-    /* 弹窗 */
     #importTutorialOverlay, #updateOverlay, #tutorialOverlay {
       display: none; position: fixed; inset: 0; z-index: 200;
       background: rgba(0,0,0,.7); backdrop-filter: blur(6px);
@@ -206,7 +203,6 @@
     body.preview #topbar, body.preview #bottomBar, body.preview #propsBar, body.preview #selectBox { display: none !important; }
     body.preview.touch #dpadMove { display: block; }
 
-    /* 视野(FOV)调整模式：隐藏其他所有按键，只留一个滑块面板 */
     body.fovAdjust #topbar, body.fovAdjust #bottomBar, body.fovAdjust #propsBar,
     body.fovAdjust #selectBox, body.fovAdjust #dpadMove, body.fovAdjust #hintBar,
     body.fovAdjust #hierPanel { display: none !important; }
@@ -282,7 +278,6 @@
     }
     #propsBar input[type="range"] { width: 78px; }
 
-    /* 转移弹窗 */
     .transfer-dialog {
       background: var(--panel);
       border: 1px solid var(--accent);
@@ -360,7 +355,6 @@
       margin-bottom: 12px;
     }
 
-    /* ===== 层级结构面板 - 右侧 ===== */
     body.touch {
       --hier-w: clamp(150px, 36vw, 200px);
       --hier-max-h: 150vh;
@@ -615,7 +609,6 @@
       right: 66px !important;
     }
 
-    /* ===== 方块缩略图按钮 ===== */
     .tileGrid {
       display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px;
     }
@@ -647,7 +640,6 @@
     }
     #panelGameProps .row button { flex: 1; }
 
-    /* ===== 资源列表 ===== */
     .assetRow {
       display: flex; align-items: center; gap: 10px; padding: 9px;
       background: var(--panel2); border: 1px solid var(--line);
@@ -664,7 +656,6 @@
     .assetRow .aacts { display: flex; gap: 5px; flex-shrink: 0; }
     .assetRow .aacts button { margin: 0 !important; }
 
-    /* ===== 声音行 ===== */
     .sndRow {
       background: var(--panel2); border: 1px solid var(--line);
       border-radius: 10px; padding: 9px; margin-bottom: 6px;
@@ -681,7 +672,6 @@
       border-radius: 6px; padding: 5px 6px; font-size: 11px;
     }
 
-    /* ===== 项目设置 ===== */
     #panelProject { max-height: 78dvh; }
     .envSec {
       font-size: 11px; color: var(--accent); letter-spacing: 1.5px;
@@ -712,7 +702,6 @@
     #propsBar #collideWrap { display: inline-flex; align-items: center; gap: 4px; }
     #propsBar optgroup { color: var(--muted); }
 
-    /* 精确数值调整面板 */
     #btnPreciseToggle.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; background: #20344d; }
     .precise-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
     .precise-label { font-size: 10px; color: var(--muted); width: 40px; flex-shrink: 0; }
@@ -836,7 +825,6 @@
 <div id="toast"></div>
 <div id="overlay"></div>
 
-<!-- 组库面板 -->
 <div id="panelLibrary" class="sheet">
   <div class="handle"></div>
   <div class="title">📚 组库</div>
@@ -853,11 +841,10 @@
   </div>
 </div>
 
-<!-- 菜单 -->
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 4.4.1</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 4.4.5</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
@@ -952,7 +939,6 @@
   <button id="btnManualSave" class="accent">💾 立即存档</button>
 </div>
 
-<!-- ===== 跨设备转移弹窗 ===== -->
 <div id="transferOverlay" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);align-items:center;justify-content:center;">
   <div class="transfer-dialog">
     <div class="title">📤 跨设备转移</div>
@@ -981,7 +967,6 @@
   </div>
 </div>
 
-<!-- ===== 导入游戏教程弹窗 ===== -->
 <div id="importTutorialOverlay">
   <div id="importTutorialBox">
     <div class="title" style="text-align:center;font-size:18px;font-weight:700;margin-bottom:4px;">📖 导入游戏教程</div>
@@ -993,23 +978,18 @@
   </div>
 </div>
 
-<!-- ===== 更新公告弹窗 ===== -->
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">4.4.1</div>
+    <div class="version" id="updateVersion">4.4.5</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li>精确调整面板去掉了多余的"应用"按钮，改数值就立即生效，不用再点</li>
-      <li>初步让精确调整功能可以用于多选和组功能，但是bug仍然严重，建议不要尝试</li>
-      <li>修复了水体拾取判定范围过大的问题，现在只有点到水面才会选中水，不会再误触</li>
-      <li>菜单新增「视野调整」，专门用来调 FOV 做项目封面，调整时只留一个滑块，清爽</li>
+      <li>精确调整功能可以用于多选和组功能</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
 </div>
 
-<!-- ===== 新手教程弹窗 ===== -->
 <div id="tutorialOverlay">
   <div id="tutorialBox">
     <div class="step-indicators" id="tutorialDots">
@@ -1055,13 +1035,11 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-// ==================== 版本号 ====================
-const APP_VERSION = '4.4.1';
+const APP_VERSION = '4.4.5';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
 
-// ==================== 更新检测 ====================
 function checkForUpdates() {
   const lastVersion = localStorage.getItem(LAST_VERSION_KEY);
   const isNew = lastVersion !== APP_VERSION;
@@ -1088,12 +1066,11 @@ if (updateOkBtn) {
   };
 }
 
-// ==================== 新手教程 ====================
 const TUTORIAL_STEPS = [
   { title: '👆 怎么选中物体', desc: '在物体上<strong>点一下</strong>，它就变橙色高亮了。<br>想取消选中就点空白处。' },
   { title: '✋ 怎么移动/旋转/缩放', desc: '底部工具栏有四个按钮：<strong>选中、移动、旋转、缩放</strong>。<br>点一下切换工具，然后拖动物体上的红绿蓝手柄。' },
   { title: '🎮 怎么预览地图', desc: '点底部 <strong>"预览"</strong> 按钮，你就进入游戏视角了。<br><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 走路，<kbd>空格</kbd> 跳跃，<kbd>Shift</kbd> 加速。<br>按 <kbd>Esc</kbd> 退出预览。' },
-  { title: '💾 怎么保存和导出', desc: '顶部 <strong>"保存"</strong> 按钮自动存到浏览器里。<br>菜单里可以 <strong>导出为文件</strong>，方便分享给别人。<br><br>🆕 组功能：选中多个物体点击"建组"！' },
+  { title: '💾 怎么保存和导出', desc: '顶部 <strong>"保存"</strong> 按钮自动存到浏览器里。<br>菜单里可以 <strong>导出为文件</strong>，方便分享给别人。<br><br>🆕 组功能：选中多个物体点击"建组"！' }
 ];
 
 var tutorialStep = 0;
@@ -1146,7 +1123,6 @@ function checkTutorial() {
   setTimeout(function() { showTutorial(0); }, 800);
 }
 
-// ==================== 全屏 ====================
 document.getElementById('btnFullscreen').onclick = function() {
   var el = document.documentElement;
   if (!document.fullscreenElement) {
@@ -1156,7 +1132,6 @@ document.getElementById('btnFullscreen').onclick = function() {
   }
 };
 
-// ==================== Three.js 初始化 ====================
 var viewport = document.getElementById('viewport');
 var renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -1257,9 +1232,6 @@ var KIND_ICON = {
   object: '🟫', prop: '🎮', gun: '🔫', water: '💧', light: '💡', spawn: '🚩'
 };
 
-// ============================================================
-// === 组系统 ==================================================
-// ============================================================
 class GroupManager {
   constructor() {
     this.groups = [];
@@ -1423,9 +1395,6 @@ class GroupManager {
   }
 }
 
-// ============================================================
-// === 组库 ====================================================
-// ============================================================
 class GroupLibrary {
   constructor() {
     this._key = GROUP_LIBRARY_KEY;
@@ -1473,9 +1442,6 @@ class GroupLibrary {
 var groupManager = new GroupManager();
 var groupLibrary = new GroupLibrary();
 
-// ================================================================
-// === 道具配置表 ================================================
-// ================================================================
 var GAME_ITEMS = [{"id":"spawnpoint","n":"重生点","s":"box","d":[2.08,0.13,2.08],"c":"#2fd06a"},{"id":"board","n":"公告牌","s":"box","d":[1.9,1.15,0.1],"c":"#4a3a28"},{"id":"button","n":"按钮","s":"box","d":[0.165,0.32,0.052],"c":"#555555"},{"id":"oil","n":"油桶","s":"cyl","d":[1.05,0.48],"c":"#59636a"},{"id":"phone","n":"手机","s":"box","d":[0.096,0.16,0.018],"c":"#202020"},{"id":"clock","n":"时钟","s":"box","d":[0.428,0.45,0.053],"c":"#d7d7d7"},{"id":"tv","n":"电视","s":"box","d":[1.2,0.654,0.072],"c":"#252525"},{"id":"crate","n":"木箱","s":"box","d":[1.0,1.0,1.0],"c":"#8a5f34"},{"id":"barrel","n":"铁桶","s":"cyl","d":[1.05,0.38],"c":"#4e6470"},{"id":"explbarrel","n":"爆炸油桶","s":"cyl","d":[1.05,0.38],"c":"#b23023"},{"id":"saw","n":"旋转锯","s":"cyl","d":[0.06,0.52],"c":"#cfd3d8"},{"id":"radio","n":"收音机","s":"box","d":[0.365,0.435,0.143],"c":"#2b2b2b"},{"id":"camera","n":"摄像机","s":"box","d":[0.285,1.58,0.294],"c":"#2a2d33"},{"id":"bandage","n":"绷带","s":"box","d":[0.23,0.21,0.14],"c":"#ac9f86"},{"id":"smallmed","n":"小型医疗箱","s":"box","d":[0.43,0.25,0.66],"c":"#d8dde2"},{"id":"medmed","n":"中型医疗箱","s":"box","d":[0.882,0.227,1.0],"c":"#c4cdd4"},{"id":"cash","n":"现金","s":"box","d":[0.5,0.5,0.5],"c":"#8d9299"},{"id":"ammolight","n":"轻型弹药箱","s":"box","d":[0.52,0.3,0.3],"c":"#6d7a4a"},{"id":"ammoheavy","n":"重型弹药箱","s":"box","d":[0.62,0.34,0.34],"c":"#4f5a38"},{"id":"ammosniper","n":"狙击弹药箱","s":"box","d":[0.46,0.24,0.26],"c":"#3d4550"},{"id":"ammogrenade","n":"榴弹弹药箱","s":"box","d":[0.58,0.36,0.4],"c":"#6b5a2c"},{"id":"plank","n":"长木板","s":"box","d":[2.4,0.12,0.5],"c":"#8a5f34"},{"id":"lamp","n":"台灯","s":"box","d":[0.53,1.913,0.53],"c":"#54595f"},{"id":"table","n":"桌子","s":"box","d":[1.4,0.86,0.9],"c":"#6b4a28"},{"id":"bed","n":"床","s":"box","d":[1.09,0.59,2.31],"c":"#7a5230"},{"id":"midarmor","n":"防弹衣","s":"box","d":[0.62,0.4,0.38],"c":"#3d4436"},{"id":"vestarmor","n":"战术防弹衣","s":"box","d":[0.46,0.46,0.3],"c":"#35392f"},{"id":"headarmor_1","n":"战术头盔","s":"box","d":[0.36,0.32,0.35],"c":"#4b5144"},{"id":"headarmor_2","n":"重型头盔","s":"box","d":[0.38,0.35,0.38],"c":"#3f4540"},{"id":"lightarmor","n":"轻型防弹衣","s":"box","d":[0.435,0.448,0.311],"c":"#4a4f42"},{"id":"heavyarmor","n":"重型防弹衣","s":"box","d":[0.501,0.79,0.327],"c":"#2f342c"},{"id":"headarmor_nv","n":"头戴式双眼夜视仪","s":"box","d":[0.291,0.187,0.47],"c":"#3b4038"},{"id":"headarmor_steel","n":"旧式钢盔","s":"box","d":[0.385,0.252,0.393],"c":"#6a6f66"},{"id":"headarmor_riot","n":"武警头盔","s":"box","d":[0.382,0.329,0.358],"c":"#6a6f66"},{"id":"headarmor_riot_visor","n":"武警头盔(带面罩)","s":"box","d":[0.379,0.329,0.383],"c":"#6a6f66"},{"id":"shipin_cap","n":"鸭舌帽","s":"box","d":[0.508,0.127,0.326],"c":"#6a6f66"},{"id":"shipin_cap2","n":"鸭舌帽2","s":"box","d":[0.508,0.127,0.326],"c":"#6a6f66"},{"id":"shipin_cowboy","n":"牛仔帽","s":"box","d":[0.613,0.14,0.613],"c":"#6a6f66"},{"id":"shipin_safety","n":"安全帽","s":"box","d":[0.44,0.343,0.348],"c":"#6a6f66"},{"id":"shipin_mask_dark","n":"艾路迪克口罩","s":"box","d":[0.219,0.178,0.298],"c":"#6a6f66"},{"id":"shipin_mask","n":"口罩","s":"box","d":[0.218,0.178,0.298],"c":"#6a6f66"},{"id":"shipin_straw","n":"草帽","s":"box","d":[0.518,0.125,0.518],"c":"#6a6f66"},{"id":"shipin_hat","n":"礼帽","s":"box","d":[0.454,0.123,0.454],"c":"#6a6f66"},{"id":"shipin_tophat","n":"高礼帽","s":"box","d":[0.454,0.356,0.454],"c":"#6a6f66"},{"id":"shipin_beanie","n":"毛线帽","s":"box","d":[0.34,0.193,0.333],"c":"#6a6f66"},{"id":"shipin_face_mask","n":"面具","s":"box","d":[0.314,0.312,0.295],"c":"#6a6f66"},{"id":"shipin_hockey_mask","n":"曲棍球面具","s":"box","d":[0.315,0.312,0.289],"c":"#6a6f66"},{"id":"acc_hood_mask","n":"面罩兜帽","s":"box","d":[0.36,0.4,0.36],"c":"#6a6f66"},{"id":"acc_goggles_red","n":"战术护目镜(红)","s":"box","d":[0.34,0.14,0.24],"c":"#6a6f66"},{"id":"acc_goggles_green","n":"战术护目镜(绿)","s":"box","d":[0.34,0.14,0.24],"c":"#6a6f66"},{"id":"acc_goggles_white","n":"战术护目镜(白)","s":"box","d":[0.34,0.14,0.24],"c":"#6a6f66"},{"id":"acc_chef_hat","n":"厨师帽","s":"box","d":[0.327,0.433,0.329],"c":"#6a6f66"},{"id":"acc_plague_mask","n":"瘟疫医生面具","s":"box","d":[0.67,0.413,0.765],"c":"#6a6f66"},{"id":"acc_ushanka","n":"雷锋帽","s":"box","d":[0.442,0.407,0.412],"c":"#6a6f66"},{"id":"acc_gas_mask","n":"防毒面具","s":"box","d":[0.361,0.334,0.394],"c":"#6a6f66"},{"id":"acc_box_hood","n":"方块头套","s":"box","d":[0.315,0.318,0.315],"c":"#6a6f66"},{"id":"acc_army_cap","n":"军绿布帽","s":"box","d":[0.359,0.144,0.364],"c":"#6a6f66"},{"id":"acc_gasmask_heavy","n":"重型防毒面具","s":"box","d":[0.328,0.328,0.405],"c":"#6a6f66"},{"id":"acc_headphones","n":"耳机","s":"box","d":[0.38,0.304,0.238],"c":"#6a6f66"},{"id":"acc_santa_hat","n":"圣诞帽","s":"box","d":[0.315,0.256,0.392],"c":"#6a6f66"},{"id":"acc_dive_goggles","n":"潜水镜","s":"box","d":[0.342,0.322,0.317],"c":"#6a6f66"},{"id":"swimring_red","n":"红色游泳圈","s":"torus","d":[0.44,0.13],"c":"#c2493f"},{"id":"swimring_blue","n":"蓝色游泳圈","s":"torus","d":[0.44,0.13],"c":"#33459a"}];
 var GAME_GUNS = [{"id":"toolgun","n":"工具枪","cat":"other"},{"id":"gravgun","n":"重力枪","cat":"other"},{"id":"flashlight","n":"手电筒","cat":"other"},{"id":"pistol","n":"手枪","cat":"light"},{"id":"revolver","n":"左轮手枪","cat":"light"},{"id":"m1911","n":"M1911","cat":"light"},{"id":"smg","n":"冲锋枪","cat":"light"},{"id":"mp5","n":"MP5","cat":"light"},{"id":"ppsh","n":"波波沙","cat":"light"},{"id":"aa12","n":"AA-12","cat":"heavy"},{"id":"shotgun","n":"霰弹枪","cat":"heavy"},{"id":"spas","n":"SPAS 霰弹枪","cat":"heavy"},{"id":"rifle","n":"突击步枪","cat":"heavy"},{"id":"ak47","n":"AK-47","cat":"heavy"},{"id":"lightsniper","n":"轻型狙击枪","cat":"sniper"},{"id":"sniper","n":"狙击枪","cat":"sniper"},{"id":"m2010","n":"M2010 ESR","cat":"sniper"},{"id":"m107","n":"M107A1","cat":"sniper"},{"id":"nailgun","n":"钉枪","cat":"light"},{"id":"egggun","n":"彩蛋枪","cat":"other"},{"id":"grenade","n":"手雷","cat":"other"},{"id":"impactnade","n":"摔炮手榴弹","cat":"other"},{"id":"c4","n":"遥控炸弹","cat":"other"},{"id":"mine","n":"地雷","cat":"other"},{"id":"cleaver","n":"菜刀","cat":"melee"},{"id":"healkit","n":"回血药剂","cat":"other"},{"id":"poison","n":"毒药","cat":"other"},{"id":"styptic","n":"止血针剂","cat":"other"},{"id":"v5","n":"V5针剂","cat":"other"},{"id":"rifleb","n":"突击步枪B","cat":"heavy"},{"id":"m79","n":"M79 榴弹发射器","cat":"heavy"},{"id":"crowbar","n":"撬棍","cat":"melee"},{"id":"knife","n":"军刀","cat":"melee"},{"id":"baton","n":"警棍","cat":"melee"},{"id":"bandage","n":"绷带","cat":"other"},{"id":"medkit","n":"小医疗箱","cat":"other"}];
 
@@ -1501,7 +1467,6 @@ var PROP_DEFS = {};
   for (var j = 0; j < GAME_GUNS.length; j++) GUN_BY_ID[GAME_GUNS[j].id] = GAME_GUNS[j];
 })();
 
-// ==================== 存档系统 ====================
 var SAVES_KEY = 'ragdollbox_saves';
 var currentSaveId = null;
 
@@ -1718,7 +1683,6 @@ window._deleteSave = function(saveId, event) {
   refreshSavesList();
 };
 
-// ==================== Toast ====================
 function toast(text) {
   var el = document.getElementById('toast');
   el.textContent = text;
@@ -1727,7 +1691,6 @@ function toast(text) {
   toastTimer = setTimeout(function() { el.classList.remove('show'); }, 1800);
 }
 
-// ==================== 纹理系统 ====================
 var TEXTURES = [
   { id: '', name: '无（纯色）' },
   { id: '__import__', name: '📥 导入贴图…' },
@@ -1995,9 +1958,6 @@ var SPAWN_HALF = 0.55;
 var SPAWN_RADIUS = 0.3;
 var PLAYER_EYE = 0.72;
 
-// ============================================================
-// 通用道具创建函数
-// ============================================================
 function createProp(propType, data) {
   data = data || {};
   var def = PROP_DEFS[propType];
@@ -2355,9 +2315,6 @@ function getCommonGroup() {
   return firstGroup;
 }
 
-// ============================================================
-// 工具切换
-// ============================================================
 var TOOL_BUTTONS = { select: 'btnSelect', translate: 'btnMove', rotate: 'btnRotate', scale: 'btnScale' };
 
 function setTool(tool) {
@@ -2494,21 +2451,39 @@ function refreshProps() {
   refreshPrecisePanel();
 }
 
-// ============================================================
-// 精确数值调整（支持单个物体 / 多选 / 组，改了就立即生效）
-// ============================================================
 var RAD2DEG = 180 / Math.PI;
 var DEG2RAD = Math.PI / 180;
-var preciseSuppress = false; // 刷新面板数值时临时挂起，避免刷新触发input事件形成回环
+var preciseSuppress = false;
 
-// 精确面板的操作目标：单个物体 -> 该物体；多选/组 -> 以 transformProxy(组/多选中心) 为基准整体变换
+function isMultiSelectOnly() {
+  if (selection.length < 2) return false;
+  // 检查选中的物体是否都属于同一个组，且数量等于该组总人数
+  var firstGroup = groupManager.getGroupOfObject(selection[0]);
+  if (firstGroup) {
+    var allInSameGroup = true;
+    for (var i = 1; i < selection.length; i++) {
+      if (groupManager.getGroupOfObject(selection[i]) !== firstGroup) {
+        allInSameGroup = false;
+        break;
+      }
+    }
+    if (allInSameGroup && selection.length === firstGroup.members.length) {
+      return true; // 完整组 → 即时生效
+    }
+  }
+  return true; // 多选 → 确认生效
+}
+
 function getPreciseTarget() {
   if (!selection.length) return null;
   if (selection.length === 1) {
     return { mode: 'single', obj: selection[0] };
   }
   var commonGroup = getCommonGroup();
-  return { mode: 'multi', members: commonGroup ? commonGroup.members.slice() : selection.slice(), group: commonGroup };
+  if (commonGroup && selection.length === commonGroup.members.length) {
+    return { mode: 'group', group: commonGroup, members: commonGroup.members.slice() };
+  }
+  return { mode: 'multi', members: selection.slice(), group: null };
 }
 
 function refreshPrecisePanel() {
@@ -2541,9 +2516,9 @@ function refreshPrecisePanel() {
     document.getElementById('preciseSY').value = +scl.y.toFixed(3);
     document.getElementById('preciseSZ').value = +scl.z.toFixed(3);
   } else {
-    // 多选 / 组：显示的是中心点坐标，旋转/缩放显示为相对增量基准（0 / 1），每次改动都是相对当前状态的整体变换
     panel.dataset.mixed = '1';
-    hint.textContent = (target.group ? '📦 组' : '多选') + '整体调整 · 位置=中心坐标 · 旋转缩放=相对当前的整体变换 · 改了就立即生效';
+    var label = target.mode === 'group' ? '📦 组' : '多选';
+    hint.textContent = label + '整体调整 · 位置=中心坐标 · 旋转缩放=相对当前的整体变换 · 回车或失焦才生效';
     syncProxyToSelection();
     var c = transformProxy.position;
     document.getElementById('preciseX').value = +c.x.toFixed(3);
@@ -2559,8 +2534,6 @@ function refreshPrecisePanel() {
   preciseSuppress = false;
 }
 
-// 共用：对一组物体做"世界坐标包围盒整体缩放"（跟拖拽手柄组缩放用的是同一套算法）
-// center: 缩放锚点（世界坐标）；ratio: 三轴缩放比例（世界轴）
 function scaleMembersAroundWorldPoint(members, center, ratio, minScale) {
   minScale = minScale || 0.05;
   for (var i = 0; i < members.length; i++) {
@@ -2635,7 +2608,6 @@ function applyPreciseRotation() {
       o.position.copy(center).add(arm);
       o.quaternion.premultiply(spin);
     }
-    // 用完立即把面板旋转框归零，因为这是"相对增量"而非绝对值
     document.getElementById('preciseRX').value = 0;
     document.getElementById('preciseRY').value = 0;
     document.getElementById('preciseRZ').value = 0;
@@ -2643,8 +2615,6 @@ function applyPreciseRotation() {
   }
 }
 
-// 组/多选缩放：按世界坐标包围盒统一缩放（跟拖拽手柄用的是同一套算法，也是主流建模软件的做法），
-// 支持三轴分别输入不同比例。
 function applyPreciseScale() {
   if (preciseSuppress) return;
   var target = getPreciseTarget();
@@ -2712,24 +2682,64 @@ function afterPreciseTransformMulti(target) {
     if (!showing) refreshPrecisePanel();
   };
 
-  // 改了就立即生效：input 事件（拖动/输入过程中也会持续触发），
-  // 同时保留回车键，方便习惯回车确认的用户
-  var fnMap = {
-    preciseX: applyPrecisePosition, preciseY: applyPrecisePosition, preciseZ: applyPrecisePosition,
-    preciseRX: applyPreciseRotation, preciseRY: applyPreciseRotation, preciseRZ: applyPreciseRotation,
-    preciseSX: applyPreciseScale, preciseSY: applyPreciseScale, preciseSZ: applyPreciseScale
-  };
-  for (var id in fnMap) {
-    (function(inputId, fn) {
-      var el = document.getElementById(inputId);
-      if (!el) return;
-      el.addEventListener('input', function() { fn(); });
-      el.addEventListener('change', function() { fn(); });
-      el.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') { e.preventDefault(); fn(); el.blur(); }
-      });
-    })(id, fnMap[id]);
+  function getEventType() {
+    return isMultiSelectOnly() ? 'change' : 'input';
   }
+
+  function rebindInputs() {
+    var useChange = isMultiSelectOnly();
+    var ids = ['preciseX','preciseY','preciseZ','preciseRX','preciseRY','preciseRZ','preciseSX','preciseSY','preciseSZ'];
+    var fns = {
+      preciseX: applyPrecisePosition, preciseY: applyPrecisePosition, preciseZ: applyPrecisePosition,
+      preciseRX: applyPreciseRotation, preciseRY: applyPreciseRotation, preciseRZ: applyPreciseRotation,
+      preciseSX: applyPreciseScale, preciseSY: applyPreciseScale, preciseSZ: applyPreciseScale
+    };
+    for (var i = 0; i < ids.length; i++) {
+      var id = ids[i];
+      var el = document.getElementById(id);
+      if (!el) continue;
+      var newEl = el.cloneNode(true);
+      el.parentNode.replaceChild(newEl, el);
+      var fn = fns[id];
+      if (useChange) {
+        newEl.addEventListener('change', fn);
+        newEl.addEventListener('keydown', function(e, f) {
+          if (e.key === 'Enter') { e.preventDefault(); f(); this.blur(); }
+        }.bind(newEl, fn));
+      } else {
+        newEl.addEventListener('input', fn);
+        newEl.addEventListener('change', fn);
+        newEl.addEventListener('keydown', function(e, f) {
+          if (e.key === 'Enter') { e.preventDefault(); f(); this.blur(); }
+        }.bind(newEl, fn));
+      }
+    }
+  }
+
+  // 初始绑定
+  rebindInputs();
+
+  // 每次选中变化时重新绑定
+  var origSetSelection = setSelection;
+  setSelection = function(objs) {
+    origSetSelection(objs);
+    rebindInputs();
+  };
+  var origAddToSelection = addToSelection;
+  addToSelection = function(obj) {
+    origAddToSelection(obj);
+    rebindInputs();
+  };
+  var origRemoveFromSelection = removeFromSelection;
+  removeFromSelection = function(obj) {
+    origRemoveFromSelection(obj);
+    rebindInputs();
+  };
+  var origClearSelection = clearSelection;
+  clearSelection = function() {
+    origClearSelection();
+    rebindInputs();
+  };
 })();
 
 function refreshPropsExtra() {
@@ -2937,9 +2947,6 @@ document.getElementById('btnFocus').onclick = function() { closeSheet(); focusSe
 document.getElementById('btnDuplicate').onclick = duplicateSelected;
 document.getElementById('btnDelete').onclick = removeSelected;
 
-// ============================================================
-// 组操作函数
-// ============================================================
 function createGroupFromSelection() {
   if (selection.length < 2) { toast('至少选中2个物体才能建组'); return; }
   var inGroup = [];
@@ -3020,9 +3027,6 @@ function placeGroupFromLibrary(libData) {
   }
 }
 
-// ============================================================
-// 组库UI
-// ============================================================
 function refreshLibraryList() {
   var lib = groupLibrary.getAll();
   var searchTerm = document.getElementById('librarySearch').value.toLowerCase();
@@ -3099,9 +3103,6 @@ document.getElementById('btnLibraryClear').onclick = function() {
   toast('组库已清空');
 };
 
-// ============================================================
-// UI绑定
-// ============================================================
 var overlay = document.getElementById('overlay');
 var panelMenu = document.getElementById('panelMenu');
 var panelPlace = document.getElementById('panelPlace');
@@ -3212,9 +3213,6 @@ function generatePropButtons() {
 }
 generatePropButtons();
 
-// ============================================================
-// Transform 事件
-// ============================================================
 transform.addEventListener('mouseDown', function() {
   proxyStart.pos.copy(transformProxy.position);
   proxyStart.scale.copy(transformProxy.scale);
@@ -3232,8 +3230,6 @@ transform.addEventListener('mouseDown', function() {
   }
   if (currentTool === 'scale') {
     scaleStart = transformProxy.scale.clone();
-    // 记录整体的世界坐标包围盒（AABB），组/多选缩放以这个盒子为基准整体拉伸，
-    // 而不是让每个物体各自算一遍——这样效果才会跟建模软件里的"缩放选中物体"一致。
     if (members.length > 1) {
       var box = new THREE.Box3();
       for (var i = 0; i < members.length; i++) box.expandByObject(members[i]);
@@ -3279,9 +3275,6 @@ transform.addEventListener('objectChange', function() {
   );
 
   if (members.length > 1 && currentTool === 'scale' && scaleBoxStart && !scaleBoxStart.isEmpty()) {
-    // ===== 组/多选缩放：以整体世界坐标包围盒为基准的"整体缩放"（Prisma 3D / 主流建模软件那种效果）=====
-    // 缩放锚点固定用包围盒中心（对应 transformProxy 用中心点做轴心的设定），
-    // 每个物体的世界坐标位置、以及它自身的世界向缩放，都按同一套世界轴比例整体拉伸。
     var boxCenter = scaleBoxStart.getCenter(new THREE.Vector3());
     for (var i = 0; i < members.length; i++) {
       var o = members[i];
@@ -3289,21 +3282,16 @@ transform.addEventListener('objectChange', function() {
       if (!st || o.userData.isProp) continue;
       var parent = o.parent;
 
-      // --- 位置：把物体的世界坐标相对包围盒中心，按世界轴比例缩放 ---
       var worldPos = st.pos.clone();
       if (parent) parent.localToWorld(worldPos);
       worldPos.sub(boxCenter).multiply(ratio).add(boxCenter);
       if (parent) parent.worldToLocal(worldPos);
       o.position.copy(worldPos);
 
-      // --- 缩放：把物体自身的缩放（在世界坐标系下的等效缩放）按同样的世界轴比例拉伸 ---
-      // 先取出物体在拖拽开始时的世界旋转，得到"物体局部轴"与"世界轴"的映射关系，
-      // 把局部 scale 转换到世界轴分量上叠加 ratio，再转换回物体自己的局部轴。
       var worldQuat = new THREE.Quaternion();
-      o.getWorldQuaternion(worldQuat); // 用当前四元数即可（本帧还未被旋转工具改动）
+      o.getWorldQuaternion(worldQuat);
       var invWorldQuat = worldQuat.clone().invert();
       var scaleVec = new THREE.Vector3(st.scale.x, st.scale.y, st.scale.z);
-      // 物体局部轴 -> 世界轴 -> 乘以世界比例 -> 转回物体局部轴
       scaleVec.applyQuaternion(worldQuat).multiply(ratio).applyQuaternion(invWorldQuat);
       o.scale.set(
         Math.max(0.05, Math.abs(scaleVec.x)),
@@ -3328,7 +3316,6 @@ transform.addEventListener('objectChange', function() {
         o.position.copy(proxyStart.pos).add(arm);
         o.quaternion.copy(spin).multiply(st.quat);
       }
-      // 注：组的缩放(scale)总是走上面的整体包围盒分支（组成员数恒 ≥ 2），这里不会进入 scale 分支
     }
     groupManager._updateBounds(commonGroup);
     groupManager._hideBounds(commonGroup);
@@ -3345,7 +3332,6 @@ transform.addEventListener('objectChange', function() {
         o.position.copy(proxyStart.pos).add(arm);
         o.quaternion.copy(spin).multiply(st.quat);
       } else if (currentTool === 'scale') {
-        // 单个物体缩放：沿物体自身局部轴缩放（跟以前一样，Transform控件本身就是按物体局部轴走的）
         if (o.userData.isProp) continue;
         o.scale.set(
           Math.max(0.05, st.scale.x * ratio.x),
@@ -3369,9 +3355,6 @@ transform.addEventListener('mouseUp', function() {
 var ctrlDragging = false;
 transform.addEventListener('dragging-changed', function(e) { ctrlDragging = e.value; });
 
-// ============================================================
-// 指针事件
-// ============================================================
 function objectFromHit(o) {
   while (o && o !== objectsRoot) {
     if (o.userData && o.userData.mapObject) return o;
@@ -3592,9 +3575,6 @@ renderer.domElement.addEventListener('wheel', function(e) {
   camera.position.addScaledVector(dir, e.deltaY > 0 ? -step : step);
 }, { passive: false });
 
-// ============================================================
-// 十字键
-// ============================================================
 var canvasMove = document.getElementById('canvasMove');
 var ctxMove = canvasMove.getContext('2d');
 
@@ -3684,9 +3664,6 @@ function resizeDpad() {
 resizeDpad();
 window.addEventListener('resize', resizeDpad);
 
-// ============================================================
-// 键盘
-// ============================================================
 function typingInField(e) {
   var t = e.target;
   return !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT');
@@ -3748,9 +3725,6 @@ window.addEventListener('keydown', function(e) {
 window.addEventListener('keyup', function(e) { keys.delete(e.code); });
 window.addEventListener('blur', function() { keys.clear(); forceReleaseDragLocks(); });
 
-// ============================================================
-// 撤销/重做
-// ============================================================
 document.getElementById('btnUndo').onclick = undo;
 document.getElementById('btnRedo').onclick = function() { redo(); closeSheet(); };
 
@@ -3833,7 +3807,6 @@ function duplicateSelected() {
 
     var srcGroup = groupManager.getGroupOfObject(obj);
     if (srcGroup) {
-      // 整组复制：复制组内全部成员，并在新对象之间重建同一个组
       var newMembers = [];
       for (var j = 0; j < srcGroup.members.length; j++) {
         var member = srcGroup.members[j];
@@ -3870,9 +3843,6 @@ function disposeObject(root) {
   });
 }
 
-// ============================================================
-// 序列化
-// ============================================================
 function roundArray(a, n) { n = n || 5; return Array.from(a, function(v) { return +Number(v).toFixed(n); }); }
 
 function imageToDataURL(img) {
@@ -4162,9 +4132,6 @@ function exportMap() {
 
 document.getElementById('btnExportMap').onclick = exportMap;
 
-// ============================================================
-// 上传到游戏（生成分享码） - 使用旧接口 relay.riftcrown.com
-// ============================================================
 var RDB_RELAY = 'https://relay.riftcrown.com';
 
 function showShareCode(code) {
@@ -4238,9 +4205,6 @@ async function uploadMapToGame() {
 
 document.getElementById('btnUploadMap').onclick = uploadMapToGame;
 
-// ============================================================
-// ============ 跨设备转移（新接口 /put /get） ================
-// ============================================================
 var TRANSFER_BASE = 'https://rdpmapeditor.pages.dev';
 
 document.getElementById('btnTransferMap').onclick = function() {
@@ -4447,9 +4411,6 @@ document.getElementById('transferCodeInput').addEventListener('input', function(
   this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
 });
 
-// ============================================================
-// GLTF 导出
-// ============================================================
 document.getElementById('btnExportGltf').onclick = exportGltf;
 
 async function exportGltf() {
@@ -4702,9 +4663,6 @@ function redo() {
   restoreSnapshot(history[historyIndex]);
 }
 
-// ============================================================
-// 切换局部/世界坐标系
-// ============================================================
 document.getElementById('btnToggleLocal').onclick = function() {
   useLocalSpace = !useLocalSpace;
   transform.setSpace(useLocalSpace ? 'local' : 'world');
@@ -4716,9 +4674,6 @@ document.getElementById('btnToggleLocal').onclick = function() {
   syncProxyToSelection();
 };
 
-// ============================================================
-// GLTF 导入
-// ============================================================
 var gltfInput = document.getElementById('gltfInput');
 document.getElementById('btnImportGltf').onclick = function() { closeSheet(); gltfInput.click(); };
 gltfInput.addEventListener('change', async function(e) {
@@ -4770,9 +4725,6 @@ gltfInput.addEventListener('change', async function(e) {
   e.target.value = '';
 });
 
-// ============================================================
-// FBX 导入
-// ============================================================
 var fbxInput = document.getElementById('fbxInput');
 document.getElementById('btnImportFbx').onclick = function() { closeSheet(); fbxInput.click(); };
 
@@ -4822,9 +4774,6 @@ fbxInput.addEventListener('change', async function(e) {
   }
 });
 
-// ============================================================
-// 预览
-// ============================================================
 var PREVIEW = {
   walk: 4.6,
   run: 7.5,
@@ -5002,9 +4951,6 @@ function stepPreview(dt) {
   camera.position.set(st.pos.x, st.pos.y + PREVIEW.eye, st.pos.z);
 }
 
-// ============================================================
-// 项目设置 · 环境 · 资源
-// ============================================================
 var ENV_DEFAULTS = {
   hemiSky: '#d8e8ff',
   hemiGround: '#6b6b5a',
@@ -5067,9 +5013,6 @@ function assetBytes() {
   return total;
 }
 
-// ============================================================
-// 天空 / 环境应用
-// ============================================================
 var skyMesh = null;
 var skyMat = null;
 var editorAmbient = null;
@@ -5214,9 +5157,6 @@ function resolveTexUrl(v) {
   return v;
 }
 
-// ============================================================
-// 游戏水体（着色器与游戏内同源）
-// ============================================================
 var WATER_VERT = `
 uniform mat4 uTextureMatrix;
 varying vec4 vMirror;
@@ -5553,7 +5493,7 @@ function createWater(data) {
 
   var bodyMesh = new THREE.Mesh(waterBodyGeometry(root.userData.waterDepth, round), makeWaterBodyMaterial());
   bodyMesh.renderOrder = 4;
-  bodyMesh.raycast = function() {}; // 水体的可视化"水箱"体积不参与拾取判定，避免碰到旁边物体时误选中水
+  bodyMesh.raycast = function() {};
   root.add(bodyMesh);
   root.userData.waterBody = bodyMesh;
 
@@ -5561,7 +5501,7 @@ function createWater(data) {
     waterEdgeGeometry(root.userData.waterDepth, round),
     new THREE.LineBasicMaterial({ color: 0x5fd3f5, transparent: true, opacity: 0.28, depthWrite: false })
   );
-  edge.raycast = function() {}; // 纯装饰线框，不参与拾取
+  edge.raycast = function() {};
   root.add(edge);
   root.userData.waterEdge = edge;
 
@@ -5571,7 +5511,7 @@ function createWater(data) {
     caustic = new THREE.Mesh(cg, causticMat);
     caustic.rotation.x = -Math.PI / 2;
     caustic.renderOrder = 5;
-    caustic.raycast = function() {}; // 光斑特效，不参与拾取
+    caustic.raycast = function() {};
     root.add(caustic);
     root.userData.waterCaustic = caustic;
   }
@@ -5662,7 +5602,6 @@ function updateWater(dt) {
   }
 }
 
-// ===== 水面反射（照搬游戏的斜投影裁剪）=====
 var reflectRT = null;
 var reflectCam = new THREE.PerspectiveCamera();
 var _reflPos = new THREE.Vector3();
@@ -5799,9 +5738,6 @@ function renderWaterReflection() {
   u.uHasReflect.value = 1;
 }
 
-// ============================================================
-// 光源
-// ============================================================
 var lightList = [];
 var LIGHT_GIZMO_GEO = new THREE.SphereGeometry(0.16, 12, 10);
 var LIGHT_CONE_MAT = new THREE.LineBasicMaterial({ color: 0xffd479, transparent: true, opacity: 0.6 });
@@ -5898,9 +5834,6 @@ function lightTargetWorld(root) {
   ];
 }
 
-// ============================================================
-// 缩略图渲染（放置面板用）
-// ============================================================
 var thumbCache = new Map();
 var thumbRenderer = null;
 var thumbScene = null;
@@ -5999,9 +5932,6 @@ function gunThumb(id) {
   return url;
 }
 
-// ============================================================
-// 游戏枪械放置
-// ============================================================
 function createGun(gunId, data) {
   data = data || {};
   var g = GUN_BY_ID[gunId];
@@ -6030,9 +5960,6 @@ function createGun(gunId, data) {
   return root;
 }
 
-// ============================================================
-// 物体声音
-// ============================================================
 var SOUND_TRIGGERS = [
   { id: 'fist', label: '被拳头攻击' },
   { id: 'melee', label: '被近战武器攻击' },
@@ -6059,9 +5986,6 @@ function soundsCarrier(o) {
   return t && t !== 'spawn' && t !== 'light' && t !== 'water' && t !== 'gun' && !o.userData.isProp;
 }
 
-// ============================================================
-// 层级结构面板（右侧 + 组树形折叠）
-// ============================================================
 var hierPanel = null;
 var hierList = null;
 var hierSearch = null;
@@ -6261,9 +6185,6 @@ function refreshHierarchy() {
   hierCount.textContent = (children.length || 0) + ' 个对象';
 }
 
-// ============================================================
-// 放置面板
-// ============================================================
 var panelGameProps = null;
 var gamePropsTab = 'item';
 var gamePropsSearch = '';
@@ -6371,9 +6292,6 @@ function refreshGameProps() {
   }
 }
 
-// ============================================================
-// 项目资源
-// ============================================================
 var panelAssets = null;
 var assetFileInput = null;
 var assetPendingKind = 'texture';
@@ -6613,9 +6531,6 @@ async function placeAssetModel(key) {
   }
 }
 
-// ============================================================
-// 声音编辑
-// ============================================================
 var panelSound = null;
 var soundTargetObj = null;
 
@@ -6707,9 +6622,6 @@ function refreshSoundPanel() {
   }
 }
 
-// ============================================================
-// 项目设置
-// ============================================================
 var panelProject = null;
 
 function envRow(label, html) {
@@ -6862,9 +6774,6 @@ function refreshProjectPanel() {
   }
 }
 
-// ============================================================
-// 地图预览图
-// ============================================================
 var thumbFileInput = null;
 var folderInput = null;
 
@@ -6934,9 +6843,6 @@ function buildThumbInputs() {
   });
 }
 
-// ============================================================
-// ZIP（仅 store，读的时候顺带支持 deflate）
-// ============================================================
 var CRC_TABLE = (function() {
   var t = new Uint32Array(256);
   for (var n = 0; n < 256; n++) {
@@ -7178,9 +7084,6 @@ async function importProjectFolder(file) {
   }
 }
 
-// ============================================================
-// 属性栏扩展
-// ============================================================
 var propCollide = null;
 var propSoundBtn = null;
 var waterBox = null;
@@ -7373,9 +7276,6 @@ function rebuildTextureOptions() {
   propTex.value = cur;
 }
 
-// ============================================================
-// 新面板初始化
-// ============================================================
 buildEditorSky();
 buildVoidPlane();
 buildHierarchy();
@@ -7414,9 +7314,6 @@ refreshProjectPanel();
   menu.insertBefore(folderBtn, document.getElementById('btnImportGltf'));
 })();
 
-// ============================================================
-// 主循环
-// ============================================================
 var last = performance.now();
 var _lastSelectedGroup = null;
 
@@ -7473,9 +7370,6 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-// ============================================================
-// 初始场景
-// ============================================================
 createPrimitive('box', {
   name: '默认地面',
   color: '#8d908c',
@@ -7487,9 +7381,6 @@ createPrimitive('box', {
 selectObject(null);
 pushHistory(true);
 
-// ============================================================
-// 启动检测
-// ============================================================
 checkForUpdates();
 checkTutorial();
 
@@ -7526,16 +7417,12 @@ window.RDPMAP = {
 console.log('🎮 RagdollBox 地图编辑器 v' + APP_VERSION + ' · 组功能已加载！');
 console.log('📦 组操作: 选中多个物体 → 建组 | 点击组内物体穿透选中 | 组旋转以组中心为轴');
 
-// ============================================================
-// 精选地图 - 弹窗加载 maps.html
-// ============================================================
 document.getElementById('btnFeaturedMaps').onclick = function() {
   closeSheet();
   showFeaturedMapsModal();
 };
 
 function showFeaturedMapsModal() {
-  // 如果已存在则移除旧的
   var old = document.getElementById('featuredMapsModal');
   if (old) old.remove();
 
@@ -7568,9 +7455,6 @@ function showFeaturedMapsModal() {
   };
 }
 
-// ============================================================
-// 全局UI缩放（数字输入框）
-// ============================================================
 var uiScaleInput = document.getElementById('uiScaleInput');
 var uiScaleApply = document.getElementById('uiScaleApply');
 var appEl = document.getElementById('app');
@@ -7610,9 +7494,6 @@ if (savedScale) {
   }
 }
 
-// ============================================================
-// 视野(FOV)调整 —— 用于制作项目封面，隐藏其他按键只留一个滑块
-// ============================================================
 (function setupFovAdjust() {
   var btnFovAdjust = document.getElementById('btnFovAdjust');
   var fovSlider = document.getElementById('fovSlider');
@@ -7621,7 +7502,7 @@ if (savedScale) {
   var fovConfirm = document.getElementById('fovConfirm');
   if (!btnFovAdjust || !fovSlider) return;
 
-  var fovBeforeAdjust = null; // 进入调整模式前的 fov，取消时用于还原
+  var fovBeforeAdjust = null;
 
   function setFov(v) {
     v = Math.max(20, Math.min(120, v));
@@ -7632,7 +7513,7 @@ if (savedScale) {
   }
 
   function enterFovAdjust() {
-    if (previewOn) return; // 预览模式下不进入
+    if (previewOn) return;
     fovBeforeAdjust = camera.fov;
     closeSheet();
     setFov(camera.fov);
