@@ -844,7 +844,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 4.4.5</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 4.5.0</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
@@ -981,10 +981,10 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">4.4.5</div>
+    <div class="version" id="updateVersion">4.5.0</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li>精确调整功能可以用于多选和组功能</li>
+      <li>多选功能中的框选功能可以正常触发了,长按任意一处一秒即可触发框选</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -1035,7 +1035,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-const APP_VERSION = '4.4.5';
+const APP_VERSION = '4.5.0';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
@@ -3371,6 +3371,12 @@ var lastPointer = { x: 0, y: 0 };
 var DRAG_THRESHOLD = 9;
 var selectBoxEl = document.getElementById('selectBox');
 var boxStart = { x: 0, y: 0 };
+var longPressTimer = null;
+var LONG_PRESS_MS = 1000;
+
+function clearLongPressTimer() {
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+}
 
 function getCanvasCoords(e) {
   var r = renderer.domElement.getBoundingClientRect();
@@ -3437,6 +3443,23 @@ renderer.domElement.addEventListener('pointerdown', function(e) {
   lastPointer = { x: e.clientX, y: e.clientY };
   isRotating = false;
   isBoxSelecting = false;
+  clearLongPressTimer();
+  if (!DESKTOP && multiSelectMode) {
+    var pressAtDown = { x: e.clientX, y: e.clientY };
+    longPressTimer = setTimeout(function() {
+      longPressTimer = null;
+      if (!pointerIsDown || isRotating || isBoxSelecting) return;
+      var moved = Math.hypot(pressAtDown.x - pointerDownPos.x, pressAtDown.y - pointerDownPos.y);
+      if (moved > DRAG_THRESHOLD) return;
+      isBoxSelecting = true;
+      boxStart = { x: pressAtDown.x, y: pressAtDown.y };
+      selectBoxEl.style.left = boxStart.x + 'px';
+      selectBoxEl.style.top = boxStart.y + 'px';
+      selectBoxEl.style.width = '0px';
+      selectBoxEl.style.height = '0px';
+      selectBoxEl.style.display = 'block';
+    }, LONG_PRESS_MS);
+  }
   renderer.domElement.setPointerCapture(e.pointerId);
 });
 
@@ -3461,9 +3484,11 @@ renderer.domElement.addEventListener('pointermove', function(e) {
   var totalDx = e.clientX - pointerDownPos.x;
   var totalDy = e.clientY - pointerDownPos.y;
   var movedEnough = Math.hypot(totalDx, totalDy) > DRAG_THRESHOLD;
-  if (!DESKTOP && !isRotating && movedEnough) { isRotating = true; }
+  if (movedEnough && longPressTimer && !isBoxSelecting) { clearLongPressTimer(); }
+  var pendingLongPress = !DESKTOP && multiSelectMode && !isBoxSelecting && (longPressTimer !== null);
+  if (!DESKTOP && !isRotating && !isBoxSelecting && movedEnough && !pendingLongPress) { isRotating = true; }
   var boxAllowed = DESKTOP || multiSelectMode;
-  if (boxAllowed && !isRotating && !isBoxSelecting && movedEnough) {
+  if (DESKTOP && boxAllowed && !isRotating && !isBoxSelecting && movedEnough) {
     if (!pickAt({ clientX: pointerDownPos.x, clientY: pointerDownPos.y })) {
       isBoxSelecting = true;
       boxStart = { x: pointerDownPos.x, y: pointerDownPos.y };
@@ -3494,16 +3519,31 @@ function finishBoxSelect(e, additive) {
   var x0 = Math.min(boxStart.x, e.clientX), x1 = Math.max(boxStart.x, e.clientX);
   var y0 = Math.min(boxStart.y, e.clientY), y1 = Math.max(boxStart.y, e.clientY);
   var r = renderer.domElement.getBoundingClientRect();
-  var v = new THREE.Vector3();
   var picked = [];
   var children = objectsRoot.children;
+  var box3 = new THREE.Box3();
+  var corner = new THREE.Vector3();
   for (var i = 0; i < children.length; i++) {
     var obj = children[i];
-    obj.getWorldPosition(v);
-    v.project(camera);
-    var sx = r.left + (v.x * 0.5 + 0.5) * r.width;
-    var sy = r.top + (-v.y * 0.5 + 0.5) * r.height;
-    if (v.z < 1 && sx >= x0 && sx <= x1 && sy >= y0 && sy <= y1) picked.push(obj);
+    box3.setFromObject(obj);
+    if (box3.isEmpty()) continue;
+    var min = box3.min, max = box3.max;
+    var fullyInside = true;
+    var anyInFront = false;
+    for (var cx = 0; cx < 2 && fullyInside; cx++) {
+      for (var cy = 0; cy < 2 && fullyInside; cy++) {
+        for (var cz = 0; cz < 2 && fullyInside; cz++) {
+          corner.set(cx ? max.x : min.x, cy ? max.y : min.y, cz ? max.z : min.z);
+          corner.project(camera);
+          if (corner.z >= 1) { fullyInside = false; break; }
+          anyInFront = true;
+          var sx = r.left + (corner.x * 0.5 + 0.5) * r.width;
+          var sy = r.top + (-corner.y * 0.5 + 0.5) * r.height;
+          if (sx < x0 || sx > x1 || sy < y0 || sy > y1) { fullyInside = false; }
+        }
+      }
+    }
+    if (fullyInside && anyInFront) picked.push(obj);
   }
   if (!picked.length) { if (!additive) clearSelection(); return; }
   var merged = additive ? new Set([...selection, ...picked]) : new Set(picked);
@@ -3543,6 +3583,7 @@ renderer.domElement.addEventListener('pointerup', function(e) {
       _lastSelectedGroup = null;
     }
   }
+  clearLongPressTimer();
   pointerIsDown = false;
   isRotating = false;
   isBoxSelecting = false;
@@ -3551,11 +3592,13 @@ renderer.domElement.addEventListener('pointerup', function(e) {
 
 renderer.domElement.addEventListener('pointerleave', function() {
   if (isBoxSelecting) selectBoxEl.style.display = 'none';
+  clearLongPressTimer();
   pointerIsDown = false; isRotating = false; isBoxSelecting = false;
 });
 renderer.domElement.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
 function forceReleaseDragLocks() {
+  clearLongPressTimer();
   if (!ctrlDragging && !pointerIsDown && !isRotating && !isBoxSelecting && !lookLocked) return;
   ctrlDragging = false;
   pointerIsDown = false;
