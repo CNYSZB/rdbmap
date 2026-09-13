@@ -846,7 +846,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 5.0.0</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 5.0.1</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
@@ -983,10 +983,10 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">5.0.0</div>
+    <div class="version" id="updateVersion">5.0.1</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li>加入了真正的瓦片贴图，制作地图现在变得十分方便，这是个超大超大超好用的更新，所以我把版本号定为5.0.0</li>
+      <li>傻逼cloude居然骗我说没有更改导出的效果，导致出现了游戏完全认不了新版编辑器地图的问题，目前，瓦片贴图效果仅仅只能在编辑器中使用，无论是否开启瓦片贴图，具体又有多少个物体开启都将不会在地图文件中存入相关数据</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -1037,7 +1037,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-const APP_VERSION = '5.0.0';
+const APP_VERSION = '5.0.1';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
@@ -4121,8 +4121,6 @@ function serializeObject(o) {
     scale: roundArray(o.scale.toArray())
   };
   // texTileSize: null 表示旧版拉伸模式；数字表示瓦片模式下每格代表的米数
-  var tts = o.userData.mapTexTileSize;
-  b.texTileSize = Number.isFinite(+tts) && +tts > 0 ? +tts : null;
   if (o.userData.mapPhysics && o.userData.mapCollide !== false) {
     b.physics = 1;
     b.mass = Math.max(0.2, Math.min(20000, +o.userData.mapMass || defaultMass(o)));
