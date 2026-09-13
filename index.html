@@ -733,7 +733,9 @@
     <label>名称</label><input id="propName" type="text" />
     <label>颜色</label><input id="propColor" type="color" value="#c5c9cf" />
     <label>纹理</label><select id="propTex"></select>
-    <label>平铺</label><input id="propTexRep" type="number" min="0.1" max="64" step="0.5" value="1" />
+    <button id="propTileModeBtn" title="切换：瓦片贴图（按真实尺寸自动铺贴，不拉伸）／传统平铺（手动填重复次数）">🧱 瓦片</button>
+    <label id="propTexRepLabel">平铺</label><input id="propTexRep" type="number" min="0.1" max="64" step="0.5" value="1" />
+    <label id="propTileSizeLabel" style="display:none;">瓦片(米)</label><input id="propTileSize" type="number" min="0.05" max="50" step="0.1" value="1" style="display:none;width:56px;" />
     <label>不透明</label><input id="propOpacity" type="range" min="0" max="1" step="0.05" value="1" />
     <label>物理</label><input id="propPhys" type="checkbox" />
     <label>质量</label><input id="propMass" type="number" min="0.2" max="20000" step="1" value="10" />
@@ -844,7 +846,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 4.5.0</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 5.0.0</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
@@ -981,10 +983,10 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">4.5.0</div>
+    <div class="version" id="updateVersion">5.0.0</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li>多选功能中的框选功能可以正常触发了,长按任意一处一秒即可触发框选</li>
+      <li>加入了真正的瓦片贴图，制作地图现在变得十分方便，这是个超大超大超好用的更新，所以我把版本号定为5.0.0</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -1035,7 +1037,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-const APP_VERSION = '4.5.0';
+const APP_VERSION = '5.0.0';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
@@ -1710,15 +1712,11 @@ var TEXTURES = [
 
 var texCache = new Map();
 
-function canvasTex(size, paint, tile) {
+function canvasTex(size, paint) {
   var cv = document.createElement('canvas');
   cv.width = cv.height = size;
   paint(cv.getContext('2d'), size);
-  var t = new THREE.CanvasTexture(cv);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.colorSpace = THREE.SRGBColorSpace;
-  if (tile) t.repeat.set(tile, tile);
-  return t;
+  return cv;
 }
 
 var TEX_PAINT = {
@@ -1908,14 +1906,18 @@ var TEX_PAINT = {
   }
 };
 
-function namedTexture(name, repeat) {
+function namedTexture(name) {
   if (!name || !TEX_PAINT[name]) return null;
-  var rep = Math.max(0.1, Math.min(64, +repeat || 1));
-  var key = name + '|' + rep;
-  var t = texCache.get(key);
-  if (t) return t;
-  t = canvasTex(name === 'ground' ? 256 : 128, TEX_PAINT[name], rep);
-  texCache.set(key, t);
+  var cv = texCache.get(name);
+  if (!cv) {
+    cv = canvasTex(name === 'ground' ? 256 : 128, TEX_PAINT[name]);
+    texCache.set(name, cv);
+  }
+  // 每个物体独立的 Texture 实例（共用同一张画好的 canvas 图像），
+  // 这样各自的 .repeat 互不干扰，也不需要每次缩放都重画/重建。
+  var t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
 
@@ -2083,29 +2085,47 @@ function applyObjectColor(root, hex) {
   });
 }
 
-function applyObjectSurface(root) {
-  if (!root || !root.isMesh) return;
-  if (root.userData.isProp) return;
-  if (root.userData.mapType === 'model' || root.userData.mapType === 'spawn') return;
+// BoxGeometry 材质组标准顺序：0:+X 1:-X 2:+Y(顶) 3:-Y(底) 4:+Z 5:-Z
+// 返回每个面在贴图上对应的 [宽边长度, 高边长度]（都是物体的真实世界尺寸，单位米）
+var BOX_FACE_DIMS = [
+  function(sx, sy, sz) { return [sz, sy]; }, // +X
+  function(sx, sy, sz) { return [sz, sy]; }, // -X
+  function(sx, sy, sz) { return [sx, sz]; }, // +Y 顶
+  function(sx, sy, sz) { return [sx, sz]; }, // -Y 底
+  function(sx, sy, sz) { return [sx, sy]; }, // +Z
+  function(sx, sy, sz) { return [sx, sy]; }  // -Z
+];
+
+// 计算某一个面应有的贴图重复次数：面的两条真实边长各自除以瓦片尺寸，互不影响别的面。
+function computeFaceRepeat(dims, tileSize) {
+  var ts = Math.max(0.05, +tileSize || 1);
+  var rx = dims[0] / ts;
+  var ry = dims[1] / ts;
+  return [Math.max(0.05, Math.min(512, rx)), Math.max(0.05, Math.min(512, ry))];
+}
+
+// 对单个 material 应用贴图/颜色/透明度。repXY 为该材质对应面已经算好的重复次数。
+function applySurfaceToMaterial(root, m, repXY) {
   var tex = root.userData.mapTex || '';
-  var rep = root.userData.mapTexRepeat || 1;
   var opacity = root.userData.mapOpacity === undefined ? 1 : root.userData.mapOpacity;
   var custom = root.userData.mapCustom;
-  var m = root.material;
   if (!m) return;
 
-  root._oldMapRef = m.map;
-
   if (custom) {
-    var key = 'custom|' + custom + '|' + rep;
+    // 缓存 key 不含 repeat 值：同一张贴图只建一份 Texture 实例，缩放时只改 .repeat，
+    // 不重建对象，避免每帧新建纹理导致画面闪烁。
+    var key = 'custom|' + custom;
     var t = texCache.get(key);
     if (!t) {
       t = new THREE.TextureLoader().load(custom);
       t.wrapS = t.wrapT = THREE.RepeatWrapping;
       t.colorSpace = THREE.SRGBColorSpace;
-      t.repeat.set(rep, rep);
       texCache.set(key, t);
     }
+    t.repeat.set(repXY[0], repXY[1]);
+    // 以物体表面中心为锚点向两边对称铺贴，而不是从某个角开始铺，
+    // 这样物体拉伸时贴图始终从中间向外扩展。
+    t.offset.set((1 - repXY[0]) / 2, (1 - repXY[1]) / 2);
     m.map = t;
     m.transparent = opacity < 1;
     m.opacity = opacity;
@@ -2127,9 +2147,16 @@ function applyObjectSurface(root) {
     m.side = THREE.DoubleSide;
     m.color.set(root.userData.mapColor || '#c5c9cf');
   } else {
-    var namedTex = namedTexture(tex, rep);
-    if (namedTex) {
-      m.map = namedTex;
+    // 内置材质：这个 material 已持有对应贴图实例时直接复用、只改 .repeat；
+    // 只有贴图种类真的变了才换一个新的 Texture 实例，避免缩放时反复重建导致闪烁。
+    if (m._namedTexKind !== tex) {
+      m._namedTexKind = tex;
+      m._namedTexObj = namedTexture(tex);
+    }
+    if (m._namedTexObj) {
+      m._namedTexObj.repeat.set(repXY[0], repXY[1]);
+      m._namedTexObj.offset.set((1 - repXY[0]) / 2, (1 - repXY[1]) / 2);
+      m.map = m._namedTexObj;
     } else {
       m.map = null;
     }
@@ -2140,6 +2167,45 @@ function applyObjectSurface(root) {
     m.color.set(m.map ? '#ffffff' : (root.userData.mapColor || '#c5c9cf'));
   }
   m.needsUpdate = true;
+}
+
+function applyObjectSurface(root) {
+  if (!root || !root.isMesh) return;
+  if (root.userData.isProp) return;
+  if (root.userData.mapType === 'model' || root.userData.mapType === 'spawn') return;
+  var legacyRep = root.userData.mapTexRepeat || 1;
+  var tileSize = root.userData.mapTexTileSize;
+  var useTiling = Number.isFinite(+tileSize) && +tileSize > 0;
+  var mats = Array.isArray(root.material) ? root.material : [root.material];
+  if (!mats.length || !mats[0]) return;
+
+  root._oldMapRef = mats[0].map;
+
+  if (mats.length === 6) {
+    // box：六面独立材质，各自按自己的真实边长算 repeat，互不牵连
+    var s = root.scale;
+    var sx = Math.max(0.001, Math.abs(s.x));
+    var sy = Math.max(0.001, Math.abs(s.y));
+    var sz = Math.max(0.001, Math.abs(s.z));
+    for (var i = 0; i < 6; i++) {
+      var repXY;
+      if (useTiling) {
+        var dims = BOX_FACE_DIMS[i](sx, sy, sz);
+        repXY = computeFaceRepeat(dims, tileSize);
+      } else {
+        repXY = [legacyRep, legacyRep];
+      }
+      applySurfaceToMaterial(root, mats[i], repXY);
+    }
+  } else {
+    // 非 box 形状（球/柱/锥/坡道等）沿用旧的单一 repeat 逻辑，UV 结构不同，不做分面处理
+    var repXY = useTiling ? (function() {
+      var s = root.scale;
+      var sx = Math.max(0.001, Math.abs(s.x)), sy = Math.max(0.001, Math.abs(s.y)), sz = Math.max(0.001, Math.abs(s.z));
+      return computeFaceRepeat([Math.sqrt(sx * sz), sy], tileSize);
+    })() : [legacyRep, legacyRep];
+    applySurfaceToMaterial(root, mats[0], repXY);
+  }
 }
 
 function createSpawn(data) {
@@ -2160,7 +2226,12 @@ function createPrimitive(type, data) {
   data = data || {};
   if (type === 'spawn') return createSpawn(data);
   if (PROP_DEFS[type]) return createProp(type, data);
-  var mat = new THREE.MeshStandardMaterial({ color: data.color || '#c5c9cf', roughness: 0.82, metalness: 0.04 });
+  var matOpts = { color: data.color || '#c5c9cf', roughness: 0.82, metalness: 0.04 };
+  // box 用 6 个独立材质（对应 +X,-X,+Y,-Y,+Z,-Z），这样每个面各自按自己的真实边长
+  // 计算瓦片密度，互不牵连，缩放某一轴不会压扁/拉伸其他方向的贴图。
+  var mat = type === 'box'
+    ? [0, 1, 2, 3, 4, 5].map(function() { return new THREE.MeshStandardMaterial(matOpts); })
+    : new THREE.MeshStandardMaterial(matOpts);
   var mesh = new THREE.Mesh(geometryFor(type), mat);
   mesh.castShadow = mesh.receiveShadow = true;
   mesh.userData.mapObject = true;
@@ -2170,6 +2241,10 @@ function createPrimitive(type, data) {
   mesh.userData.mapTex = data.tex || '';
   var repRaw = Array.isArray(data.texRepeat) ? data.texRepeat[0] : data.texRepeat;
   mesh.userData.mapTexRepeat = Number.isFinite(+repRaw) ? +repRaw : 1;
+  // 瓦片贴图：贴图按真实尺寸铺贴，单位为“米/格”；未指定时新建物体默认开启（1米一格），
+  // 从旧存档载入且缺该字段时在 loadMapData 中会保持旧版拉伸行为
+  mesh.userData.mapTexTileSize = Number.isFinite(+data.texTileSize) ? +data.texTileSize
+    : (data.texTileSize === null ? null : 1);
   mesh.userData.mapOpacity = Number.isFinite(+data.opacity) ? +data.opacity : 1;
   mesh.userData.mapCustom = data.texAsset ? assetUrl(data.texAsset) : (data.customTex || null);
   mesh.userData.mapPhysics = !!data.physics;
@@ -2344,6 +2419,10 @@ btnMulti.onclick = function() {
 
 var propTex = document.getElementById('propTex');
 var propTexRep = document.getElementById('propTexRep');
+var propTileModeBtn = document.getElementById('propTileModeBtn');
+var propTexRepLabel = document.getElementById('propTexRepLabel');
+var propTileSize = document.getElementById('propTileSize');
+var propTileSizeLabel = document.getElementById('propTileSizeLabel');
 var propOpacity = document.getElementById('propOpacity');
 var propPhys = document.getElementById('propPhys');
 var propMass = document.getElementById('propMass');
@@ -2400,8 +2479,8 @@ function refreshProps() {
 
   var surf = selection.filter(surfaceEditable);
   var canSurface = surf.length > 0;
-  for (var i = 0; i < [propTex, propTexRep, propOpacity].length; i++) {
-    var el = [propTex, propTexRep, propOpacity][i];
+  for (var i = 0; i < [propTex, propTexRep, propTileSize, propTileModeBtn, propOpacity].length; i++) {
+    var el = [propTex, propTexRep, propTileSize, propTileModeBtn, propOpacity][i];
     el.disabled = !canSurface;
   }
   if (canSurface) {
@@ -2411,6 +2490,13 @@ function refreshProps() {
     } else if (s0.userData.mapCustom) { propTex.value = '__import__'; }
     else { propTex.value = s0.userData.mapTex || ''; }
     propTexRep.value = s0.userData.mapTexRepeat || 1;
+    var tileOn = Number.isFinite(+s0.userData.mapTexTileSize) && +s0.userData.mapTexTileSize > 0;
+    propTileSize.value = tileOn ? s0.userData.mapTexTileSize : 1;
+    propTileModeBtn.classList.toggle('active', tileOn);
+    propTexRepLabel.style.display = tileOn ? 'none' : '';
+    propTexRep.style.display = tileOn ? 'none' : '';
+    propTileSizeLabel.style.display = tileOn ? '' : 'none';
+    propTileSize.style.display = tileOn ? '' : 'none';
     propOpacity.value = s0.userData.mapOpacity === undefined ? 1 : s0.userData.mapOpacity;
   }
 
@@ -2647,6 +2733,15 @@ function applyPreciseScale() {
   }
 }
 
+// 精确调整面板可直接改 scale（不经过 transform 的 objectChange 事件），
+// 瓦片贴图物体在此之后也要重算平铺次数，避免数值输入缩放后贴图仍是旧密度
+function refreshTileSurfaceIfNeeded(obj) {
+  if (!obj || obj.userData.isProp) return;
+  if (Number.isFinite(+obj.userData.mapTexTileSize) && +obj.userData.mapTexTileSize > 0) {
+    applyObjectSurface(obj);
+  }
+}
+
 function afterPreciseTransform(obj) {
   var group = groupManager.getGroupOfObject(obj);
   if (group) {
@@ -2654,6 +2749,7 @@ function afterPreciseTransform(obj) {
     groupManager._hideBounds(group);
     groupManager._showBounds(group);
   }
+  refreshTileSurfaceIfNeeded(obj);
   if (typeof syncProxyToSelection === 'function') syncProxyToSelection();
   refreshProps();
   pushHistory();
@@ -2665,6 +2761,8 @@ function afterPreciseTransformMulti(target) {
     groupManager._hideBounds(target.group);
     groupManager._showBounds(target.group);
   }
+  var members = target.members || (target.group && target.group.members) || [];
+  for (var i = 0; i < members.length; i++) refreshTileSurfaceIfNeeded(members[i]);
   syncProxyToSelection();
   refreshProps();
   pushHistory();
@@ -2854,6 +2952,32 @@ propTexRep.addEventListener('change', function() {
     applyObjectSurface(o);
   }
   pushHistory();
+});
+
+propTileSize.addEventListener('change', function() {
+  var ts = Math.max(0.05, Math.min(50, +propTileSize.value || 1));
+  propTileSize.value = ts;
+  for (var i = 0; i < selection.length; i++) {
+    var o = selection[i];
+    if (!surfaceEditable(o)) continue;
+    if (!(Number.isFinite(+o.userData.mapTexTileSize) && +o.userData.mapTexTileSize > 0)) continue;
+    o.userData.mapTexTileSize = ts;
+    applyObjectSurface(o);
+  }
+  pushHistory();
+});
+
+propTileModeBtn.addEventListener('click', function() {
+  var turningOn = !propTileModeBtn.classList.contains('active');
+  for (var i = 0; i < selection.length; i++) {
+    var o = selection[i];
+    if (!surfaceEditable(o)) continue;
+    o.userData.mapTexTileSize = turningOn ? (+propTileSize.value || 1) : null;
+    applyObjectSurface(o);
+  }
+  refreshProps();
+  pushHistory();
+  toast(turningOn ? '已切换为瓦片贴图（按真实尺寸铺贴）' : '已切换为传统平铺（手动重复次数）');
 });
 
 propOpacity.addEventListener('input', function() {
@@ -3338,6 +3462,16 @@ transform.addEventListener('objectChange', function() {
           Math.max(0.05, st.scale.y * ratio.y),
           Math.max(0.05, st.scale.z * ratio.z)
         );
+      }
+    }
+  }
+  // 缩放时若物体处于瓦片贴图模式，实时按新尺寸重算平铺次数，避免拖拽中贴图被拉伸变形
+  if (currentTool === 'scale') {
+    for (var i = 0; i < members.length; i++) {
+      var mo = members[i];
+      if (mo.userData.isProp) continue;
+      if (Number.isFinite(+mo.userData.mapTexTileSize) && +mo.userData.mapTexTileSize > 0) {
+        applyObjectSurface(mo);
       }
     }
   }
@@ -3986,6 +4120,9 @@ function serializeObject(o) {
     rotation: roundArray([o.rotation.x, o.rotation.y, o.rotation.z]),
     scale: roundArray(o.scale.toArray())
   };
+  // texTileSize: null 表示旧版拉伸模式；数字表示瓦片模式下每格代表的米数
+  var tts = o.userData.mapTexTileSize;
+  b.texTileSize = Number.isFinite(+tts) && +tts > 0 ? +tts : null;
   if (o.userData.mapPhysics && o.userData.mapCollide !== false) {
     b.physics = 1;
     b.mass = Math.max(0.2, Math.min(20000, +o.userData.mapMass || defaultMass(o)));
@@ -4596,6 +4733,9 @@ function restoreObject(d) {
     }
     return m;
   }
+  // 旧存档没有 texTileSize 字段时，保持其原有的"拉伸铺贴"外观，不自动转为瓦片模式，
+  // 避免老地图一打开贴图密度突变；只有序列化数据里显式带了该字段才沿用（即本工具新版保存过的地图）。
+  if (d.texTileSize === undefined) d.texTileSize = null;
   return createPrimitive(d.type, d);
 }
 
@@ -7417,7 +7557,7 @@ createPrimitive('box', {
   name: '默认地面',
   color: '#8d908c',
   tex: 'ground',
-  texRepeat: 20,
+  texTileSize: 2.5,
   position: [0, -0.25, 0],
   scale: [50, 0.5, 50]
 });
