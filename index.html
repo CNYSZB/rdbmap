@@ -844,7 +844,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 5.0.2</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 6.0.0</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
@@ -981,10 +981,10 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">5.0.2</div>
+    <div class="version" id="updateVersion">6.0.0</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li>删除了瓦片贴图，这个功能带来的bug太多了…</li>
+      <li>对英语进行了支持</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -1035,7 +1035,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-const APP_VERSION = '5.0.2';
+const APP_VERSION = '6.0.0';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
@@ -1467,6 +1467,40 @@ var PROP_DEFS = {};
   for (var j = 0; j < GAME_GUNS.length; j++) GUN_BY_ID[GAME_GUNS[j].id] = GAME_GUNS[j];
 })();
 
+// ===== 存储警告配置（想改提示文字/冷却时间，改这里）=====
+var STORAGE_WARN_CFG = {
+  enabled: true,            // 是否启用存储不足提示（false = 完全不弹）
+  retryCooldownMs: 60000,   // 保存失败后，自动存档暂停重试的时间（毫秒），避免反复写入导致卡顿
+  title: '⚠️ 存档空间不足',
+  message: '当前地图可能较大，浏览器暂时无法自动保存。你可以在菜单里先「导出地图」备份，或精简地图后再试。',
+  okText: '我已知晓'
+};
+var storageWarnShown = false;   // 只存在内存里：点“我已知晓”后，直到下次重新进入页面才会再出现
+var storageFailedAt = 0;        // 最近一次保存失败的时间
+
+function storageWarnOnce() {
+  storageFailedAt = Date.now();
+  if (!STORAGE_WARN_CFG.enabled || storageWarnShown) return;
+  storageWarnShown = true;
+  var ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;left:0;top:0;right:0;bottom:0;z-index:99999;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;';
+  var box = document.createElement('div');
+  box.style.cssText = 'background:var(--panel2);border:1px solid var(--danger);border-radius:14px;padding:20px;max-width:340px;width:100%;color:var(--text);';
+  var h = document.createElement('div');
+  h.textContent = STORAGE_WARN_CFG.title;
+  h.style.cssText = 'font-size:16px;font-weight:700;margin-bottom:10px;';
+  var p = document.createElement('div');
+  p.textContent = STORAGE_WARN_CFG.message;
+  p.style.cssText = 'font-size:13px;line-height:1.7;color:var(--muted);margin-bottom:16px;';
+  var b = document.createElement('button');
+  b.textContent = STORAGE_WARN_CFG.okText;
+  b.style.cssText = 'display:block;width:100%;padding:12px;font-size:15px;border-radius:10px;border:1px solid var(--accent);background:var(--panel);color:var(--accent);';
+  b.onclick = function() { ov.remove(); };
+  box.appendChild(h); box.appendChild(p); box.appendChild(b);
+  ov.appendChild(box);
+  document.body.appendChild(ov);
+}
+
 var SAVES_KEY = 'ragdollbox_saves';
 var currentSaveId = null;
 
@@ -1477,6 +1511,7 @@ function getSaves() {
 function setSaves(saves) {
   try {
     localStorage.setItem(SAVES_KEY, JSON.stringify(saves));
+    storageFailedAt = 0;
     return true;
   } catch (err) {
     var autoSaves = saves.filter(function(s) { return /^自动存档\d+$/.test(s.name); });
@@ -1487,7 +1522,7 @@ function setSaves(saves) {
       try { localStorage.setItem(SAVES_KEY, JSON.stringify(pruned)); toast('⚠️ 已清理旧自动存档'); return true; }
       catch(e2) { console.error(e2); }
     }
-    toast('⚠️ 保存失败（存储空间不足）');
+    storageWarnOnce();
     return false;
   }
 }
@@ -1534,6 +1569,7 @@ function persistMapData(mapData) {
 }
 
 function autoSave(mapData) {
+  if (STORAGE_WARN_CFG && storageFailedAt && Date.now() - storageFailedAt < STORAGE_WARN_CFG.retryCooldownMs) return;
   if (!mapData) mapData = serializeMap();
   persistMapData(mapData);
 }
@@ -7589,6 +7625,719 @@ if (savedScale) {
     }
   });
 })();
+
+/* ================= 多语言 (I18N) 引擎 =================
+   用法说明（维护用）：
+   1) 旧文案：直接用「中文原文」当键，在文件最底部 I18N_CFG.en 里填英文即可。
+   2) 新文案：可以写 t('键名')，然后在 I18N_CFG.zh / I18N_CFG.en 里各填一份。
+   3) 汉字 ≤2 个的键只做「整句匹配」（防止误伤长句）；≥3 个汉字的键会按子串替换（长的优先）。
+      短键如果也想按子串替换，在键前面加 ~ ，例如 '~共 '。
+   4) 找不到英文时自动显示中文，不会报错。
+   5) 不想被翻译的元素：加属性 data-i18n-skip
+   ====================================================== */
+var LANG_KEY = 'ragdollbox_lang';
+var currentLang = 'zh';
+var I18N_CJK = /[\u4e00-\u9fff]/;
+var I18N_ATTRS = ['placeholder', 'title', 'aria-label', 'alt'];
+var i18nKeys = null;
+var i18nCache = {};
+var i18nCacheN = 0;
+
+function i18nHas(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+
+function i18nBuild() {
+  var en = (I18N_CFG && I18N_CFG.en) || {};
+  i18nKeys = Object.keys(en).filter(function(k) {
+    return k.charAt(0) === '~' || (k.match(/[\u4e00-\u9fff]/g) || []).length >= 3;
+  }).sort(function(a, b) { return b.length - a.length; });
+  i18nCache = {}; i18nCacheN = 0;
+}
+
+// 全角标点 → 半角（仅对已翻译的句子使用）
+function i18nFw(s) {
+  var map = { '：': ':', '，': ',', '。': '.', '！': '!', '？': '?', '；': ';', '、': ',' };
+  return s.replace(/[：，。！？；、]/g, function(c, i, str) {
+    var nx = str.charAt(i + 1);
+    return map[c] + (nx && !/[\s<)\]"']/.test(nx) ? ' ' : '');
+  }).replace(/[「」]/g, '"').replace(/（/g, ' (').replace(/）/g, ')').replace(/ {2,}/g, ' ');
+}
+
+function t(s) {
+  if (typeof s !== 'string' || typeof I18N_CFG === 'undefined' || !I18N_CFG) return s;
+  var dict = I18N_CFG[currentLang];
+  if (dict && i18nHas(dict, s) && !I18N_CJK.test(s)) return dict[s];   // 键名模式
+  if (currentLang !== 'en' || !I18N_CJK.test(s)) return s;
+  if (i18nHas(i18nCache, s)) return i18nCache[s];
+  if (!i18nKeys) i18nBuild();
+  var en = I18N_CFG.en, out = s;
+  var lead = s.match(/^\s*/)[0], trail = s.match(/\s*$/)[0];
+  var full = s.trim();
+  var m = s.match(/^([^\u4e00-\u9fffA-Za-z0-9]*)([\s\S]*?)([^\u4e00-\u9fffA-Za-z0-9]*)$/);
+  if (i18nHas(en, full)) out = lead + en[full] + trail;
+  else if (m && m[2] && i18nHas(en, m[2])) out = m[1] + en[m[2]] + m[3];
+  else {
+    for (var i = 0; i < i18nKeys.length; i++) {
+      var k = i18nKeys[i], kk = k.charAt(0) === '~' ? k.slice(1) : k;
+      if (out.indexOf(kk) !== -1) out = out.split(kk).join(en[k]);
+    }
+  }
+  if (out !== s) out = i18nFw(out);
+  if (i18nCacheN > 3000) { i18nCache = {}; i18nCacheN = 0; }
+  i18nCache[s] = out; i18nCacheN++;
+  return out;
+}
+
+function i18nTR(raw) {
+  var lead = raw.match(/^\s*/)[0];
+  if (lead.length === raw.length) return raw;
+  var trail = raw.match(/\s*$/)[0];
+  return lead + t(raw.slice(lead.length, raw.length - trail.length)) + trail;
+}
+
+function i18nAttrs(n) {
+  for (var i = 0; i < I18N_ATTRS.length; i++) {
+    var a = I18N_ATTRS[i];
+    if (!n.hasAttribute(a)) continue;
+    var cur = n.getAttribute(a);
+    n.__zhA = n.__zhA || {}; n.__trA = n.__trA || {};
+    if (n.__zhA[a] === undefined || cur !== n.__trA[a]) {   // 首次，或被程序改过
+      if (!I18N_CJK.test(cur)) { delete n.__zhA[a]; delete n.__trA[a]; continue; }
+      n.__zhA[a] = cur;
+    }
+    var nv = currentLang === 'en' ? i18nTR(n.__zhA[a]) : n.__zhA[a];
+    n.__trA[a] = nv;
+    if (cur !== nv) n.setAttribute(a, nv);
+  }
+}
+
+function i18nNode(n) {
+  if (n.nodeType === 3) {
+    var p = n.parentNode;
+    if (p && (p.nodeName === 'SCRIPT' || p.nodeName === 'STYLE' || p.nodeName === 'TEXTAREA')) return;
+    if (p && p.closest && p.closest('[data-i18n-skip]')) return;
+    if (n.__zh !== undefined && n.nodeValue !== n.__tr) n.__zh = undefined;   // 程序改过文字
+    if (n.__zh === undefined) {
+      if (!I18N_CJK.test(n.nodeValue)) return;
+      n.__zh = n.nodeValue;
+    }
+    var v = currentLang === 'en' ? i18nTR(n.__zh) : n.__zh;
+    n.__tr = v;
+    if (n.nodeValue !== v) n.nodeValue = v;
+    return;
+  }
+  if (n.nodeType !== 1) return;
+  if (n.nodeName === 'SCRIPT' || n.nodeName === 'STYLE') return;
+  if (n.closest && n.closest('[data-i18n-skip]')) return;
+  i18nAttrs(n);
+  for (var c = n.firstChild; c; c = c.nextSibling) i18nNode(c);
+}
+
+function i18nApplyAll() {
+  i18nNode(document.body);
+  if (window.__zhTitle === undefined) window.__zhTitle = document.title;
+  document.title = currentLang === 'en' ? t(window.__zhTitle) : window.__zhTitle;
+}
+
+var i18nObs = new MutationObserver(function(muts) {
+  if (currentLang !== 'en') return;
+  for (var i = 0; i < muts.length; i++) {
+    var m = muts[i];
+    if (m.type === 'childList') {
+      for (var j = 0; j < m.addedNodes.length; j++) i18nNode(m.addedNodes[j]);
+    } else if (m.type === 'characterData') {
+      i18nNode(m.target);
+    } else if (m.type === 'attributes') {
+      i18nAttrs(m.target);
+    }
+  }
+});
+
+function setLang(l) {
+  currentLang = (l === 'en') ? 'en' : 'zh';
+  try { localStorage.setItem(LANG_KEY, currentLang); } catch (e) {}
+  document.documentElement.lang = currentLang === 'en' ? 'en' : 'zh-CN';
+  i18nCache = {}; i18nCacheN = 0;
+  i18nApplyAll();
+}
+
+function showLangChooser() {
+  if (document.getElementById('i18nChooser')) return;
+  var chosen = false;
+  try { chosen = !!localStorage.getItem(LANG_KEY); } catch (e) {}
+  var ov = document.createElement('div');
+  ov.id = 'i18nChooser';
+  ov.setAttribute('data-i18n-skip', '');
+  ov.style.cssText = 'position:fixed;left:0;top:0;right:0;bottom:0;z-index:100000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px;';
+  var box = document.createElement('div');
+  box.style.cssText = 'background:var(--panel2);border:1px solid var(--accent);border-radius:14px;padding:22px;max-width:320px;width:100%;text-align:center;color:var(--text);';
+  var h = document.createElement('div');
+  h.textContent = '请选择语言 / Select Language';
+  h.style.cssText = 'font-size:16px;font-weight:700;margin-bottom:16px;';
+  box.appendChild(h);
+  [['zh', '中文'], ['en', 'English']].forEach(function(p) {
+    var b = document.createElement('button');
+    b.textContent = p[1];
+    b.style.cssText = 'display:block;width:100%;margin:8px 0;padding:12px;font-size:15px;border-radius:10px;border:1px solid var(--accent);background:var(--panel);color:var(--accent);';
+    b.onclick = function() { setLang(p[0]); ov.remove(); };
+    box.appendChild(b);
+  });
+  ov.appendChild(box);
+  if (chosen) ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+}
+
+// 系统弹窗（alert / confirm / prompt）也走翻译
+(function() {
+  var _a = window.alert.bind(window), _c = window.confirm.bind(window), _p = window.prompt.bind(window);
+  window.alert = function(m) { return _a(typeof m === 'string' ? t(m) : m); };
+  window.confirm = function(m) { return _c(typeof m === 'string' ? t(m) : m); };
+  window.prompt = function(m, d) { return _p(typeof m === 'string' ? t(m) : m, d); };
+})();
+
+// 菜单里的「语言 / Language」入口
+(function() {
+  var menu = document.getElementById('panelMenu');
+  if (!menu) return;
+  var b = document.createElement('button');
+  b.textContent = '🌐 语言 / Language';
+  b.setAttribute('data-i18n-skip', '');
+  b.onclick = showLangChooser;
+  menu.insertBefore(b, document.getElementById('btnOpenMap') || menu.firstChild);
+})();
+
+function i18nInit() {
+  var saved = null;
+  try { saved = localStorage.getItem(LANG_KEY); } catch (e) {}
+  i18nObs.observe(document.body, { childList: true, subtree: true, characterData: true,
+    attributes: true, attributeFilter: I18N_ATTRS });
+  if (saved === 'en' || saved === 'zh') setLang(saved);
+  else showLangChooser();          // 第一次使用：主动询问语言
+}
+setTimeout(i18nInit, 0);           // 等下面的语言表加载完再启动
+
+/* ============== 语言表（放在文件最后，方便维护） ==============
+   en：中文原文 → 英文。新增批次请追加在「英文表结束」这一行之前。 */
+var I18N_CFG = { zh: {}, en: {} };
+// ---- 英文表 第1批 ----
+Object.assign(I18N_CFG.en, {
+  "RagdollBox 地图编辑器": "RagdollBox Map Editor",
+  "全屏": "Fullscreen",
+  "保存": "Save",
+  "局部": "Local",
+  "名称": "Name",
+  "颜色": "Color",
+  "纹理": "Texture",
+  "平铺": "Tiling",
+  "不透明": "Opacity",
+  "物理": "Physics",
+  "质量": "Mass",
+  "弹力": "Bounce",
+  "位置": "Position",
+  "缩放": "Scale",
+  "类型": "Type",
+  "聚焦": "Focus",
+  "复制": "Copy",
+  "删除": "Delete",
+  "精确调整": "Fine Tune",
+  "旋转°": "Rotation°",
+  "改了就立即生效": "Changes apply immediately",
+  "组": "Group",
+  "成员: 0": "Members: 0",
+  "重命名": "Rename",
+  "解组": "Ungroup",
+  "保存到组库": "Save to Library",
+  "再次点击组内物体可单独选中": "Tap an object in the group again to select it alone",
+  "右键拖动 = 视角 · 滚轮 = 前后 · Shift+左键 = 加选 · 点击组切换选中/单独选中物体": "Right-drag = Camera · Wheel = Forward/Back · Shift+Left click = Add to selection · Tap a group to toggle group / single-object selection",
+  "预览中": "Previewing",
+  "WASD 移动 · 空格 跳 · Shift 跑": "WASD Move · Space Jump · Shift Run",
+  "退出预览 (Esc)": "Exit Preview (Esc)",
+  "退出预览": "Exit Preview",
+  "视野调整（拖动滑块实时预览，方便制作项目封面）": "FOV Adjust (drag the slider for a live preview, handy for project covers)",
+  "窄": "Narrow",
+  "宽": "Wide",
+  "取消": "Cancel",
+  "确定并保存": "Confirm & Save",
+  "选中": "Select",
+  "移动": "Move",
+  "旋转": "Rotate",
+  "多选": "Multi",
+  "放置": "Place",
+  "建组": "Group",
+  "组库": "Library",
+  "预览": "Preview",
+  "存档": "Saves",
+  "撤销": "Undo",
+  "UI缩放": "UI Scale",
+  "应用": "Apply",
+  "搜索组": "Search groups",
+  "暂无保存的组": "No saved groups",
+  "清空库": "Clear Library",
+  "菜单": "Menu",
+  "当前版本": "Current version",
+  "打开地图文件": "Open Map File",
+  "导出地图（JSON）": "Export Map (JSON)",
+  "上传到游戏（生成分享码）": "Upload to Game (get share code)",
+  "跨设备转移": "Cross-Device Transfer",
+  "精选地图": "Featured Maps",
+  "导出 GLTF（含贴图 · ZIP）": "Export GLTF (with textures · ZIP)",
+  "导入游戏教程": "Game Import Guide",
+  "导入 GLTF / GLB": "Import GLTF / GLB",
+  "导入 FBX": "Import FBX",
+  "重做": "Redo",
+  "视野调整（用于制作封面）": "FOV Adjust (for making covers)",
+  "重新看新手教程": "Replay Beginner Tutorial",
+  "查看更新历史": "View Update History",
+  "快捷键一览": "Shortcut Overview",
+  "制作人员": "Credits",
+  "快捷键 / 操作说明": "Shortcuts / Controls",
+  "组功能": "Group Features",
+  "选中多个物体 → 建组": "Select multiple objects → Group",
+  "点击「📦建组」打包": "Tap \"📦 Group\" to bundle them",
+  "点击组内物体": "Tap an object in a group",
+  "第一次选组，第二次穿透选单个": "First tap selects the group, second tap picks a single object",
+  "组 + 旋转": "Group + Rotate",
+  "以组中心为轴整体旋转": "Rotates the whole group around its center",
+  "保存组到本地，跨地图复用": "Save groups locally and reuse across maps",
+  "手机端": "Mobile",
+  "空白处拖动": "Drag on empty space",
+  "旋转视角": "Rotate camera",
+  "点按物体": "Tap an object",
+  "选中 / 穿透选中": "Select / select-through",
+  "拖动手柄": "Drag a handle",
+  "变换物体": "Transform the object",
+  "视角（桌面）": "Camera (Desktop)",
+  "右键拖动": "Right-drag",
+  "转视角": "Rotate camera",
+  "前后左右": "Forward/Back/Left/Right",
+  "空格": "Space",
+  "上升": "Ascend",
+  "下降": "Descend",
+  "滚轮": "Mouse wheel",
+  "沿视线前后": "Forward/back along view",
+  "选择": "Selection",
+  "左键": "Left click",
+  "Shift + 左键": "Shift + Left click",
+  "加选": "Add to selection",
+  "框选": "Box select",
+  "全选": "Select all",
+  "取消选择": "Deselect",
+  "原版制作人员和重置版部分功能作者：": "Original credits & author of some remake features: ",
+  "Jindinghe使用cloude": "Jindinghe (using Claude)",
+  "重制版：": "Remake: ",
+  "走位很呆使用Claude Sonnet 5和deepseek": "走位很呆 (using Claude Sonnet 5 and DeepSeek)",
+  "Bug反馈邮箱：": "Bug report email: ",
+  "放置物体": "Place Objects",
+  "方块": "Cube",
+  "球体": "Sphere",
+  "圆柱体": "Cylinder",
+  "圆锥": "Cone",
+  "六边形体": "Hexagonal Prism",
+  "斜坡": "Ramp",
+  "三角体": "Triangular Prism",
+  "游戏道具": "Game Props",
+  "出生点": "Spawn Point",
+  "存档管理": "Save Manager",
+  "搜索存档名称": "Search save names",
+  "当前关联存档：": "Linked save: ",
+  "暂无存档": "No saves yet",
+  "立即存档": "Save Now",
+  "将地图上传到云端，在另一台设备上下载": "Upload the map to the cloud and download it on another device",
+  "上传当前地图": "Upload Current Map",
+  "地图数据会保存 30天，大小上限 3MB": "Map data is kept for 30 days; size limit 3MB",
+  "或输入分享码下载：": "Or enter a share code to download: ",
+  "下载": "Download",
+  "关闭": "Close",
+  "将你编辑好的地图导入到 RagdollBox 游戏中": "Import your finished map into the RagdollBox game",
+  "我知道了": "Got it",
+  "新版本": "New Version",
+  "删除了瓦片贴图，这个功能带来的bug太多了…": "Removed tile textures — that feature caused too many bugs…",
+  "我知道了，开始编辑！": "Got it, start editing!",
+  "怎么选中物体": "How to select objects",
+  "在物体上": "On an object,",
+  "点一下": "tap once",
+  "，它就变橙色高亮了。": " and it turns orange.",
+  "想取消选中就点空白处。": "Tap empty space to deselect.",
+  "上一步": "Back",
+  "下一步": "Next",
+  "怎么移动/旋转/缩放": "How to move / rotate / scale",
+  "底部工具栏有四个按钮：": "The bottom toolbar has four buttons:",
+  "选中、移动、旋转、缩放": "Select, Move, Rotate, Scale",
+  "点一下切换工具，然后拖动物体上的红绿蓝手柄。": "Tap to switch tools, then drag the red/green/blue handles on the object.",
+  "怎么预览地图": "How to preview the map",
+  "点底部": "Tap the bottom",
+  "按钮，你就进入游戏视角了。": "button to enter play mode.",
+  "走路，": "to walk,",
+  "跳跃，": "to jump,",
+  "加速。": "to sprint.",
+  "按": "Press",
+  "退出预览。": "to exit preview.",
+  "怎么保存和导出": "How to save and export",
+  "顶部": "The top",
+  "按钮自动存到浏览器里。": "button auto-saves to your browser.",
+  "菜单里可以": "In the menu you can",
+  "导出为文件": "export as a file",
+  "，方便分享给别人。": ", which makes it easy to share with others.",
+  "组功能：选中多个物体点击": "Group feature: select multiple objects, then tap ",
+  "开始玩吧": "Let's go",
+  "单指拖动＝转视角 · 十字键移动 · ⇧跳 · ⇩下落": "One-finger drag = look · D-pad = move · ⇧ jump · ⇩ drop",
+  "导入模型": "Import Model",
+  "水体": "Water",
+  "光源": "Light",
+  "枪械": "Guns",
+  "至少选中2个物体才能建组": "Select at least 2 objects to group",
+  "选中的物体中至少2个不属于任何组": "At least 2 selected objects must not belong to any group",
+  "已创建组": "Group created",
+  "个物体": " objects",
+  "已解组": "Ungrouped",
+  "重生点": "Respawn Point",
+  "公告牌": "Notice Board",
+  "按钮": "Button",
+  "油桶": "Oil Drum",
+  "手机": "Phone",
+  "时钟": "Clock",
+  "电视": "TV",
+  "木箱": "Wooden Crate",
+  "铁桶": "Steel Barrel",
+  "爆炸油桶": "Explosive Barrel",
+  "旋转锯": "Spinning Saw",
+  "收音机": "Radio",
+  "摄像机": "Camera",
+  "绷带": "Bandage",
+  "小型医疗箱": "Small Medkit",
+  "中型医疗箱": "Medium Medkit",
+  "现金": "Cash",
+  "轻型弹药箱": "Light Ammo Box",
+  "存档空间不足": "Storage Full",
+  "当前地图可能较大，浏览器暂时无法自动保存。你可以在菜单里先「导出地图」备份，或精简地图后再试。": "The map may be large, so the browser can't auto-save right now. Back it up first via Menu → \"Export Map\", or slim the map down and try again.",
+  "我已知晓": "Got it"
+});
+// ---- 英文表 第2批 ----
+Object.assign(I18N_CFG.en, {
+  "重型弹药箱": "Heavy Ammo Box",
+  "狙击弹药箱": "Sniper Ammo Box",
+  "榴弹弹药箱": "Grenade Ammo Box",
+  "长木板": "Long Plank",
+  "台灯": "Desk Lamp",
+  "桌子": "Table",
+  "床": "Bed",
+  "防弹衣": "Body Armor",
+  "战术防弹衣": "Tactical Body Armor",
+  "战术头盔": "Tactical Helmet",
+  "重型头盔": "Heavy Helmet",
+  "轻型防弹衣": "Light Body Armor",
+  "重型防弹衣": "Heavy Body Armor",
+  "头戴式双眼夜视仪": "Head-Mounted Binocular Night Vision",
+  "旧式钢盔": "Old Steel Helmet",
+  "武警头盔": "Riot Police Helmet",
+  "武警头盔(带面罩)": "Riot Police Helmet (with Visor)",
+  "鸭舌帽": "Peaked Cap",
+  "鸭舌帽2": "Peaked Cap 2",
+  "牛仔帽": "Cowboy Hat",
+  "安全帽": "Hard Hat",
+  "艾路迪克口罩": "Ailudike Mask",
+  "口罩": "Face Mask",
+  "草帽": "Straw Hat",
+  "礼帽": "Fedora",
+  "高礼帽": "Top Hat",
+  "毛线帽": "Beanie",
+  "面具": "Mask",
+  "曲棍球面具": "Hockey Mask",
+  "面罩兜帽": "Face-Cover Hood",
+  "战术护目镜(红)": "Tactical Goggles (Red)",
+  "战术护目镜(绿)": "Tactical Goggles (Green)",
+  "战术护目镜(白)": "Tactical Goggles (White)",
+  "厨师帽": "Chef Hat",
+  "瘟疫医生面具": "Plague Doctor Mask",
+  "雷锋帽": "Ushanka",
+  "防毒面具": "Gas Mask",
+  "方块头套": "Block Head",
+  "军绿布帽": "Olive Cloth Cap",
+  "重型防毒面具": "Heavy Gas Mask",
+  "耳机": "Headphones",
+  "圣诞帽": "Santa Hat",
+  "潜水镜": "Diving Goggles",
+  "红色游泳圈": "Red Swim Ring",
+  "蓝色游泳圈": "Blue Swim Ring",
+  "工具枪": "Tool Gun",
+  "重力枪": "Gravity Gun",
+  "手电筒": "Flashlight",
+  "手枪": "Pistol",
+  "左轮手枪": "Revolver",
+  "冲锋枪": "SMG",
+  "波波沙": "PPSh",
+  "霰弹枪": "Shotgun",
+  "SPAS 霰弹枪": "SPAS Shotgun",
+  "突击步枪": "Assault Rifle",
+  "轻型狙击枪": "Light Sniper Rifle",
+  "狙击枪": "Sniper Rifle",
+  "钉枪": "Nail Gun",
+  "彩蛋枪": "Paintball Gun",
+  "手雷": "Grenade",
+  "摔炮手榴弹": "Snap-Pop Grenade",
+  "遥控炸弹": "Remote Bomb",
+  "地雷": "Landmine",
+  "菜刀": "Cleaver",
+  "回血药剂": "Health Potion",
+  "毒药": "Poison",
+  "止血针剂": "Bleed-Stop Injection",
+  "V5针剂": "V5 Injection",
+  "突击步枪B": "Assault Rifle B",
+  "M79 榴弹发射器": "M79 Grenade Launcher",
+  "撬棍": "Crowbar",
+  "军刀": "Combat Knife",
+  "警棍": "Baton",
+  "小医疗箱": "Small Medkit",
+  "已清理旧自动存档": "Old auto-save cleared",
+  "自动存档": "Auto-save",
+  "已保存": "Saved",
+  "这将清空当前舞台所有物体，确定要替换吗？": "This will clear all objects on stage. Replace them?",
+  "已加载存档": "Loaded save",
+  "未找到匹配的存档": "No matching saves",
+  "当前": "Current",
+  "创建": "Created",
+  "更新": "Updated",
+  "物体数": "Objects",
+  "加载": "Load",
+  "请输入新名称：": "Enter a new name:",
+  "已存在同名存档": "A save with that name already exists",
+  "已重命名": "Renamed",
+  "确定删除？": "Delete this?",
+  "已删除": "Deleted",
+  "无（纯色）": "None (solid color)",
+  "导入贴图": "Import Texture",
+  "透明玻璃": "Clear Glass",
+  "隐形（有碰撞）": "Invisible (with collision)",
+  "地面": "Ground",
+  "草地": "Grass",
+  "石砖": "Stone Brick",
+  "砖墙": "Brick Wall",
+  "涂料墙": "Painted Wall",
+  "屋顶瓦": "Roof Tiles",
+  "木板": "Wood Planks",
+  "金属": "Metal",
+  "瓷砖": "Ceramic Tile",
+  "沙地": "Sand",
+  "未知道具类型": "Unknown prop type",
+  "多选模式已开启": "Multi-select on",
+  "多选模式已关闭": "Multi-select off",
+  "成员": "Members",
+  "道具": "Props",
+  "已选中": "Selected",
+  "多个": "Multiple",
+  "请先选中一个物体": "Select an object first",
+  "整体调整 · 位置=中心坐标 · 旋转缩放=相对当前的整体变换 · 回车或失焦才生效": "Group adjust · Position = center coordinates · Rotate/Scale = relative whole-group transform · Applies on Enter or when focus leaves",
+  "该道具不支持缩放": "This prop does not support scaling",
+  "声音": "Sound",
+  "聚光灯": "Spotlight",
+  "点光源": "Point Light",
+  "已导入自定义贴图": "Custom texture imported",
+  "选中物体已设为物理物体": "Selected object is now a physics object",
+  "选中物体改回固定": "Selected object set back to static",
+  "先选中一个物体": "Select an object first",
+  "物体": "Object",
+  "选中的物体中有些已在组内，请先解组或选择不在组内的物体": "Some selected objects are already in a group. Ungroup them first, or select objects that are not in a group.",
+  "请先选中一个组": "Select a group first",
+  "请输入组的新名称：": "Enter a new group name:",
+  "已重命名为": "Renamed to",
+  "请选中一个组": "Select a group",
+  "组内至少需要2个物体": "A group needs at least 2 objects",
+  "已保存组到库": "Group saved to library",
+  "组数据无效": "Invalid group data",
+  "已放置组": "Group placed",
+  "未找到匹配的组": "No matching groups",
+  "选中一个组 → 属性面板点「保存到组库」": "Select a group → tap \"Save to Library\" in the properties panel",
+  "已存在同名的组": "A group with that name already exists",
+  "确定要从组库中删除这个组吗？": "Delete this group from the library?",
+  "确定要清空整个组库吗？": "Clear the entire library?",
+  "组库已清空": "Library cleared",
+  "已放置": "Placed",
+  "已单独选中": "Selected alone",
+  "已选中组": "Group selected",
+  "已对准": "Aligned",
+  "副本": "Copy",
+  "未命名地图": "Untitled Map",
+  "已导出": "Exported",
+  "个道具": " props",
+  "个出生点": " spawn points",
+  "没有出生点": "no spawn points",
+  "分享码": "Share code",
+  "在手机上打开游戏 → 选地图 → 添加地图，": "Open the game on your phone → Maps → Add Map,",
+  "把这串码输进去就能下载。": "enter this code to download it.",
+  "90天没人用会自动清掉": "Unused codes are cleared automatically after 90 days",
+  "知道了": "Got it",
+  "已复制": "Copied",
+  "地图太大（": "Map too large (",
+  "~MB，上限 3MB）": "MB, limit 3MB)",
+  "请精简地图后再试": "Please slim the map down and try again",
+  "正在上传": "Uploading",
+  "上传失败（": "Upload failed (",
+  "连不上服务器，检查网络": "Can't reach the server; check your network",
+  "上传中": "Uploading",
+  "序列化地图数据": "Serializing map data",
+  "上传到云端": "Uploading to cloud",
+  "上传成功": "Upload successful",
+  "分享这个码给其他设备，即可下载你的地图": "Share this code with another device to download your map",
+  "复制分享码": "Copy share code",
+  "上传失败": "Upload failed",
+  "未知错误": "Unknown error",
+  "网络错误": "Network error",
+  "请输入有效的分享码（4-8位）": "Please enter a valid share code (4-8 characters)",
+  "下载中": "Downloading",
+  "正在下载地图": "Downloading map",
+  "下载失败": "Download failed",
+  "JSON 解析失败": "JSON parse failed",
+  "无效的地图数据格式": "Invalid map data format",
+  "这将清空当前舞台所有物体，确定要加载新地图吗？": "This will clear all objects on stage. Load the new map?",
+  "已取消加载": "Load cancelled",
+  "已转移地图": "Map transferred",
+  "地图加载成功": "Map loaded",
+  "地图已从云端加载": "Map loaded from the cloud",
+  "加载失败": "Load failed",
+  "正在导出": "Exporting",
+  "没有可导出的物体": "No objects to export",
+  "GLTF 导出成功": "GLTF exported",
+  "GLTF 导出失败": "GLTF export failed",
+  "地图已打开": "Map opened",
+  "地图文件无效": "Invalid map file",
+  "不是RagdollBoxMap文件": "Not a RagdollBoxMap file",
+  "世界": "World",
+  "已切换为局部坐标系": "Switched to local coordinates",
+  "已切换为世界坐标系": "Switched to world coordinates",
+  "请选择.gltf或.glb主文件": "Please select the main .gltf or .glb file",
+  "GLTF已导入": "GLTF imported",
+  "导入失败": "Import failed",
+  "FBX 已导入": "FBX imported",
+  "FBX 已导入（自动缩放到": "FBX imported (auto-scaled to",
+  "FBX 导入失败": "FBX import failed",
+  "还没放出生点，从原点开始预览": "No spawn point placed; previewing from the origin",
+  "已退出预览": "Preview exited",
+  "掉进虚空了，回到出生点": "Fell into the void; back to spawn",
+  "被拳头攻击": "Hit by fist",
+  "被近战武器攻击": "Hit by melee weapon",
+  "被钝器攻击": "Hit by blunt weapon",
+  "被枪械射击": "Shot by firearm",
+  "产生碰撞": "On collision",
+  "在上面走路": "Walked on",
+  "循环播放": "Loop",
+  "任意": "Any",
+  "布娃娃": "Ragdoll",
+  "物品": "Item",
+  "层级": "Hierarchy",
+  "折叠/展开": "Collapse/Expand",
+  "搜索": "Search",
+  "个对象": " objects",
+  "没有匹配的对象": "No matching objects",
+  "场景还是空的": "The scene is empty",
+  "地形": "Terrain",
+  "场景": "Scene",
+  "游戏内容": "Game Content",
+  "游戏道具 / 枪械": "Game Props / Guns",
+  "从项目资源放模型": "Place a model from project assets",
+  "返回": "Back",
+  "搜索名称": "Search name",
+  "没有匹配的内容": "No matching content",
+  "项目资源": "Project Assets",
+  "添加贴图": "Add Texture",
+  "添加声音": "Add Sound",
+  "添加模型": "Add Model",
+  "已添加": "Added",
+  "个资源": " assets",
+  "还没有资源": "No assets yet",
+  "贴到选中": "Apply to Selected",
+  "试听": "Play",
+  "~\n\n有 ": "\n\nUsed in ",
+  "处在用（贴图": "places (textures",
+  "~· 声音": "· sounds",
+  "~· 天空盒": "· skybox",
+  "），会一起清掉。": "); they will be removed too.",
+  "删除资源「": "Delete asset \"",
+  "~共 ": "Total ",
+  "个资源，约": " assets, about",
+  "（资源会一起打进 .rbmap，太大会存不进浏览器）": " (Assets are bundled into the .rbmap; if it's too large the browser can't store it)",
+  "已贴到": "Applied to",
+  "选中的物体不能贴图": "The selected object can't take textures",
+  "放置失败": "Placement failed",
+  "物体声音": "Object Sounds",
+  "去项目资源导入声音": "Go to Project Assets to import sounds",
+  "先在项目资源里导入声音": "Import sounds in Project Assets first",
+  "这个类型不支持挂声音": "This type doesn't support attached sounds",
+  "当前物体：": "Current object: ",
+  "还没有声音": "No sounds yet",
+  "删": "Del",
+  "碰撞来源": "Collision source",
+  "音量": "Volume",
+  "半径": "Radius",
+  "间隔": "Interval",
+  "音调": "Pitch",
+  "项目设置": "Project Settings",
+  "环境光": "Ambient Light",
+  "天空光颜色": "Sky Light Color",
+  "地面反光颜色": "Ground Bounce Color",
+  "环境光强度": "Ambient Intensity",
+  "全局补光颜色": "Fill Light Color",
+  "全局补光强度": "Fill Light Intensity",
+  "太阳颜色": "Sun Color",
+  "太阳强度": "Sun Intensity",
+  "太阳方向 X/Y/Z": "Sun Direction X/Y/Z",
+  "太阳投影": "Sun Shadows",
+  "曝光": "Exposure",
+  "雾": "Fog",
+  "开启雾": "Enable Fog",
+  "雾颜色": "Fog Color",
+  "雾起点 / 终点": "Fog Start / End",
+  "天空盒": "Skybox",
+  "模式": "Mode",
+  "渐变天空": "Gradient Sky",
+  "纯色": "Solid Color",
+  "自定义全景图": "Custom Panorama",
+  "渐变 顶 / 中 / 底": "Gradient Top / Mid / Bottom",
+  "全景图资源": "Panorama Asset",
+  "地图下限（低于此高度＝虚空）": "Map floor (below this height = void)",
+  "资源与预览图": "Assets & Preview Image",
+  "用当前视角截图": "Screenshot Current View",
+  "选图片": "Choose Image",
+  "清除": "Clear",
+  "项目文件夹": "Project Folder",
+  "导出项目文件夹（.zip）": "Export Project Folder (.zip)",
+  "导入项目文件夹（.zip）": "Import Project Folder (.zip)",
+  "环境恢复默认": "Reset Environment to Default",
+  "环境已恢复默认": "Environment reset to default",
+  "未选择": "none selected",
+  "还没有预览图": "No preview image yet",
+  "已生成预览图": "Preview image generated",
+  "预览图已更新": "Preview image updated",
+  "不是有效的 zip 文件": "Not a valid zip file",
+  "压缩方式不支持": "Unsupported compression method",
+  "项目文件夹已导出": "Project folder exported",
+  "导出失败": "Export failed",
+  "压缩包里没找到 map.rbmap": "map.rbmap not found in the archive",
+  "map.rbmap 不是地图文件": "map.rbmap is not a map file",
+  "项目文件夹已导入": "Project folder imported",
+  "碰撞": "Collision",
+  "形状": "Shape",
+  "矩形": "Rectangle",
+  "圆形": "Circle",
+  "深度": "Depth",
+  "深水色": "Deep Water Color",
+  "浅水色": "Shallow Water Color",
+  "焦散": "Caustics",
+  "亮度": "Brightness",
+  "范围": "Range",
+  "衰减": "Falloff",
+  "张角": "Cone Angle",
+  "边缘柔化": "Edge Softness",
+  "投影": "Shadows",
+  "项目设置（环境光 / 天空盒 / 资源 / 预览图）": "Project Settings (Ambient / Skybox / Assets / Preview)",
+  "默认地面": "Default Ground",
+  "组功能已加载": "Group features loaded",
+  "组操作: 选中多个物体 → 建组 | 点击组内物体穿透选中 | 组旋转以组中心为轴": "Group ops: select multiple objects → Group | tap an object in a group to select through | groups rotate around their center",
+  "请输入 0.5 ~ 2.0 之间的数值": "Enter a value between 0.5 and 2.0",
+  "视野已保存": "FOV saved"
+});
+Object.assign(I18N_CFG.en, {
+  "对英语进行了支持": "Added English language support"
+});
+// ---- 英文表结束（后续批次插在此行之前）----
 </script>
 </body>
 </html>
