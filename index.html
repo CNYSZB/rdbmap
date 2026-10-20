@@ -432,6 +432,18 @@
       background: rgba(255,255,255,.08);
     }
 
+    /* ===== 层级栏底部拖拽手柄 ===== */
+    #hierGrip {
+      flex-shrink: 0; height: 22px; cursor: ns-resize; touch-action: none;
+      display: flex; align-items: center; justify-content: center;
+      border-top: 1px solid var(--line); background: rgba(255,255,255,.03);
+    }
+    #hierGrip i { display: block; width: 36px; height: 4px; border-radius: 2px; background: var(--muted); opacity: .6; }
+    #hierPanel.collapsed #hierGrip { display: none; }
+    #hierPanel.hierSized:not(.collapsed) { max-height: none; transition: width 0.2s; }
+    #hierPanel.hierSized:not(.collapsed) #hierList { max-height: none !important; flex: 1 1 auto; }
+    #hierPanel.collapsed { height: auto !important; }
+
     #hierPanel .hierBody {
   display: flex;
   flex-direction: column;
@@ -762,9 +774,9 @@
       </div>
       <div class="precise-row">
         <span class="precise-label">缩放</span>
-        <input id="preciseSX" type="number" step="0.05" min="0.05" class="precise-input" />
-        <input id="preciseSY" type="number" step="0.05" min="0.05" class="precise-input" />
-        <input id="preciseSZ" type="number" step="0.05" min="0.05" class="precise-input" />
+        <input id="preciseSX" type="number" step="0.01" min="0.001" class="precise-input" />
+        <input id="preciseSY" type="number" step="0.01" min="0.001" class="precise-input" />
+        <input id="preciseSZ" type="number" step="0.01" min="0.001" class="precise-input" />
       </div>
       <div id="preciseHint" style="font-size:10px;color:var(--muted);margin-top:4px;">改了就立即生效</div>
     </div>
@@ -949,6 +961,9 @@
       <div style="margin-top:10px;font-size:12px;color:var(--muted);text-align:center;">地图数据会保存 30天，大小上限 3MB</div>
     </div>
 
+    <button id="transferUploadGroupBtn" style="width:100%;padding:12px;border-radius:10px;font-size:14px;margin-bottom:6px;">📦 上传组（选中了组就传该组，否则传整个组库）</button>
+    <div style="margin:0 0 14px;font-size:12px;color:var(--muted);text-align:center;">另一台设备输入分享码下载，会自动存入组库</div>
+
     <div id="transferDownloadArea">
       <div style="font-size:13px;color:var(--muted);margin-bottom:8px;">或输入分享码下载：</div>
       <div class="input-group">
@@ -981,10 +996,17 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">6.0.0</div>
+    <div class="version" id="updateVersion">6.1.0</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li>对英语进行了支持</li>
+      <li>层级栏现在可以拖动底部调整高度，会自适应屏幕，不会挡住按钮</li>
+      <li>跨设备转移现在会保留组，并新增「上传组」：可单独传输选中的组或整个组库</li>
+      <li>修复组库放置、复制组时灯光等特殊物体失效的问题（旧组库里已存的灯需重新保存）</li>
+      <li>修复点击组时误选中组内物体的问题</li>
+      <li>修复撤销、读档后组可能被拆散的问题</li>
+      <li>精确输入：小数点不再被吞掉；缩放下限降为 0.001，输入时碰到下限会等输入完再修正</li>
+      <li>放置物体改为按范围放置：范围内放在准心命中处，范围外放在范围边界</li>
+      <li>如果遇到 bug，欢迎反馈！</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -1035,7 +1057,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-const APP_VERSION = '6.0.0';
+const APP_VERSION = '6.1.0';
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
@@ -1227,6 +1249,8 @@ var primitiveNames = {
   hex: '六边形体', ramp: '斜坡', triangle: '三角体', model: '导入模型',
   spawn: '出生点', water: '水体', light: '光源', gun: '枪械'
 };
+
+var SCALE_MIN = 0.001; // 缩放下限（原来是0.05，会强行改你输入的小数）
 
 var KIND_ICON = {
   object: '🟫', prop: '🎮', gun: '🔫', water: '💧', light: '💡', spawn: '🚩'
@@ -2225,25 +2249,39 @@ function createPrimitive(type, data) {
 
 var PLACE_LIFT = { spawn: SPAWN_BODY_LIFT, water: 0.02, light: 2.6, gun: 0.24, model: 0 };
 
+var PLACE_CFG = {
+  range: 60   // 放置范围(米)：范围内有物体→放在准心命中处；没有→放在这个距离的边界
+};
 function placementPoint(type) {
   var lift = PLACE_LIFT[type] !== undefined ? PLACE_LIFT[type] : 0.5;
   var dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-  var p = null;
+  var rng = PLACE_CFG.range;
+  var p = null, clampY = true;
   raycaster.set(camera.position, dir);
   var hits = raycaster.intersectObjects(objectsRoot.children, true);
-  if (hits.length && hits[0].distance < 90) {
-    p = hits[0].point.clone();
-    p.y += lift;
+  if (hits.length && hits[0].distance <= rng) {
+    var h = hits[0];
+    p = h.point.clone();
+    if (h.face && h.object) {
+      var nrm = h.face.normal.clone().transformDirection(h.object.matrixWorld);
+      p.addScaledVector(nrm, lift);
+    } else {
+      p.y += lift;
+    }
   }
   if (!p && dir.y < -0.02) {
     var t = (lift - camera.position.y) / dir.y;
-    if (t > 1 && t < 80) p = camera.position.clone().addScaledVector(dir, t);
+    if (t > 1 && t <= rng) p = camera.position.clone().addScaledVector(dir, t);
   }
-  if (!p) { p = camera.position.clone().addScaledVector(dir, 6); p.y = lift; }
+  if (!p) { // 范围内没有东西：放在范围边界，不再强行压到地面高度
+    p = camera.position.clone().addScaledVector(dir, rng);
+    clampY = false;
+  }
   p.x = Math.round(p.x * 2) / 2;
   p.z = Math.round(p.z * 2) / 2;
   if (type !== 'spawn' && type !== 'water' && type !== 'light') {
-    p.y = Math.max(lift, Math.round(p.y * 2) / 2);
+    p.y = Math.round(p.y * 2) / 2;
+    if (clampY) p.y = Math.max(lift, p.y);
   }
   return p.toArray();
 }
@@ -2522,6 +2560,12 @@ function getPreciseTarget() {
   return { mode: 'multi', members: selection.slice(), group: null };
 }
 
+function setPV(id, v) {
+  var el = document.getElementById(id);
+  if (!el || document.activeElement === el) return; // 正在输入的框不覆盖，避免小数点被吃掉
+  el.value = v;
+}
+
 function refreshPrecisePanel() {
   var panel = document.getElementById('precisePanel');
   var hint = document.getElementById('preciseHint');
@@ -2542,36 +2586,36 @@ function refreshPrecisePanel() {
     hint.textContent = '改了就立即生效';
     var single = target.obj;
     var pos = single.position, rot = single.rotation, scl = single.scale;
-    document.getElementById('preciseX').value = +pos.x.toFixed(3);
-    document.getElementById('preciseY').value = +pos.y.toFixed(3);
-    document.getElementById('preciseZ').value = +pos.z.toFixed(3);
-    document.getElementById('preciseRX').value = +(rot.x * RAD2DEG).toFixed(2);
-    document.getElementById('preciseRY').value = +(rot.y * RAD2DEG).toFixed(2);
-    document.getElementById('preciseRZ').value = +(rot.z * RAD2DEG).toFixed(2);
-    document.getElementById('preciseSX').value = +scl.x.toFixed(3);
-    document.getElementById('preciseSY').value = +scl.y.toFixed(3);
-    document.getElementById('preciseSZ').value = +scl.z.toFixed(3);
+    setPV('preciseX', +pos.x.toFixed(3));
+    setPV('preciseY', +pos.y.toFixed(3));
+    setPV('preciseZ', +pos.z.toFixed(3));
+    setPV('preciseRX', +(rot.x * RAD2DEG).toFixed(2));
+    setPV('preciseRY', +(rot.y * RAD2DEG).toFixed(2));
+    setPV('preciseRZ', +(rot.z * RAD2DEG).toFixed(2));
+    setPV('preciseSX', +scl.x.toFixed(3));
+    setPV('preciseSY', +scl.y.toFixed(3));
+    setPV('preciseSZ', +scl.z.toFixed(3));
   } else {
     panel.dataset.mixed = '1';
     var label = target.mode === 'group' ? '📦 组' : '多选';
     hint.textContent = label + '整体调整 · 位置=中心坐标 · 旋转缩放=相对当前的整体变换 · 回车或失焦才生效';
     syncProxyToSelection();
     var c = transformProxy.position;
-    document.getElementById('preciseX').value = +c.x.toFixed(3);
-    document.getElementById('preciseY').value = +c.y.toFixed(3);
-    document.getElementById('preciseZ').value = +c.z.toFixed(3);
-    document.getElementById('preciseRX').value = 0;
-    document.getElementById('preciseRY').value = 0;
-    document.getElementById('preciseRZ').value = 0;
-    document.getElementById('preciseSX').value = 1;
-    document.getElementById('preciseSY').value = 1;
-    document.getElementById('preciseSZ').value = 1;
+    setPV('preciseX', +c.x.toFixed(3));
+    setPV('preciseY', +c.y.toFixed(3));
+    setPV('preciseZ', +c.z.toFixed(3));
+    setPV('preciseRX', 0);
+    setPV('preciseRY', 0);
+    setPV('preciseRZ', 0);
+    setPV('preciseSX', 1);
+    setPV('preciseSY', 1);
+    setPV('preciseSZ', 1);
   }
   preciseSuppress = false;
 }
 
 function scaleMembersAroundWorldPoint(members, center, ratio, minScale) {
-  minScale = minScale || 0.05;
+  minScale = minScale || SCALE_MIN;
   for (var i = 0; i < members.length; i++) {
     var o = members[i];
     if (o.userData.isProp) continue;
@@ -2651,7 +2695,11 @@ function applyPreciseRotation() {
   }
 }
 
-function applyPreciseScale() {
+var SCALE_TYPING_WAIT = 1200; // 输入中碰到下限时，停手多久(毫秒)后再检查
+var _scaleFinalTimer = 0;
+function applyPreciseScale(e) {
+  var finalPass = !e || e.type !== 'input'; // 回车/失焦/计时到 = 输入完成
+  clearTimeout(_scaleFinalTimer);
   if (preciseSuppress) return;
   var target = getPreciseTarget();
   if (!target) return;
@@ -2659,12 +2707,18 @@ function applyPreciseScale() {
   var sy = parseFloat(document.getElementById('preciseSY').value);
   var sz = parseFloat(document.getElementById('preciseSZ').value);
   if (isNaN(sx) || isNaN(sy) || isNaN(sz)) return;
-  var MIN_SCALE = 0.05;
+  var MIN_SCALE = SCALE_MIN;
 
   if (target.mode === 'single') {
     var obj = target.obj;
     if (obj.userData.isProp) { toast('该道具不支持缩放'); return; }
-    obj.scale.set(Math.max(MIN_SCALE, sx), Math.max(MIN_SCALE, sy), Math.max(MIN_SCALE, sz));
+    if (!finalPass && (sx < MIN_SCALE || sy < MIN_SCALE || sz < MIN_SCALE)) {
+      // 输入过程中碰到下限：该轴先保持不变，等输入完再检查，仍低于下限才修正
+      obj.scale.set(sx < MIN_SCALE ? obj.scale.x : sx, sy < MIN_SCALE ? obj.scale.y : sy, sz < MIN_SCALE ? obj.scale.z : sz);
+      _scaleFinalTimer = setTimeout(function() { applyPreciseScale(); }, SCALE_TYPING_WAIT);
+    } else {
+      obj.scale.set(Math.max(MIN_SCALE, sx), Math.max(MIN_SCALE, sy), Math.max(MIN_SCALE, sz));
+    }
     afterPreciseTransform(obj);
   } else {
     if (sx === 1 && sy === 1 && sz === 1) return;
@@ -3022,19 +3076,56 @@ function renameGroupSelected() {
   toast('✅ 已重命名为: ' + commonGroup.name);
 }
 
+function serializeAny(o) {
+  var kind = objKindOf(o);
+  if (kind === 'gun') {
+    var q = o.quaternion;
+    return { k: 'gun', d: { id: o.userData.gunId, name: o.userData.mapName, p: roundArray(o.position.toArray()), q: roundArray([q.x, q.y, q.z, q.w]) } };
+  }
+  if (kind === 'water') return { k: 'water', d: serializeWater(o) };
+  if (kind === 'light') {
+    var ld = serializeLight(o);
+    ld.quaternion = roundArray(o.quaternion.toArray());
+    ld.scale = roundArray(o.scale.toArray());
+    return { k: 'light', d: ld };
+  }
+  if (kind === 'spawn') return { k: 'spawn', d: { p: roundArray(o.position.toArray()) } };
+  return { k: kind === 'prop' ? 'prop' : 'object', d: serializeObject(o) };
+}
+
+function restoreAny(it) {
+  if (!it) return null;
+  if (!it.k) return restoreObject(it); // 兼容旧版组库数据
+  var d = it.d || {};
+  if (it.k === 'gun') {
+    var g = createGun(d.id, { position: d.p || [0, 0.5, 0], name: d.name });
+    if (g && d.q && d.q.length === 4) g.quaternion.set(d.q[0], d.q[1], d.q[2], d.q[3]);
+    return g;
+  }
+  if (it.k === 'water') return createWater(d);
+  if (it.k === 'light') {
+    var l = createLight(d);
+    if (l) {
+      if (d.quaternion && d.quaternion.length === 4) l.quaternion.fromArray(d.quaternion);
+      if (d.scale && d.scale.length === 3) l.scale.fromArray(d.scale);
+    }
+    return l;
+  }
+  if (it.k === 'spawn') return createSpawn({ position: d.p || [0, 0.87, 0] });
+  return restoreObject(d);
+}
+
+function groupToLibData(group) {
+  var libData = { id: group.id, name: group.name, createdAt: new Date().toISOString(), items: [] };
+  for (var i = 0; i < group.members.length; i++) libData.items.push(serializeAny(group.members[i]));
+  return libData;
+}
+
 function saveGroupToLibrary() {
   var commonGroup = getCommonGroup();
   if (!commonGroup) { toast('请选中一个组'); return; }
   if (commonGroup.members.length < 2) { toast('组内至少需要2个物体'); return; }
-  var libData = {
-    id: commonGroup.id,
-    name: commonGroup.name,
-    createdAt: new Date().toISOString(),
-    objects: []
-  };
-  for (var i = 0; i < commonGroup.members.length; i++) {
-    libData.objects.push(serializeObject(commonGroup.members[i]));
-  }
+  var libData = groupToLibData(commonGroup);
   groupLibrary.save(libData);
   toast('✅ 已保存组到库: ' + commonGroup.name);
   refreshLibraryList();
@@ -3042,14 +3133,14 @@ function saveGroupToLibrary() {
 
 function placeGroupFromLibrary(libData) {
   var objects = [];
-  for (var i = 0; i < libData.objects.length; i++) {
-    var obj = restoreObject(libData.objects[i]);
+  var srcItems = libData.items || libData.objects || [];
+  for (var i = 0; i < srcItems.length; i++) {
+    var obj = restoreAny(srcItems[i]);
     if (obj) objects.push(obj);
   }
   if (objects.length < 2) { toast('组数据无效'); return; }
-  var dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-  var pos = camera.position.clone().addScaledVector(dir, 6);
-  pos.y = Math.max(0.5, pos.y);
+  var pa = placementPoint('box');
+  var pos = new THREE.Vector3(pa[0], pa[1], pa[2]);
   var center = new THREE.Vector3();
   for (var i = 0; i < objects.length; i++) center.add(objects[i].position);
   center.divideScalar(objects.length);
@@ -3080,7 +3171,7 @@ function refreshLibraryList() {
   var html = '';
   for (var i = 0; i < filtered.length; i++) {
     var g = filtered[i];
-    var count = g.objects ? g.objects.length : 0;
+    var count = (g.items || g.objects || []).length;
     var date = new Date(g.createdAt).toLocaleString('zh-CN');
     html += '<div class="library-item">';
     html += '<div class="lib-preview">📦</div>';
@@ -3330,9 +3421,9 @@ transform.addEventListener('objectChange', function() {
       var scaleVec = new THREE.Vector3(st.scale.x, st.scale.y, st.scale.z);
       scaleVec.applyQuaternion(worldQuat).multiply(ratio).applyQuaternion(invWorldQuat);
       o.scale.set(
-        Math.max(0.05, Math.abs(scaleVec.x)),
-        Math.max(0.05, Math.abs(scaleVec.y)),
-        Math.max(0.05, Math.abs(scaleVec.z))
+        Math.max(SCALE_MIN, Math.abs(scaleVec.x)),
+        Math.max(SCALE_MIN, Math.abs(scaleVec.y)),
+        Math.max(SCALE_MIN, Math.abs(scaleVec.z))
       );
     }
     if (commonGroup) {
@@ -3370,9 +3461,9 @@ transform.addEventListener('objectChange', function() {
       } else if (currentTool === 'scale') {
         if (o.userData.isProp) continue;
         o.scale.set(
-          Math.max(0.05, st.scale.x * ratio.x),
-          Math.max(0.05, st.scale.y * ratio.y),
-          Math.max(0.05, st.scale.z * ratio.z)
+          Math.max(SCALE_MIN, st.scale.x * ratio.x),
+          Math.max(SCALE_MIN, st.scale.y * ratio.y),
+          Math.max(SCALE_MIN, st.scale.z * ratio.z)
         );
       }
     }
@@ -3599,7 +3690,9 @@ renderer.domElement.addEventListener('pointerup', function(e) {
     if (hitObj) {
       var group = groupManager.getGroupOfObject(hitObj);
       if (group && !additive) {
-        if (_lastSelectedGroup === group) {
+        var cg0 = getCommonGroup();
+        var onlyInner = selection.length === 1 && groupManager.getGroupOfObject(selection[0]) === group;
+        if (cg0 === group || onlyInner) {
           selectObject(hitObj);
           toast('🔍 已单独选中: ' + (hitObj.userData.mapName || '物体'));
         } else {
@@ -3864,7 +3957,9 @@ function duplicateOneObject(obj) {
   if (kind === 'light') {
     var ld = serializeLight(obj);
     ld.name += ' 副本';
-    return createLight(ld);
+    var nl = createLight(ld);
+    if (nl) { nl.quaternion.copy(obj.quaternion); nl.scale.copy(obj.scale); }
+    return nl;
   }
   if (kind === 'spawn') {
     return createSpawn({ position: obj.position.toArray() });
@@ -4318,7 +4413,6 @@ document.getElementById('transferUploadBtn').onclick = async function() {
   try {
     var mapData = serializeMap();
     var exportData = JSON.parse(JSON.stringify(mapData));
-    delete exportData.groups;
     var jsonStr = JSON.stringify(exportData);
     var raw = new TextEncoder().encode(jsonStr);
 
@@ -4369,6 +4463,47 @@ document.getElementById('transferUploadBtn').onclick = async function() {
 
   btn.disabled = false;
   btn.textContent = '📤 上传当前地图';
+};
+
+document.getElementById('transferUploadGroupBtn').onclick = async function() {
+  var btn = this;
+  var result = document.getElementById('transferResult');
+  var content = document.getElementById('transferResultContent');
+  var pack = { format: 'RagdollBoxGroupPack', version: 1, groups: [] };
+  var cg = getCommonGroup();
+  pack.groups = cg ? [groupToLibData(cg)] : groupLibrary.getAll();
+  result.style.display = 'block';
+  if (!pack.groups.length) {
+    content.innerHTML = '<div style="color:var(--danger);">❌ 没有可上传的组：请先选中一个组，或先把组保存到组库</div>';
+    return;
+  }
+  btn.disabled = true;
+  content.innerHTML = '<div style="color:var(--muted);">📤 上传中...</div>';
+  try {
+    var raw = new TextEncoder().encode(JSON.stringify(pack));
+    var body = raw;
+    if (typeof CompressionStream === 'function') {
+      try {
+        var stream = new Blob([raw]).stream().pipeThrough(new CompressionStream('gzip'));
+        body = new Uint8Array(await new Response(stream).arrayBuffer());
+      } catch (_e) {}
+    }
+    if (body.length > 3 * 1024 * 1024) {
+      content.innerHTML = '<div style="color:var(--danger);">❌ 数据太大（上限 3MB）</div>';
+    } else {
+      var resp = await fetch(TRANSFER_BASE + '/put', { method: 'POST', headers: { 'content-type': 'application/octet-stream' }, mode: 'cors', body: body });
+      var res = await resp.json();
+      if (res.ok && res.code) {
+        content.innerHTML = '<div style="text-align:center;"><div style="font-size:13px;color:var(--accent);margin-bottom:6px;">✅ 已上传组数：' + pack.groups.length + '</div>' +
+          '<div style="font-family:ui-monospace,monospace;font-size:32px;letter-spacing:10px;padding:12px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:8px;user-select:all;color:var(--accent);">' + res.code + '</div></div>';
+      } else {
+        content.innerHTML = '<div style="color:var(--danger);">❌ 上传失败：' + (res.msg || '未知错误') + '</div>';
+      }
+    }
+  } catch (err) {
+    content.innerHTML = '<div style="color:var(--danger);">❌ 网络错误：' + err.message + '</div>';
+  }
+  btn.disabled = false;
 };
 
 document.getElementById('transferDownloadBtn').onclick = async function() {
@@ -4435,6 +4570,16 @@ document.getElementById('transferDownloadBtn').onclick = async function() {
 
     if (mapData.ok === false) {
       content.innerHTML = '<div style="color:var(--danger);">❌ 下载失败：' + (mapData.msg || '未知错误') + '</div>';
+      btn.disabled = false;
+      btn.textContent = '📥 下载';
+      return;
+    }
+
+    if (mapData.format === 'RagdollBoxGroupPack') {
+      var gs = Array.isArray(mapData.groups) ? mapData.groups : [];
+      for (var gi = 0; gi < gs.length; gi++) groupLibrary.save(gs[gi]);
+      refreshLibraryList();
+      content.innerHTML = '<div style="color:var(--accent);">✅ 已导入组数：' + gs.length + '<br><span style="font-size:12px;color:var(--muted);">到「组库」里点放置即可</span></div>';
       btn.disabled = false;
       btn.textContent = '📥 下载';
       return;
@@ -4665,36 +4810,37 @@ function loadMapData(d, rh) {
   var lists = { object: [], prop: [], gun: [], water: [], light: [], spawn: [] };
   for (var i = 0; i < objs.length; i++) {
     var o = objs[i];
-    if (!o || o.type === 'spawn') continue;
+    if (!o || o.type === 'spawn') { lists.object.push(null); continue; }
     var obj = restoreObject(o);
-    if (obj) lists.object.push(obj);
+    lists.object.push(obj || null);
   }
   for (var i2 = 0; i2 < props.length; i2++) {
     var p = props[i2];
-    if (!p || !p.id) continue;
+    if (!p || !p.id) { lists.prop.push(null); continue; }
     if (p.id === 'water') {
       createWater({ position: p.p || [0, 0, 0], sizeX: 10, sizeZ: 10, depth: 2.4 });
+      lists.prop.push(null);
       continue;
     }
-    if (!PROP_DEFS[p.id]) continue;
+    if (!PROP_DEFS[p.id]) { lists.prop.push(null); continue; }
     var pobj = restoreObject(p);
-    if (pobj) lists.prop.push(pobj);
+    lists.prop.push(pobj || null);
   }
   for (var i3 = 0; i3 < guns.length; i3++) {
     var g = guns[i3];
-    if (!g || !g.id) continue;
+    if (!g || !g.id) { lists.gun.push(null); continue; }
     var gobj = createGun(g.id, { position: g.p || [0, 0.5, 0] });
-    if (!gobj) continue;
+    if (!gobj) { lists.gun.push(null); continue; }
     if (g.q && g.q.length === 4) gobj.quaternion.set(g.q[0], g.q[1], g.q[2], g.q[3]);
     lists.gun.push(gobj);
   }
   for (var i4 = 0; i4 < waters.length; i4++) {
     var w = createWater(waters[i4]);
-    if (w) lists.water.push(w);
+    lists.water.push(w || null);
   }
   for (var i5 = 0; i5 < lights.length; i5++) {
     var l = createLight(lights[i5]);
-    if (l) lists.light.push(l);
+    lists.light.push(l || null);
   }
   for (var i6 = 0; i6 < spawns.length; i6++) {
     var sp = spawns[i6];
@@ -6084,7 +6230,8 @@ function buildHierarchy() {
     '<input id="hierSearch" type="text" placeholder="🔍 搜索…" />' +
     '<div id="hierList"></div>' +
     '<div class="hierFoot"><span id="hierCount">0 个对象</span></div>' +
-    '</div>';
+    '</div>' +
+    '<div id="hierGrip" title="拖动调整高度"><i></i></div>';
   document.getElementById('app').appendChild(hierPanel);
   hierList = hierPanel.querySelector('#hierList');
   hierSearch = hierPanel.querySelector('#hierSearch');
@@ -6105,6 +6252,67 @@ function buildHierarchy() {
   };
 
   if (hierCollapsed) hierPanel.classList.add('collapsed');
+  setupHierResize();
+}
+
+// ===== 层级栏高度拖拽（自适应；只会被挤小，不会自动恢复）=====
+var HIER_RESIZE_CFG = {
+  minH: 110,     // 面板最小高度(px)
+  gap: 8         // 距离下方按钮/屏幕底边的安全间隙(px)
+};
+var hierUserH = null; // 用户设定的高度（未拖过为 null，沿用原自适应）
+
+function hierScale() {
+  var r = hierPanel.getBoundingClientRect();
+  return (hierPanel.offsetHeight && r.height) ? r.height / hierPanel.offsetHeight : 1;
+}
+function hierMaxH() {
+  var r = hierPanel.getBoundingClientRect();
+  var limit = window.innerHeight - HIER_RESIZE_CFG.gap;
+  var bar = document.getElementById('bottomBar');
+  if (bar) {
+    for (var i = 0; i < bar.children.length; i++) {
+      var b = bar.children[i].getBoundingClientRect();
+      if (!b.width || !b.height) continue;
+      if (b.right <= r.left || b.left >= r.right) continue; // 水平不重叠则不挡
+      if (b.top - HIER_RESIZE_CFG.gap < limit) limit = b.top - HIER_RESIZE_CFG.gap;
+    }
+  }
+  return Math.max(60, (limit - r.top) / hierScale());
+}
+function hierApplyH(h) {
+  hierPanel.classList.add('hierSized');
+  hierPanel.style.height = h + 'px';
+}
+function hierReclamp() {
+  if (hierUserH == null || hierCollapsed) return;
+  hierUserH = Math.min(hierUserH, hierMaxH()); // 只往下压，切回来也不恢复
+  hierApplyH(hierUserH);
+}
+function setupHierResize() {
+  var grip = hierPanel.querySelector('#hierGrip');
+  var startY = 0, startH = 0, sc = 1, dragging = false;
+  grip.addEventListener('pointerdown', function(e) {
+    e.preventDefault(); e.stopPropagation();
+    dragging = true;
+    sc = hierScale();
+    startY = e.clientY;
+    startH = hierPanel.offsetHeight;
+    try { grip.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  grip.addEventListener('pointermove', function(e) {
+    if (!dragging) return;
+    e.preventDefault(); e.stopPropagation();
+    var h = startH + (e.clientY - startY) / sc;
+    h = Math.max(HIER_RESIZE_CFG.minH, Math.min(h, hierMaxH())); // 超限则静默停住
+    hierUserH = h;
+    hierApplyH(h);
+  });
+  function end(e) { dragging = false; try { grip.releasePointerCapture(e.pointerId); } catch (_) {} }
+  grip.addEventListener('pointerup', end);
+  grip.addEventListener('pointercancel', end);
+  window.addEventListener('resize', function() { hierReclamp(); setTimeout(hierReclamp, 250); });
+  window.addEventListener('orientationchange', function() { setTimeout(hierReclamp, 300); });
 }
 
 function objKindOf(o) {
@@ -8336,6 +8544,26 @@ Object.assign(I18N_CFG.en, {
 });
 Object.assign(I18N_CFG.en, {
   "对英语进行了支持": "Added English language support"
+});
+Object.assign(I18N_CFG.en, {
+  "层级栏现在可以拖动底部调整高度，会自适应屏幕，不会挡住按钮": "The hierarchy panel can now be resized by dragging its bottom edge; it adapts to the screen and never covers the buttons",
+  "跨设备转移现在会保留组，并新增「上传组」：可单独传输选中的组或整个组库": "Cross-device transfer now keeps groups, and a new \"Upload Group(s)\" option sends the selected group or the whole library",
+  "修复组库放置、复制组时灯光等特殊物体失效的问题（旧组库里已存的灯需重新保存）": "Fixed lights and other special objects breaking when placing from the library or copying groups (lights already stored in the old library must be saved again)",
+  "修复点击组时误选中组内物体的问题": "Fixed clicking a group sometimes selecting an object inside it instead",
+  "修复撤销、读档后组可能被拆散的问题": "Fixed groups possibly breaking apart after undo or loading a save",
+  "精确输入：小数点不再被吞掉；缩放下限降为 0.001，输入时碰到下限会等输入完再修正": "Precise input: decimal points are no longer swallowed; the scale minimum is now 0.001, and hitting it while typing is only corrected once you finish typing",
+  "放置物体改为按范围放置：范围内放在准心命中处，范围外放在范围边界": "Placement now uses a range: objects go where the crosshair hits within range, or at the range boundary if nothing is hit",
+  "📦 上传组（选中了组就传该组，否则传整个组库）": "📦 Upload Group(s) (selected group, or the whole library if none selected)",
+  "另一台设备输入分享码下载，会自动存入组库": "Download on another device with the share code; groups are saved into the library automatically",
+  "没有可上传的组：请先选中一个组，或先把组保存到组库": "No groups to upload: select a group first, or save groups to the library",
+  "数据太大（上限 3MB）": "Data too large (limit 3MB)",
+  "已上传组数：": "Groups uploaded: ",
+  "已导入组数：": "Groups imported: ",
+  "到「组库」里点放置即可": "Open the Library and tap Place to use them",
+  "拖动调整高度": "Drag to resize height"
+});
+Object.assign(I18N_CFG.en, {
+  "如果遇到 bug，欢迎反馈！": "If you run into any bugs, please let us know!"
 });
 // ---- 英文表结束（后续批次插在此行之前）----
 </script>
