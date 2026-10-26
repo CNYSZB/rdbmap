@@ -1001,6 +1001,7 @@
     <ul class="changelog" id="updateChangelog">
       <li>删除水：ragdollbox2 加入水之前将不支持放置水，但已有的地图水仍然能够编辑</li>
       <li>修复了跨设备传输地图时组会变成一整个物体，而不是它原本的样子的 bug</li>
+      <li>修复了放置物体时 Y 轴被强制压到世界地面的问题，现在完全以屏幕中心的准心为准</li>
       <li>如果遇到 bug，欢迎反馈！</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
@@ -8618,7 +8619,7 @@ Object.assign(I18N_CFG.en, {
 Object.assign(I18N_CFG.en, {
   "删除水：ragdollbox2 加入水之前将不支持放置水，但已有的地图水仍然能够编辑": "Water removed: placing water is no longer supported until water is added to RagdollBox 2, but water already in existing maps can still be edited",
   "修复了跨设备传输地图时组会变成一整个物体，而不是它原本的样子的 bug": "Fixed a bug where groups turned into a single object instead of staying as they were when transferring a map across devices",
-  "如果遇到 bug，欢迎反馈！": "If you run into any bugs, feel free to report them!"
+  "修复了放置物体时 Y 轴被强制压到世界地面的问题，现在完全以屏幕中心的准心为准": "Fixed an issue where the Y axis was forced down to world ground level when placing objects; placement now follows the center crosshair exactly"
 });
 // ---- 英文表结束（后续批次插在此行之前）----
 </script>
