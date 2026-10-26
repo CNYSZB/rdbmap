@@ -1,0 +1,1311 @@
+{
+	"ambience": {
+		"beds": {
+			"air": "amb_air.ogg",
+			"field": "amb_field.ogg",
+			"town": "amb_town.ogg"
+		},
+		"fade": 4.0,
+		"profiles": [
+			{
+				"beds": {
+					"air": -3.0,
+					"field": 0.0
+				},
+				"en": "Field",
+				"id": "field",
+				"n": "田野"
+			},
+			{
+				"beds": {
+					"air": 0.0
+				},
+				"en": "Outdoor",
+				"id": "outdoor",
+				"n": "户外"
+			},
+			{
+				"beds": {
+					"air": -5.0,
+					"town": 0.0
+				},
+				"en": "Town",
+				"id": "town",
+				"n": "城镇"
+			},
+			{
+				"beds": {
+					"air": 0.0
+				},
+				"en": "Arena",
+				"id": "arena",
+				"n": "竞技场"
+			}
+		]
+	},
+	"categories": [
+		{
+			"en": "Props",
+			"id": "props",
+			"n": "道具",
+			"sections": [
+				[
+					"interior",
+					"家具",
+					"Furniture"
+				],
+				[
+					"clutter",
+					"杂物",
+					"Clutter"
+				],
+				[
+					"scene",
+					"场景",
+					"Scene"
+				]
+			]
+		},
+		{
+			"en": "Entities",
+			"id": "entities",
+			"n": "实体",
+			"sections": [
+				[
+					"explosive",
+					"爆炸物",
+					"Explosives"
+				]
+			]
+		},
+		{
+			"en": "Dolls",
+			"id": "npcs",
+			"n": "人偶",
+			"sections": [
+				[
+					"dolls",
+					"人偶",
+					"Dolls"
+				],
+				[
+					"npc",
+					"NPC",
+					""
+				]
+			]
+		},
+		{
+			"en": "Items",
+			"id": "items",
+			"n": "物品",
+			"sections": [
+				[
+					"medical",
+					"医疗",
+					"Medical"
+				]
+			]
+		},
+		{
+			"en": "Vehicle",
+			"id": "vehicles",
+			"n": "载具",
+			"sections": [
+				[
+					"cars",
+					"汽车",
+					"Cars"
+				]
+			]
+		},
+		{
+			"en": "Weapons",
+			"id": "weapons",
+			"n": "武器",
+			"sections": [
+				[
+					"primary",
+					"主武器",
+					"Primary"
+				],
+				[
+					"secondary",
+					"副武器",
+					"Secondary"
+				]
+			]
+		}
+	],
+	"format": "RagdollBox2Kit",
+	"items": [
+		{
+			"box": [
+				-1.04,
+				-0.065,
+				-1.04,
+				1.04,
+				0.0706,
+				1.04
+			],
+			"cat": "props",
+			"en": "Spawn pad",
+			"id": "spawnpoint",
+			"kind": "prop",
+			"model": "spawnpoint.glb",
+			"n": "重生点",
+			"sec": "scene"
+		},
+		{
+			"box": [
+				-0.4998,
+				-0.4203,
+				-1.0323,
+				0.4998,
+				0.4203,
+				1.0323
+			],
+			"cat": "props",
+			"en": "Table",
+			"icon": "table.png",
+			"id": "table",
+			"kind": "prop",
+			"model": "table.glb",
+			"n": "桌子",
+			"sec": "interior"
+		},
+		{
+			"box": [
+				-0.5461,
+				-0.2928,
+				-1.155,
+				0.5461,
+				0.2928,
+				1.155
+			],
+			"cat": "props",
+			"en": "Bed",
+			"icon": "bed.png",
+			"id": "bed",
+			"kind": "prop",
+			"model": "bed.glb",
+			"n": "床",
+			"sec": "interior"
+		},
+		{
+			"box": [
+				-0.6207,
+				-0.2364,
+				-1.0845,
+				0.6207,
+				0.2364,
+				1.0845
+			],
+			"cat": "props",
+			"en": "Wooden bed",
+			"icon": "plankbed.png",
+			"id": "plankbed",
+			"kind": "prop",
+			"model": "plankbed.glb",
+			"n": "木床",
+			"sec": "interior"
+		},
+		{
+			"box": [
+				-0.2639,
+				-0.9565,
+				-0.2636,
+				0.2639,
+				0.9565,
+				0.2636
+			],
+			"cat": "props",
+			"en": "Floor lamp",
+			"icon": "lamp.png",
+			"id": "lamp",
+			"kind": "prop",
+			"model": "lamp.glb",
+			"n": "台灯",
+			"sec": "interior"
+		},
+		{
+			"box": [
+				-0.6,
+				-0.327,
+				-0.0357,
+				0.6,
+				0.327,
+				0.0357
+			],
+			"cat": "props",
+			"en": "TV",
+			"icon": "tv.png",
+			"id": "tv",
+			"kind": "prop",
+			"model": "tv.glb",
+			"n": "电视",
+			"sec": "interior"
+		},
+		{
+			"box": [
+				-0.3265,
+				-0.2785,
+				-0.1079,
+				0.3265,
+				0.2785,
+				0.1079
+			],
+			"cat": "props",
+			"en": "Monitor",
+			"icon": "monitor.png",
+			"id": "monitor",
+			"kind": "prop",
+			"model": "monitor.glb",
+			"n": "显示器",
+			"sec": "interior"
+		},
+		{
+			"box": [
+				-0.214,
+				-0.225,
+				-0.0262,
+				0.214,
+				0.225,
+				0.0262
+			],
+			"cat": "props",
+			"en": "Clock",
+			"icon": "clock.png",
+			"id": "clock",
+			"kind": "prop",
+			"model": "clock.glb",
+			"n": "时钟",
+			"sec": "interior"
+		},
+		{
+			"box": [
+				-0.1829,
+				-0.2175,
+				-0.0716,
+				0.1829,
+				0.2175,
+				0.0715
+			],
+			"cat": "props",
+			"en": "Radio",
+			"icon": "radio.png",
+			"id": "radio",
+			"kind": "prop",
+			"model": "radio.glb",
+			"n": "收音机",
+			"sec": "interior"
+		},
+		{
+			"box": [
+				-0.5,
+				-0.4991,
+				-0.4991,
+				0.5,
+				0.4991,
+				0.4991
+			],
+			"cat": "props",
+			"en": "Crate",
+			"icon": "crate.png",
+			"id": "crate",
+			"kind": "prop",
+			"model": "crate.glb",
+			"n": "木箱",
+			"sec": "clutter"
+		},
+		{
+			"box": [
+				-0.3697,
+				-0.525,
+				-0.3697,
+				0.3697,
+				0.525,
+				0.3697
+			],
+			"cat": "props",
+			"en": "Steel drum",
+			"icon": "barrel.png",
+			"id": "barrel",
+			"kind": "prop",
+			"model": "barrel.glb",
+			"n": "铁桶",
+			"sec": "clutter"
+		},
+		{
+			"box": [
+				-0.1664,
+				-0.0128,
+				-1.0197,
+				0.1664,
+				0.0128,
+				1.0197
+			],
+			"cat": "props",
+			"en": "Long plank",
+			"icon": "plank.png",
+			"id": "plank",
+			"kind": "prop",
+			"model": "plank.glb",
+			"n": "长木板",
+			"sec": "clutter"
+		},
+		{
+			"box": [
+				-0.0146,
+				-0.0272,
+				-0.0165,
+				0.0146,
+				0.0272,
+				0.0165
+			],
+			"cat": "props",
+			"en": "Nail",
+			"icon": "nail.png",
+			"id": "nail",
+			"kind": "prop",
+			"model": "nail.glb",
+			"n": "钉子",
+			"sec": "clutter"
+		},
+		{
+			"box": [
+				-0.95,
+				-0.575,
+				-0.054,
+				0.95,
+				0.575,
+				0.054
+			],
+			"cat": "props",
+			"en": "Notice board",
+			"icon": "board.png",
+			"id": "board",
+			"kind": "prop",
+			"model": "board.glb",
+			"n": "公告牌",
+			"sec": "clutter"
+		},
+		{
+			"box": [
+				-0.1423,
+				-0.79,
+				-0.1466,
+				0.1423,
+				0.79,
+				0.1466
+			],
+			"cat": "props",
+			"en": "Camera",
+			"icon": "camera.png",
+			"id": "camera",
+			"kind": "prop",
+			"model": "camera.glb",
+			"n": "摄像机",
+			"sec": "clutter"
+		},
+		{
+			"box": [
+				-0.0481,
+				-0.08,
+				-0.0089,
+				0.0481,
+				0.08,
+				0.0089
+			],
+			"cat": "props",
+			"en": "Phone",
+			"icon": "phone.png",
+			"id": "phone",
+			"kind": "prop",
+			"model": "phone.glb",
+			"n": "手机",
+			"sec": "clutter"
+		},
+		{
+			"box": [
+				-0.044,
+				-0.0075,
+				-0.08,
+				0.044,
+				0.0075,
+				0.08
+			],
+			"cat": "props",
+			"en": "Smartphone",
+			"icon": "smartphone.png",
+			"id": "smartphone",
+			"kind": "prop",
+			"model": "smartphone.glb",
+			"n": "智能手机",
+			"sec": "clutter"
+		},
+		{
+			"box": [
+				-0.0823,
+				-0.16,
+				-0.0259,
+				0.0823,
+				0.16,
+				0.0259
+			],
+			"cat": "props",
+			"en": "Button",
+			"icon": "button.png",
+			"id": "button",
+			"kind": "prop",
+			"model": "button.glb",
+			"n": "按钮",
+			"sec": "clutter"
+		},
+		{
+			"box": [
+				-0.3713,
+				-0.525,
+				-0.3713,
+				0.3713,
+				0.525,
+				0.3713
+			],
+			"cat": "entities",
+			"en": "Explosive barrel",
+			"icon": "explbarrel.png",
+			"id": "explbarrel",
+			"kind": "prop",
+			"model": "explbarrel.glb",
+			"n": "爆炸桶",
+			"sec": "explosive"
+		},
+		{
+			"box": [
+				-0.3713,
+				-0.525,
+				-0.3713,
+				0.3713,
+				0.525,
+				0.3713
+			],
+			"cat": "entities",
+			"en": "Oil drum",
+			"icon": "oil.png",
+			"id": "oil",
+			"kind": "prop",
+			"model": "oil.glb",
+			"n": "石油桶",
+			"sec": "explosive"
+		},
+		{
+			"box": [
+				-0.3345,
+				0.0,
+				-0.17,
+				0.3345,
+				1.96,
+				0.14
+			],
+			"cat": "npcs",
+			"en": "Default doll",
+			"icon": "doll.png",
+			"id": "doll",
+			"kind": "npc",
+			"model": "doll.glb",
+			"n": "默认人偶",
+			"sec": "dolls"
+		},
+		{
+			"box": [
+				-0.3345,
+				0.0,
+				-0.17,
+				0.3345,
+				1.96,
+				0.14
+			],
+			"cat": "npcs",
+			"en": "Civilian",
+			"icon": "npc.png",
+			"id": "npc",
+			"kind": "npc",
+			"model": "npc.glb",
+			"n": "平民",
+			"sec": "npc"
+		},
+		{
+			"box": [
+				-0.3345,
+				0.0,
+				-0.17,
+				0.3345,
+				1.96,
+				0.14
+			],
+			"cat": "npcs",
+			"en": "Civilian 2",
+			"id": "npc_civilian2",
+			"kind": "npc",
+			"model": "npc_civilian2.glb",
+			"n": "平民2",
+			"sec": "npc"
+		},
+		{
+			"box": [
+				-0.3345,
+				0.0,
+				-0.2543,
+				0.3345,
+				2.0734,
+				0.2544
+			],
+			"cat": "npcs",
+			"en": "Armed civilian",
+			"icon": "npc_armed.png",
+			"id": "npc_armed",
+			"kind": "npc",
+			"model": "npc_armed.glb",
+			"n": "武装平民",
+			"sec": "npc"
+		},
+		{
+			"box": [
+				-0.3345,
+				0.0,
+				-0.17,
+				0.3345,
+				1.96,
+				0.1843
+			],
+			"cat": "npcs",
+			"en": "Militia",
+			"icon": "npc_militia.png",
+			"id": "npc_militia",
+			"kind": "npc",
+			"model": "npc_militia.glb",
+			"n": "民兵",
+			"sec": "npc"
+		},
+		{
+			"box": [
+				-0.3345,
+				0.0,
+				-0.17,
+				0.4016,
+				1.96,
+				0.173
+			],
+			"cat": "npcs",
+			"en": "SWAT",
+			"icon": "npc_police.png",
+			"id": "npc_police",
+			"kind": "npc",
+			"model": "npc_police.glb",
+			"n": "特警",
+			"sec": "npc"
+		},
+		{
+			"box": [
+				-0.3345,
+				0.0,
+				-0.17,
+				0.4341,
+				1.96,
+				0.14
+			],
+			"cat": "npcs",
+			"en": "Thug",
+			"icon": "npc_thug.png",
+			"id": "npc_thug",
+			"kind": "npc",
+			"model": "npc_thug.glb",
+			"n": "暴徒",
+			"sec": "npc"
+		},
+		{
+			"box": [
+				-0.33,
+				0.0,
+				-0.17,
+				0.33,
+				1.96,
+				0.14
+			],
+			"cat": "npcs",
+			"en": "Brute",
+			"id": "npc_villain",
+			"kind": "npc",
+			"model": "npc_villain.glb",
+			"n": "恶棍",
+			"sec": "npc"
+		},
+		{
+			"box": [
+				-0.3345,
+				0.0,
+				-0.17,
+				0.3345,
+				1.96,
+				0.1843
+			],
+			"cat": "npcs",
+			"en": "Militant",
+			"icon": "npc_militant.png",
+			"id": "npc_militant",
+			"kind": "npc",
+			"model": "npc_militant.glb",
+			"n": "武装分子",
+			"sec": "npc"
+		},
+		{
+			"box": [
+				-0.3345,
+				0.0,
+				-0.17,
+				0.4341,
+				1.96,
+				0.14
+			],
+			"cat": "npcs",
+			"en": "Maniac",
+			"icon": "npc_maniac.png",
+			"id": "npc_maniac",
+			"kind": "npc",
+			"model": "npc_maniac.glb",
+			"n": "疯子",
+			"sec": "npc"
+		},
+		{
+			"box": [
+				-0.3541,
+				0.0005,
+				-0.3662,
+				0.4181,
+				1.9245,
+				0.2347
+			],
+			"cat": "npcs",
+			"en": "Zombie",
+			"icon": "npc_zombie.png",
+			"id": "npc_zombie",
+			"kind": "npc",
+			"model": "npc_zombie.glb",
+			"n": "丧尸",
+			"sec": "npc"
+		},
+		{
+			"box": [
+				-0.115,
+				-0.1031,
+				-0.0667,
+				0.115,
+				0.1031,
+				0.0667
+			],
+			"cat": "items",
+			"en": "Bandage",
+			"icon": "bandage.png",
+			"id": "bandage",
+			"kind": "prop",
+			"model": "bandage.glb",
+			"n": "绷带",
+			"sec": "medical"
+		},
+		{
+			"box": [
+				-0.18,
+				-0.0343,
+				-0.154,
+				0.18,
+				0.0343,
+				0.154
+			],
+			"cat": "items",
+			"en": "Small medkit",
+			"icon": "smallmed.png",
+			"id": "smallmed",
+			"kind": "prop",
+			"model": "smallmed.glb",
+			"n": "小型医疗箱",
+			"sec": "medical"
+		},
+		{
+			"box": [
+				-0.25,
+				-0.0477,
+				-0.2139,
+				0.25,
+				0.0477,
+				0.2139
+			],
+			"cat": "items",
+			"en": "Medium medkit",
+			"icon": "medmed.png",
+			"id": "medmed",
+			"kind": "prop",
+			"model": "medmed.glb",
+			"n": "中型医疗箱",
+			"sec": "medical"
+		},
+		{
+			"box": [
+				-0.0421,
+				-0.0712,
+				-0.0421,
+				0.0421,
+				0.0712,
+				0.0421
+			],
+			"cat": "items",
+			"en": "Painkillers",
+			"icon": "painkiller.png",
+			"id": "painkiller",
+			"kind": "prop",
+			"model": "painkiller.glb",
+			"n": "止痛药",
+			"sec": "medical"
+		},
+		{
+			"box": [
+				-1.2161,
+				-0.0055,
+				-2.4605,
+				1.2166,
+				1.8479,
+				2.6381
+			],
+			"cat": "vehicles",
+			"en": "Sedan",
+			"icon": "sedan.png",
+			"id": "sedan",
+			"kind": "vehicle",
+			"model": "sedan.glb",
+			"n": "轿车",
+			"sec": "cars"
+		},
+		{
+			"box": [
+				-0.039,
+				-0.2051,
+				-0.4375,
+				0.0253,
+				0.0542,
+				0.4373
+			],
+			"cat": "weapons",
+			"en": "",
+			"icon": "AK47.png",
+			"id": "AK47",
+			"kind": "weapon",
+			"model": "AK47.glb",
+			"n": "AK-47",
+			"sec": "primary"
+		},
+		{
+			"box": [
+				-0.03,
+				-0.188,
+				-0.4997,
+				0.037,
+				0.0682,
+				0.4991
+			],
+			"cat": "weapons",
+			"en": "",
+			"icon": "M16.png",
+			"id": "M16",
+			"kind": "weapon",
+			"model": "M16.glb",
+			"n": "M16A2",
+			"sec": "primary"
+		},
+		{
+			"box": [
+				-0.0524,
+				-0.1754,
+				-0.5002,
+				0.0302,
+				0.088,
+				0.2886
+			],
+			"cat": "weapons",
+			"en": "",
+			"icon": "AUG.png",
+			"id": "AUG",
+			"kind": "weapon",
+			"model": "AUG.glb",
+			"n": "AUG A1",
+			"sec": "primary"
+		},
+		{
+			"box": [
+				-0.0417,
+				-0.1296,
+				-0.6097,
+				0.04,
+				0.102,
+				0.6099
+			],
+			"cat": "weapons",
+			"en": "",
+			"icon": "SVD.png",
+			"id": "SVD",
+			"kind": "weapon",
+			"model": "SVD.glb",
+			"n": "SVD",
+			"sec": "primary"
+		},
+		{
+			"box": [
+				-0.0241,
+				-0.1618,
+				-0.4878,
+				0.0241,
+				0.0219,
+				0.4882
+			],
+			"cat": "weapons",
+			"en": "",
+			"icon": "M870.png",
+			"id": "M870",
+			"kind": "weapon",
+			"model": "M870.glb",
+			"n": "M870",
+			"sec": "primary"
+		},
+		{
+			"box": [
+				-0.0265,
+				-0.1922,
+				-0.2079,
+				0.0265,
+				0.0842,
+				0.4288
+			],
+			"cat": "weapons",
+			"en": "",
+			"icon": "MP7.png",
+			"id": "MP7",
+			"kind": "weapon",
+			"model": "MP7.glb",
+			"n": "MP7A1",
+			"sec": "primary"
+		},
+		{
+			"box": [
+				-0.0349,
+				-0.2789,
+				-0.1667,
+				0.0349,
+				0.0464,
+				0.1459
+			],
+			"cat": "weapons",
+			"en": "",
+			"icon": "MAC10.png",
+			"id": "MAC10",
+			"kind": "weapon",
+			"model": "MAC10.glb",
+			"n": "MAC-10",
+			"sec": "primary"
+		},
+		{
+			"box": [
+				-0.4498,
+				-0.1349,
+				-0.1571,
+				0.4503,
+				0.1351,
+				0.157
+			],
+			"cat": "weapons",
+			"en": "Crowbar",
+			"icon": "Crowbar.png",
+			"id": "Crowbar",
+			"kind": "weapon",
+			"model": "Crowbar.glb",
+			"n": "撬棍",
+			"sec": "primary"
+		},
+		{
+			"box": [
+				-0.0172,
+				-0.1233,
+				-0.101,
+				0.0181,
+				0.017,
+				0.1001
+			],
+			"cat": "weapons",
+			"en": "",
+			"icon": "Glock17.png",
+			"id": "Glock17",
+			"kind": "weapon",
+			"model": "Glock17.glb",
+			"n": "Glock 17",
+			"sec": "secondary"
+		},
+		{
+			"box": [
+				-0.0172,
+				-0.2086,
+				-0.1007,
+				0.0189,
+				0.0417,
+				0.1175
+			],
+			"cat": "weapons",
+			"en": "",
+			"icon": "Glock18.png",
+			"id": "Glock18",
+			"kind": "weapon",
+			"model": "Glock18.glb",
+			"n": "Glock 18",
+			"sec": "secondary"
+		},
+		{
+			"box": [
+				-0.0211,
+				-0.1091,
+				-0.1481,
+				0.0192,
+				0.0322,
+				0.1429
+			],
+			"cat": "weapons",
+			"en": "",
+			"icon": "ColtPython.png",
+			"id": "ColtPython",
+			"kind": "weapon",
+			"model": "ColtPython.glb",
+			"n": "Colt Python",
+			"sec": "secondary"
+		},
+		{
+			"box": [
+				-0.02,
+				-0.1251,
+				-0.1364,
+				0.0204,
+				0.0342,
+				0.1362
+			],
+			"cat": "weapons",
+			"en": "",
+			"icon": "DesertEagle.png",
+			"id": "DesertEagle",
+			"kind": "weapon",
+			"model": "DesertEagle.glb",
+			"n": "Desert Eagle",
+			"sec": "secondary"
+		},
+		{
+			"box": [
+				-0.0193,
+				-0.1247,
+				-0.1085,
+				0.0193,
+				0.0122,
+				0.1081
+			],
+			"cat": "weapons",
+			"en": "",
+			"icon": "Beretta92FS.png",
+			"id": "Beretta92FS",
+			"kind": "weapon",
+			"model": "Beretta92FS.glb",
+			"n": "Beretta 92FS",
+			"sec": "secondary"
+		},
+		{
+			"box": [
+				-0.0265,
+				-0.1922,
+				-0.2079,
+				0.0265,
+				0.0842,
+				0.2058
+			],
+			"cat": "weapons",
+			"en": "MP7A1 Folded",
+			"icon": "MP7Folded.png",
+			"id": "MP7Folded",
+			"kind": "weapon",
+			"model": "MP7Folded.glb",
+			"n": "MP7A1 折叠",
+			"sec": "secondary"
+		},
+		{
+			"box": [
+				-0.0086,
+				-0.0199,
+				-0.3159,
+				0.0087,
+				0.0323,
+				0.0841
+			],
+			"cat": "weapons",
+			"en": "Combat Knife",
+			"icon": "Knife.png",
+			"id": "Knife",
+			"kind": "weapon",
+			"model": "Knife.glb",
+			"n": "军刀",
+			"sec": "secondary"
+		},
+		{
+			"box": [
+				-0.004,
+				-0.0187,
+				-0.3204,
+				0.0041,
+				0.0186,
+				0.0396
+			],
+			"cat": "weapons",
+			"en": "Dagger",
+			"icon": "Dagger.png",
+			"id": "Dagger",
+			"kind": "weapon",
+			"model": "Dagger.glb",
+			"n": "匕首",
+			"sec": "secondary"
+		}
+	],
+	"sky": {
+		"multiscatter": {
+			"file": "multiscatter.bin",
+			"h": 32.0,
+			"w": 32.0
+		},
+		"noise_a": "noise_a.png",
+		"noise_rgb": "noise_rgb.png",
+		"transmittance": {
+			"file": "transmittance.bin",
+			"h": 64.0,
+			"w": 256.0
+		}
+	},
+	"sounds": [
+		{
+			"en": "Footstep · Concrete",
+			"file": "foot_walk_concrete.wav",
+			"id": "game:foot_walk_concrete",
+			"n": "脚步 · 混凝土"
+		},
+		{
+			"en": "Footstep · Wood",
+			"file": "foot_walk_wood.wav",
+			"id": "game:foot_walk_wood",
+			"n": "脚步 · 木头"
+		},
+		{
+			"en": "Footstep · Metal",
+			"file": "foot_walk_metal.wav",
+			"id": "game:foot_walk_metal",
+			"n": "脚步 · 金属"
+		},
+		{
+			"en": "Run · Concrete",
+			"file": "foot_run_concrete.wav",
+			"id": "game:foot_run_concrete",
+			"n": "跑步 · 混凝土"
+		},
+		{
+			"en": "Run · Wood",
+			"file": "foot_run_wood.wav",
+			"id": "game:foot_run_wood",
+			"n": "跑步 · 木头"
+		},
+		{
+			"en": "Run · Metal",
+			"file": "foot_run_metal.wav",
+			"id": "game:foot_run_metal",
+			"n": "跑步 · 金属"
+		},
+		{
+			"en": "Landing",
+			"file": "char_land_concrete.wav",
+			"id": "game:char_land_concrete",
+			"n": "落地"
+		},
+		{
+			"en": "Jump",
+			"file": "char_jump_concrete.wav",
+			"id": "game:char_jump_concrete",
+			"n": "起跳"
+		},
+		{
+			"en": "Melee Hit · Concrete",
+			"file": "melee_hit_concrete.wav",
+			"id": "game:melee_hit_concrete",
+			"n": "近战击中 · 混凝土"
+		},
+		{
+			"en": "Melee Hit · Wood",
+			"file": "melee_hit_wood.wav",
+			"id": "game:melee_hit_wood",
+			"n": "近战击中 · 木头"
+		},
+		{
+			"en": "Melee Hit · Metal",
+			"file": "melee_hit_metal.wav",
+			"id": "game:melee_hit_metal",
+			"n": "近战击中 · 金属"
+		},
+		{
+			"en": "Melee Hit · Flesh",
+			"file": "melee_hit_flesh.wav",
+			"id": "game:melee_hit_flesh",
+			"n": "近战击中 · 肉体"
+		},
+		{
+			"en": "Punch Hit",
+			"file": "fist_hit.mp3",
+			"id": "game:fist_hit",
+			"n": "拳头击中"
+		},
+		{
+			"en": "Bullet Hit · Wood",
+			"file": "impact_bullet_wood.wav",
+			"id": "game:impact_bullet_wood",
+			"n": "子弹击中 · 木头"
+		},
+		{
+			"en": "Body Impact",
+			"file": "body_hit.wav",
+			"id": "game:body_hit",
+			"n": "身体撞击"
+		},
+		{
+			"en": "Metal Drop",
+			"file": "mag_pistol_drop_hard.wav",
+			"id": "game:mag_pistol_drop_hard",
+			"n": "金属掉落"
+		},
+		{
+			"en": "Debris",
+			"file": "explosion_debris.wav",
+			"id": "game:explosion_debris",
+			"n": "碎片落下"
+		},
+		{
+			"en": "Bump · Light",
+			"file": "veh_bump.wav",
+			"id": "game:veh_bump",
+			"n": "碰撞 · 轻"
+		},
+		{
+			"en": "Crash · Heavy",
+			"file": "veh_crash.wav",
+			"id": "game:veh_crash",
+			"n": "碰撞 · 重"
+		},
+		{
+			"en": "Glass Crack",
+			"file": "veh_glass_crack.wav",
+			"id": "game:veh_glass_crack",
+			"n": "玻璃裂开"
+		},
+		{
+			"en": "Glass Shatter",
+			"file": "veh_glass_shatter.wav",
+			"id": "game:veh_glass_shatter",
+			"n": "玻璃碎裂"
+		},
+		{
+			"en": "Horn",
+			"file": "veh_horn.wav",
+			"id": "game:veh_horn",
+			"n": "喇叭"
+		},
+		{
+			"en": "Engine (Loop)",
+			"file": "veh_engine_low.wav",
+			"id": "game:veh_engine_low",
+			"n": "引擎（循环）"
+		},
+		{
+			"en": "Scrape (Loop)",
+			"file": "slide_loop.wav",
+			"id": "game:slide_loop",
+			"n": "摩擦（循环）"
+		},
+		{
+			"en": "Blood Splash",
+			"file": "blood_splash.wav",
+			"id": "game:blood_splash",
+			"n": "血溅"
+		},
+		{
+			"en": "Gore",
+			"file": "gore_chunk.wav",
+			"id": "game:gore_chunk",
+			"n": "血肉"
+		}
+	],
+	"textures": [
+		{
+			"file": "stone.jpg",
+			"id": "stone",
+			"rough": 0.82,
+			"size": 1024.0
+		},
+		{
+			"file": "brick.jpg",
+			"id": "brick",
+			"rough": 0.82,
+			"size": 1024.0
+		},
+		{
+			"file": "plaster.jpg",
+			"id": "plaster",
+			"rough": 0.82,
+			"size": 1024.0
+		},
+		{
+			"file": "roof.jpg",
+			"id": "roof",
+			"rough": 0.82,
+			"size": 1024.0
+		},
+		{
+			"file": "wood.jpg",
+			"id": "wood",
+			"rough": 0.82,
+			"size": 1024.0
+		},
+		{
+			"file": "metal.jpg",
+			"id": "metal",
+			"rough": 0.82,
+			"size": 1024.0
+		},
+		{
+			"file": "tile.jpg",
+			"id": "tile",
+			"rough": 0.82,
+			"size": 1024.0
+		},
+		{
+			"file": "grass.jpg",
+			"id": "grass",
+			"rough": 0.82,
+			"size": 1024.0
+		},
+		{
+			"file": "sand.jpg",
+			"id": "sand",
+			"rough": 0.82,
+			"size": 1024.0
+		},
+		{
+			"file": "ground.jpg",
+			"id": "ground",
+			"rough": 0.95,
+			"size": 1024.0
+		}
+	],
+	"version": 1
+}
