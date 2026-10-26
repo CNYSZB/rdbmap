@@ -856,7 +856,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 6.0.0</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 6.2.0</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
@@ -996,16 +996,11 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">6.1.0</div>
+    <div class="version" id="updateVersion">6.2.0</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li>层级栏现在可以拖动底部调整高度，会自适应屏幕，不会挡住按钮</li>
-      <li>跨设备转移现在会保留组，并新增「上传组」：可单独传输选中的组或整个组库</li>
-      <li>修复组库放置、复制组时灯光等特殊物体失效的问题（旧组库里已存的灯需重新保存）</li>
-      <li>修复点击组时误选中组内物体的问题</li>
-      <li>修复撤销、读档后组可能被拆散的问题</li>
-      <li>精确输入：小数点不再被吞掉；缩放下限降为 0.001，输入时碰到下限会等输入完再修正</li>
-      <li>放置物体改为按范围放置：范围内放在准心命中处，范围外放在范围边界</li>
+      <li>删除水：ragdollbox2 加入水之前将不支持放置水，但已有的地图水仍然能够编辑</li>
+      <li>修复了跨设备传输地图时组会变成一整个物体，而不是它原本的样子的 bug</li>
       <li>如果遇到 bug，欢迎反馈！</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
@@ -1057,7 +1052,16 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-const APP_VERSION = '6.1.0';
+const APP_VERSION = '6.2.0';
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║ 【水体放置开关】搜索关键字：WATER_PLACEMENT_ENABLED            ║
+// ║  false = UI 里隐藏「水体」放置按钮（默认，水被"表面删除"）     ║
+// ║  true  = 恢复「水体」放置按钮                                  ║
+// ║  只影响"放置新水体"的入口；地图里已有的水照常读取/渲染/编辑/   ║
+// ║  保存/传输，不受此开关影响。                                   ║
+// ╚══════════════════════════════════════════════════════════════╝
+const WATER_PLACEMENT_ENABLED = false;
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
@@ -2250,7 +2254,11 @@ function createPrimitive(type, data) {
 var PLACE_LIFT = { spawn: SPAWN_BODY_LIFT, water: 0.02, light: 2.6, gun: 0.24, model: 0 };
 
 var PLACE_CFG = {
-  range: 60   // 放置范围(米)：范围内有物体→放在准心命中处；没有→放在这个距离的边界
+  range: 60,  // 放置范围(米)：范围内有物体→放在准心命中处；没有→放在这个距离的边界
+  // 【地面辅助】搜索关键字：groundAssist
+  // false = 完全以准心射线为准，Y 轴不会被压到世界地面（默认）
+  // true  = 旧行为：准心没打到物体且朝下看时，强制落到地面高度，并限制 Y 不低于抬升值
+  groundAssist: false
 };
 function placementPoint(type) {
   var lift = PLACE_LIFT[type] !== undefined ? PLACE_LIFT[type] : 0.5;
@@ -2269,7 +2277,7 @@ function placementPoint(type) {
       p.y += lift;
     }
   }
-  if (!p && dir.y < -0.02) {
+  if (!p && PLACE_CFG.groundAssist && dir.y < -0.02) {
     var t = (lift - camera.position.y) / dir.y;
     if (t > 1 && t <= rng) p = camera.position.clone().addScaledVector(dir, t);
   }
@@ -2281,7 +2289,7 @@ function placementPoint(type) {
   p.z = Math.round(p.z * 2) / 2;
   if (type !== 'spawn' && type !== 'water' && type !== 'light') {
     p.y = Math.round(p.y * 2) / 2;
-    if (clampY) p.y = Math.max(lift, p.y);
+    if (clampY && PLACE_CFG.groundAssist) p.y = Math.max(lift, p.y);
   }
   return p.toArray();
 }
@@ -4197,6 +4205,12 @@ function spawnMarkers() {
   return result;
 }
 
+function stripGroupTags(d) {
+  ['objects', 'props', 'guns', 'waters', 'lights'].forEach(function(k) {
+    (d[k] || []).forEach(function(x) { if (x) { delete x.grp; delete x.grpName; } });
+  });
+}
+
 function serializeMap(opt) {
   opt = opt || {};
   var marks = spawnMarkers();
@@ -4242,6 +4256,19 @@ function serializeMap(opt) {
     }
   }
   var groupsData = groupManager.serializeGroups(lists);
+  // [v6.2] 冗余：给每个组成员打 grp 标签，防止 groups 索引表在传输中丢失/错位导致组散架或合并
+  var tagArrays = { object: objects, prop: props, gun: guns, water: waters, light: lights };
+  for (var tgi = 0; tgi < groupManager.groups.length; tgi++) {
+    var tgG = groupManager.groups[tgi];
+    for (var tgj = 0; tgj < tgG.members.length; tgj++) {
+      var tgK = objKindOf(tgG.members[tgj]);
+      var tgIdx = (lists[tgK] || []).indexOf(tgG.members[tgj]);
+      if (tagArrays[tgK] && tgIdx !== -1 && tagArrays[tgK][tgIdx]) {
+        tagArrays[tgK][tgIdx].grp = tgG.id;
+        tagArrays[tgK][tgIdx].grpName = tgG.name;
+      }
+    }
+  }
   var mapData = {
     format: 'RagdollBoxMap',
     version: 3,
@@ -4298,6 +4325,7 @@ function exportMap() {
   d.name = saveName;
   var exportData = JSON.parse(JSON.stringify(d));
   delete exportData.groups;
+  stripGroupTags(exportData);
   download(saveName + '.rbmap', JSON.stringify(exportData));
   var n = d.spawns ? d.spawns.length : 0;
   var propCount = d.props ? d.props.length : 0;
@@ -4345,6 +4373,7 @@ async function uploadMapToGame() {
   var name = getCurrentSaveName();
   var exportData = JSON.parse(JSON.stringify(d));
   delete exportData.groups;
+  stripGroupTags(exportData);
   exportData.name = name;
   var raw = new TextEncoder().encode(JSON.stringify(exportData));
 
@@ -4850,6 +4879,23 @@ function loadMapData(d, rh) {
   }
   if (groupsData.length > 0 && groupManager) {
     groupManager.deserializeGroups(groupsData, lists);
+  }
+  // [v6.2] 兜底：按成员上的 grp 标签重建没能还原的组
+  if (groupManager) {
+    var tagSrc = { object: objs, prop: props, gun: guns, water: waters, light: lights };
+    var byGrp = {}, grpOrder = [];
+    for (var tk in tagSrc) {
+      for (var ti = 0; ti < tagSrc[tk].length; ti++) {
+        var td = tagSrc[tk][ti], tobj = lists[tk][ti];
+        if (!td || !td.grp || !tobj || groupManager.isObjectInGroup(tobj)) continue;
+        if (!byGrp[td.grp]) { byGrp[td.grp] = { name: td.grpName, members: [] }; grpOrder.push(td.grp); }
+        byGrp[td.grp].members.push(tobj);
+      }
+    }
+    for (var go = 0; go < grpOrder.length; go++) {
+      var gm = byGrp[grpOrder[go]];
+      if (gm.members.length >= 2) groupManager.createGroup(gm.members, gm.name);
+    }
   }
   syncWaterLighting();
   refreshHierarchy();
@@ -6517,9 +6563,12 @@ function buildPlacePanel() {
   sc.appendChild(tileButton('出生点', primitiveThumb('spawn'), function() {
     placeAndSelect(createPrimitive('spawn'));
   }));
-  sc.appendChild(tileButton('水体', primitiveThumb('water'), function() {
-    placeAndSelect(createWater(), '水体');
-  }));
+  // 【水体放置入口】由顶部 WATER_PLACEMENT_ENABLED 控制（搜索该关键字即可修改）
+  if (WATER_PLACEMENT_ENABLED) {
+    sc.appendChild(tileButton('水体', primitiveThumb('water'), function() {
+      placeAndSelect(createWater(), '水体');
+    }));
+  }
   sc.appendChild(tileButton('点光源', primitiveThumb('light'), function() {
     placeAndSelect(createLight({ type: 'point' }), '点光源');
   }));
@@ -8564,6 +8613,12 @@ Object.assign(I18N_CFG.en, {
 });
 Object.assign(I18N_CFG.en, {
   "如果遇到 bug，欢迎反馈！": "If you run into any bugs, please let us know!"
+});
+// ---- v6.2.0 ----
+Object.assign(I18N_CFG.en, {
+  "删除水：ragdollbox2 加入水之前将不支持放置水，但已有的地图水仍然能够编辑": "Water removed: placing water is no longer supported until water is added to RagdollBox 2, but water already in existing maps can still be edited",
+  "修复了跨设备传输地图时组会变成一整个物体，而不是它原本的样子的 bug": "Fixed a bug where groups turned into a single object instead of staying as they were when transferring a map across devices",
+  "如果遇到 bug，欢迎反馈！": "If you run into any bugs, feel free to report them!"
 });
 // ---- 英文表结束（后续批次插在此行之前）----
 </script>
