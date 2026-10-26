@@ -1051,7 +1051,7 @@ import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 const APP_VERSION = '6.2.0';
 
@@ -1166,6 +1166,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 viewport.prepend(renderer.domElement);
+THREE.ShaderChunk.fog_vertex = '#ifdef USE_FOG\n\tvFogDepth = length( mvPosition.xyz );\n#endif';
 
 var scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9cbcd8);
@@ -1201,8 +1202,66 @@ outlinePass.pulsePeriod = 0;
 outlinePass.visibleEdgeColor.set(0xff9a3c);
 outlinePass.hiddenEdgeColor.set(0x000000);
 composer.addPass(outlinePass);
-var outputPass = new OutputPass();
-composer.addPass(outputPass);
+var TONE_GLSL = `
+uniform sampler2D tDiffuse;
+uniform float uExposure;
+uniform float uWhite;
+uniform int uMode;
+varying vec2 vUv;
+
+vec3 tm_filmic(vec3 color, float white) {
+  const float bias = 2.0;
+  const float A = 0.22 * bias * bias;
+  const float B = 0.30 * bias;
+  const float C = 0.10;
+  const float D = 0.20;
+  const float E = 0.01;
+  const float F = 0.30;
+  vec3 c = ((color * (A * color + C * B) + D * E) / (color * (A * color + B) + D * F)) - E / F;
+  float w = ((white * (A * white + C * B) + D * E) / (white * (A * white + B) + D * F)) - E / F;
+  return c / w;
+}
+
+vec3 tm_aces(vec3 color, float white) {
+  const float bias = 1.8;
+  const float A = 0.0245786;
+  const float B = 0.000090537;
+  const float C = 0.983729;
+  const float D = 0.432951;
+  const float E = 0.238081;
+  mat3 rgb_to_rrt = mat3(
+    vec3(0.59719 * bias, 0.35458 * bias, 0.04823 * bias),
+    vec3(0.07600 * bias, 0.90834 * bias, 0.01566 * bias),
+    vec3(0.02840 * bias, 0.13383 * bias, 0.83777 * bias));
+  mat3 odt_to_rgb = mat3(
+    vec3(1.60475, -0.53108, -0.07367),
+    vec3(-0.10208, 1.10813, -0.00605),
+    vec3(-0.00327, -0.07276, 1.07602));
+  color *= rgb_to_rrt;
+  vec3 c = (color * (color + A) - B) / (color * (C * color + D) + E);
+  c *= odt_to_rgb;
+  float w = white * bias;
+  float wt = (w * (w + A) - B) / (w * (C * w + D) + E);
+  return c / wt;
+}
+
+vec3 to_srgb(vec3 c) {
+  return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(vec3(0.0031308), c));
+}
+
+void main() {
+  vec3 c = max(texture2D(tDiffuse, vUv).rgb * uExposure, vec3(0.0));
+  if (uMode == 1) c = tm_filmic(c, uWhite);
+  else if (uMode == 2) c = tm_aces(c, uWhite);
+  gl_FragColor = vec4(to_srgb(clamp(c, 0.0, 1.0)), 1.0);
+}
+`;
+var tonePass = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uExposure: { value: 1 }, uWhite: { value: 1 }, uMode: { value: 0 } },
+  vertexShader: 'varying vec2 vUv;\nvoid main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: TONE_GLSL
+});
+composer.addPass(tonePass);
 
 var objectsRoot = new THREE.Group();
 scene.add(objectsRoot);
@@ -1252,13 +1311,14 @@ var shiftHeld = false;
 var primitiveNames = {
   box: '方块', sphere: '球体', cylinder: '圆柱体', cone: '圆锥',
   hex: '六边形体', ramp: '斜坡', triangle: '三角体', model: '导入模型',
-  spawn: '出生点', water: '水体', light: '光源', gun: '枪械'
+  torus: '圆环', capsule: '胶囊', stairs: '台阶', arch: '拱', tube: '空心管', halfcyl: '半圆柱', pyramid: '棱锥',
+  spawn: '出生点', water: '水体', light: '光源', gun: '枪械', door: '门'
 };
 
 var SCALE_MIN = 0.001; // 缩放下限（原来是0.05，会强行改你输入的小数）
 
 var KIND_ICON = {
-  object: '🟫', prop: '🎮', gun: '🔫', water: '💧', light: '💡', spawn: '🚩'
+  object: '🟫', prop: '🎮', gun: '🔫', water: '💧', light: '💡', spawn: '🚩', door: '🚪'
 };
 
 class GroupManager {
@@ -1471,30 +1531,200 @@ class GroupLibrary {
 var groupManager = new GroupManager();
 var groupLibrary = new GroupLibrary();
 
-var GAME_ITEMS = [{"id":"spawnpoint","n":"重生点","s":"box","d":[2.08,0.13,2.08],"c":"#2fd06a"},{"id":"board","n":"公告牌","s":"box","d":[1.9,1.15,0.1],"c":"#4a3a28"},{"id":"button","n":"按钮","s":"box","d":[0.165,0.32,0.052],"c":"#555555"},{"id":"oil","n":"油桶","s":"cyl","d":[1.05,0.48],"c":"#59636a"},{"id":"phone","n":"手机","s":"box","d":[0.096,0.16,0.018],"c":"#202020"},{"id":"clock","n":"时钟","s":"box","d":[0.428,0.45,0.053],"c":"#d7d7d7"},{"id":"tv","n":"电视","s":"box","d":[1.2,0.654,0.072],"c":"#252525"},{"id":"crate","n":"木箱","s":"box","d":[1.0,1.0,1.0],"c":"#8a5f34"},{"id":"barrel","n":"铁桶","s":"cyl","d":[1.05,0.38],"c":"#4e6470"},{"id":"explbarrel","n":"爆炸油桶","s":"cyl","d":[1.05,0.38],"c":"#b23023"},{"id":"saw","n":"旋转锯","s":"cyl","d":[0.06,0.52],"c":"#cfd3d8"},{"id":"radio","n":"收音机","s":"box","d":[0.365,0.435,0.143],"c":"#2b2b2b"},{"id":"camera","n":"摄像机","s":"box","d":[0.285,1.58,0.294],"c":"#2a2d33"},{"id":"bandage","n":"绷带","s":"box","d":[0.23,0.21,0.14],"c":"#ac9f86"},{"id":"smallmed","n":"小型医疗箱","s":"box","d":[0.43,0.25,0.66],"c":"#d8dde2"},{"id":"medmed","n":"中型医疗箱","s":"box","d":[0.882,0.227,1.0],"c":"#c4cdd4"},{"id":"cash","n":"现金","s":"box","d":[0.5,0.5,0.5],"c":"#8d9299"},{"id":"ammolight","n":"轻型弹药箱","s":"box","d":[0.52,0.3,0.3],"c":"#6d7a4a"},{"id":"ammoheavy","n":"重型弹药箱","s":"box","d":[0.62,0.34,0.34],"c":"#4f5a38"},{"id":"ammosniper","n":"狙击弹药箱","s":"box","d":[0.46,0.24,0.26],"c":"#3d4550"},{"id":"ammogrenade","n":"榴弹弹药箱","s":"box","d":[0.58,0.36,0.4],"c":"#6b5a2c"},{"id":"plank","n":"长木板","s":"box","d":[2.4,0.12,0.5],"c":"#8a5f34"},{"id":"lamp","n":"台灯","s":"box","d":[0.53,1.913,0.53],"c":"#54595f"},{"id":"table","n":"桌子","s":"box","d":[1.4,0.86,0.9],"c":"#6b4a28"},{"id":"bed","n":"床","s":"box","d":[1.09,0.59,2.31],"c":"#7a5230"},{"id":"midarmor","n":"防弹衣","s":"box","d":[0.62,0.4,0.38],"c":"#3d4436"},{"id":"vestarmor","n":"战术防弹衣","s":"box","d":[0.46,0.46,0.3],"c":"#35392f"},{"id":"headarmor_1","n":"战术头盔","s":"box","d":[0.36,0.32,0.35],"c":"#4b5144"},{"id":"headarmor_2","n":"重型头盔","s":"box","d":[0.38,0.35,0.38],"c":"#3f4540"},{"id":"lightarmor","n":"轻型防弹衣","s":"box","d":[0.435,0.448,0.311],"c":"#4a4f42"},{"id":"heavyarmor","n":"重型防弹衣","s":"box","d":[0.501,0.79,0.327],"c":"#2f342c"},{"id":"headarmor_nv","n":"头戴式双眼夜视仪","s":"box","d":[0.291,0.187,0.47],"c":"#3b4038"},{"id":"headarmor_steel","n":"旧式钢盔","s":"box","d":[0.385,0.252,0.393],"c":"#6a6f66"},{"id":"headarmor_riot","n":"武警头盔","s":"box","d":[0.382,0.329,0.358],"c":"#6a6f66"},{"id":"headarmor_riot_visor","n":"武警头盔(带面罩)","s":"box","d":[0.379,0.329,0.383],"c":"#6a6f66"},{"id":"shipin_cap","n":"鸭舌帽","s":"box","d":[0.508,0.127,0.326],"c":"#6a6f66"},{"id":"shipin_cap2","n":"鸭舌帽2","s":"box","d":[0.508,0.127,0.326],"c":"#6a6f66"},{"id":"shipin_cowboy","n":"牛仔帽","s":"box","d":[0.613,0.14,0.613],"c":"#6a6f66"},{"id":"shipin_safety","n":"安全帽","s":"box","d":[0.44,0.343,0.348],"c":"#6a6f66"},{"id":"shipin_mask_dark","n":"艾路迪克口罩","s":"box","d":[0.219,0.178,0.298],"c":"#6a6f66"},{"id":"shipin_mask","n":"口罩","s":"box","d":[0.218,0.178,0.298],"c":"#6a6f66"},{"id":"shipin_straw","n":"草帽","s":"box","d":[0.518,0.125,0.518],"c":"#6a6f66"},{"id":"shipin_hat","n":"礼帽","s":"box","d":[0.454,0.123,0.454],"c":"#6a6f66"},{"id":"shipin_tophat","n":"高礼帽","s":"box","d":[0.454,0.356,0.454],"c":"#6a6f66"},{"id":"shipin_beanie","n":"毛线帽","s":"box","d":[0.34,0.193,0.333],"c":"#6a6f66"},{"id":"shipin_face_mask","n":"面具","s":"box","d":[0.314,0.312,0.295],"c":"#6a6f66"},{"id":"shipin_hockey_mask","n":"曲棍球面具","s":"box","d":[0.315,0.312,0.289],"c":"#6a6f66"},{"id":"acc_hood_mask","n":"面罩兜帽","s":"box","d":[0.36,0.4,0.36],"c":"#6a6f66"},{"id":"acc_goggles_red","n":"战术护目镜(红)","s":"box","d":[0.34,0.14,0.24],"c":"#6a6f66"},{"id":"acc_goggles_green","n":"战术护目镜(绿)","s":"box","d":[0.34,0.14,0.24],"c":"#6a6f66"},{"id":"acc_goggles_white","n":"战术护目镜(白)","s":"box","d":[0.34,0.14,0.24],"c":"#6a6f66"},{"id":"acc_chef_hat","n":"厨师帽","s":"box","d":[0.327,0.433,0.329],"c":"#6a6f66"},{"id":"acc_plague_mask","n":"瘟疫医生面具","s":"box","d":[0.67,0.413,0.765],"c":"#6a6f66"},{"id":"acc_ushanka","n":"雷锋帽","s":"box","d":[0.442,0.407,0.412],"c":"#6a6f66"},{"id":"acc_gas_mask","n":"防毒面具","s":"box","d":[0.361,0.334,0.394],"c":"#6a6f66"},{"id":"acc_box_hood","n":"方块头套","s":"box","d":[0.315,0.318,0.315],"c":"#6a6f66"},{"id":"acc_army_cap","n":"军绿布帽","s":"box","d":[0.359,0.144,0.364],"c":"#6a6f66"},{"id":"acc_gasmask_heavy","n":"重型防毒面具","s":"box","d":[0.328,0.328,0.405],"c":"#6a6f66"},{"id":"acc_headphones","n":"耳机","s":"box","d":[0.38,0.304,0.238],"c":"#6a6f66"},{"id":"acc_santa_hat","n":"圣诞帽","s":"box","d":[0.315,0.256,0.392],"c":"#6a6f66"},{"id":"acc_dive_goggles","n":"潜水镜","s":"box","d":[0.342,0.322,0.317],"c":"#6a6f66"},{"id":"swimring_red","n":"红色游泳圈","s":"torus","d":[0.44,0.13],"c":"#c2493f"},{"id":"swimring_blue","n":"蓝色游泳圈","s":"torus","d":[0.44,0.13],"c":"#33459a"}];
-var GAME_GUNS = [{"id":"toolgun","n":"工具枪","cat":"other"},{"id":"gravgun","n":"重力枪","cat":"other"},{"id":"flashlight","n":"手电筒","cat":"other"},{"id":"pistol","n":"手枪","cat":"light"},{"id":"revolver","n":"左轮手枪","cat":"light"},{"id":"m1911","n":"M1911","cat":"light"},{"id":"smg","n":"冲锋枪","cat":"light"},{"id":"mp5","n":"MP5","cat":"light"},{"id":"ppsh","n":"波波沙","cat":"light"},{"id":"aa12","n":"AA-12","cat":"heavy"},{"id":"shotgun","n":"霰弹枪","cat":"heavy"},{"id":"spas","n":"SPAS 霰弹枪","cat":"heavy"},{"id":"rifle","n":"突击步枪","cat":"heavy"},{"id":"ak47","n":"AK-47","cat":"heavy"},{"id":"lightsniper","n":"轻型狙击枪","cat":"sniper"},{"id":"sniper","n":"狙击枪","cat":"sniper"},{"id":"m2010","n":"M2010 ESR","cat":"sniper"},{"id":"m107","n":"M107A1","cat":"sniper"},{"id":"nailgun","n":"钉枪","cat":"light"},{"id":"egggun","n":"彩蛋枪","cat":"other"},{"id":"grenade","n":"手雷","cat":"other"},{"id":"impactnade","n":"摔炮手榴弹","cat":"other"},{"id":"c4","n":"遥控炸弹","cat":"other"},{"id":"mine","n":"地雷","cat":"other"},{"id":"cleaver","n":"菜刀","cat":"melee"},{"id":"healkit","n":"回血药剂","cat":"other"},{"id":"poison","n":"毒药","cat":"other"},{"id":"styptic","n":"止血针剂","cat":"other"},{"id":"v5","n":"V5针剂","cat":"other"},{"id":"rifleb","n":"突击步枪B","cat":"heavy"},{"id":"m79","n":"M79 榴弹发射器","cat":"heavy"},{"id":"crowbar","n":"撬棍","cat":"melee"},{"id":"knife","n":"军刀","cat":"melee"},{"id":"baton","n":"警棍","cat":"melee"},{"id":"bandage","n":"绷带","cat":"other"},{"id":"medkit","n":"小医疗箱","cat":"other"}];
-
-var GUN_SIZE = {
-  light: [0.30, 0.20, 0.075],
-  heavy: [0.92, 0.24, 0.08],
-  sniper: [1.15, 0.20, 0.075],
-  melee: [0.42, 0.10, 0.05],
-  other: [0.34, 0.20, 0.09]
-};
-
+var KIT_BASE = 'rdb2/';
+var KIT = await fetch(KIT_BASE + 'kit.json', { cache: 'no-cache' })
+  .then(function(r) { return r.ok ? r.json() : null; })
+  .catch(function() { return null; });
+var KIT_FAILED = !KIT || !Array.isArray(KIT.items);
+if (KIT_FAILED) KIT = { categories: [], items: [] };
+var KIT_EN = {};
+var GAME_ITEMS = [];
+var GAME_GUNS = [];
 var ITEM_BY_ID = {};
 var GUN_BY_ID = {};
 var PROP_DEFS = {};
 (function() {
-  for (var i = 0; i < GAME_ITEMS.length; i++) {
-    var it = GAME_ITEMS[i];
-    ITEM_BY_ID[it.id] = it;
-    var shape = it.s === 'cyl' ? 'cylinder' : (it.s === 'torus' ? 'torus' : 'box');
-    var size = it.s === 'cyl' ? [it.d[1], it.d[0]] : it.d.slice();
-    PROP_DEFS[it.id] = { name: it.n, label: it.n, color: it.c, shape: shape, size: size };
-  }
-  for (var j = 0; j < GAME_GUNS.length; j++) GUN_BY_ID[GAME_GUNS[j].id] = GAME_GUNS[j];
+  (KIT.categories || []).forEach(function(c) {
+    if (c.en) KIT_EN[c.n] = c.en;
+    (c.sections || []).forEach(function(sec) { if (sec[2]) KIT_EN[sec[1]] = sec[2]; });
+  });
+  KIT.items.forEach(function(it) {
+    if (!it || !it.id) return;
+    if (it.en && it.en !== it.n) KIT_EN[it.n] = it.en;
+    var def = {
+      id: it.id, n: it.n, name: it.n, label: it.n, kind: it.kind, cat: it.cat, sec: it.sec,
+      box: Array.isArray(it.box) && it.box.length === 6 ? it.box : [-0.25, -0.25, -0.25, 0.25, 0.25, 0.25],
+      model: it.model ? KIT_BASE + it.model : '', icon: it.icon ? KIT_BASE + it.icon : '', color: '#8d9299'
+    };
+    if (it.kind === 'weapon') { GAME_GUNS.push(def); GUN_BY_ID[it.id] = def; }
+    else { GAME_ITEMS.push(def); ITEM_BY_ID[it.id] = def; PROP_DEFS[it.id] = def; }
+  });
 })();
+
+var KIT_SOUNDS = [];
+var KIT_SOUND_BY_ID = {};
+(KIT.sounds || []).forEach(function(e) {
+  if (!e || !e.id || !e.file) return;
+  var d = { id: e.id, n: e.n || e.id, url: KIT_BASE + e.file };
+  KIT_SOUNDS.push(d);
+  KIT_SOUND_BY_ID[e.id] = d;
+  if (e.en && e.n) KIT_EN[e.n] = e.en;
+});
+var SURFACES = [
+  { id: '', name: '自动（按贴图）' },
+  { id: 'concrete', name: '混凝土' },
+  { id: 'wood', name: '木头' },
+  { id: 'metal', name: '金属' }
+];
+
+function soundUrl(a) {
+  if (KIT_SOUND_BY_ID[a]) return KIT_SOUND_BY_ID[a].url;
+  return assetUrl(a);
+}
+
+function soundExists(a) {
+  return !!(KIT_SOUND_BY_ID[a] || PROJECT.assets[a]);
+}
+
+function surfaceOf(o) {
+  var forced = o.userData.mapSurface;
+  if (forced === 'concrete' || forced === 'wood' || forced === 'metal') return forced;
+  if (o.userData.mapTex === 'wood') return 'wood';
+  if (o.userData.mapTex === 'metal') return 'metal';
+  return 'concrete';
+}
+
+function surfaceEligible(o) {
+  return surfaceEditable(o) || (o && o.userData.mapType === 'model');
+}
+
+var BREAK_HP = { def: 60, min: 1, max: 100000 };
+var BREAK_PIECE = { def: 0.35, min: 0.1, max: 2 };
+
+function clampNum(v, lim) {
+  v = +v;
+  return Number.isFinite(v) ? Math.max(lim.min, Math.min(lim.max, v)) : lim.def;
+}
+
+function breakableOf(raw) {
+  if (raw && typeof raw === 'object') return { hp: clampNum(raw.hp, BREAK_HP), piece: clampNum(raw.piece, BREAK_PIECE) };
+  if (raw === true || raw === 1) return { hp: BREAK_HP.def, piece: BREAK_PIECE.def };
+  return null;
+}
+
+var KIT_TEX = {};
+(KIT.textures || []).forEach(function(t) {
+  if (t && t.id && t.file) KIT_TEX[t.id] = { url: KIT_BASE + t.file, rough: +t.rough || 0.82 };
+});
+var kitTexBases = {};
+
+function kitTexture(name, rep) {
+  var kt = KIT_TEX[name];
+  if (!kt) return null;
+  var b = kitTexBases[name];
+  if (!b) {
+    b = kitTexBases[name] = { tex: null, loaded: false, waiting: [] };
+    b.tex = new THREE.TextureLoader().load(kt.url, function() {
+      b.loaded = true;
+      for (var i = 0; i < b.waiting.length; i++) b.waiting[i].needsUpdate = true;
+      b.waiting = [];
+    });
+    b.tex.wrapS = b.tex.wrapT = THREE.RepeatWrapping;
+    b.tex.colorSpace = THREE.SRGBColorSpace;
+    b.tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  }
+  var t = new THREE.Texture();
+  t.source = b.tex.source;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = b.tex.anisotropy;
+  t.repeat.set(rep, rep);
+  if (b.loaded) t.needsUpdate = true;
+  else b.waiting.push(t);
+  return t;
+}
+
+function surfaceRoughness(tex) {
+  return KIT_TEX[tex] ? KIT_TEX[tex].rough : (tex === 'ground' ? 0.95 : 0.82);
+}
+
+var kitLoader = new GLTFLoader();
+var kitModels = new Map();
+
+function kitModel(def) {
+  if (!def || !def.model) return Promise.resolve(null);
+  if (!kitModels.has(def.id)) {
+    kitModels.set(def.id, new Promise(function(done) {
+      kitLoader.load(def.model, function(g) {
+        g.scene.traverse(function(o) {
+          if (!o.isMesh) return;
+          o.castShadow = o.receiveShadow = true;
+          o.userData.kitShared = true;
+        });
+        done(g.scene);
+      }, undefined, function() { done(null); });
+    }));
+  }
+  return kitModels.get(def.id);
+}
+
+function kitProxy(def) {
+  var b = def.box;
+  var geo = new THREE.BoxGeometry(Math.max(0.01, b[3] - b[0]), Math.max(0.01, b[4] - b[1]), Math.max(0.01, b[5] - b[2]));
+  geo.translate((b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2);
+  var mat = new THREE.MeshStandardMaterial({ color: '#8d9299', roughness: 0.8, transparent: true, opacity: 0.35, depthWrite: false });
+  var mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = mesh.receiveShadow = false;
+  mesh.userData.kitProxy = true;
+  return mesh;
+}
+
+function attachKitModel(root, proxy, def) {
+  kitModel(def).then(function(scene) {
+    if (!scene) {
+      proxy.material.opacity = 0.85;
+      proxy.material.depthWrite = true;
+      return;
+    }
+    var m = scene.clone(true);
+    m.userData.kitModel = true;
+    root.add(m);
+    proxy.material.visible = false;
+    if (isSelected(root)) syncOutlinePassSelection();
+  });
+}
+
+function kitGunLift(def) { return -def.box[0]; }
+
+function fixedSize(o) { return !!(o && o.userData && (o.userData.isProp || o.userData.isGun)); }
+
+function kitExportClone(o) {
+  if (!fixedSize(o) && !o.userData.isDoor) return o.clone(true);
+  var g = new THREE.Group();
+  g.name = o.name;
+  g.userData = JSON.parse(JSON.stringify(o.userData));
+  g.position.copy(o.position);
+  g.quaternion.copy(o.quaternion);
+  g.scale.copy(o.scale);
+  for (var i = 0; i < o.children.length; i++) {
+    if (!o.children[i].userData.kitProxy) g.add(o.children[i].clone(true));
+  }
+  var drop = [];
+  g.traverse(function(c) { if (c.userData.editorOnly) drop.push(c); });
+  for (var j = 0; j < drop.length; j++) if (drop[j].parent) drop[j].parent.remove(drop[j]);
+  return g;
+}
+
+function kitThumb(def) {
+  var key = 'k:' + def.id;
+  if (thumbCache.has(key)) return Promise.resolve(thumbCache.get(key));
+  return kitModel(def).then(function(scene) {
+    if (!scene) return '';
+    var url = renderThumb(scene.clone(true), true);
+    thumbCache.set(key, url);
+    return url;
+  });
+}
 
 // ===== 存储警告配置（想改提示文字/冷却时间，改这里）=====
 var STORAGE_WARN_CFG = {
@@ -1979,7 +2209,7 @@ function namedTexture(name, repeat) {
   var key = name + '|' + rep;
   var t = texCache.get(key);
   if (t) return t;
-  t = canvasTex(name === 'ground' ? 256 : 128, TEX_PAINT[name], rep);
+  t = kitTexture(name, rep) || canvasTex(name === 'ground' ? 256 : 128, TEX_PAINT[name], rep);
   texCache.set(key, t);
   return t;
 }
@@ -2030,51 +2260,18 @@ function createProp(propType, data) {
     console.warn('未知道具类型:', propType);
     return null;
   }
-  var geometry;
-  var s = def.size;
-  switch (def.shape) {
-    case 'box':
-      geometry = new THREE.BoxGeometry(s[0], s[1], s[2]);
-      break;
-    case 'cylinder':
-      geometry = new THREE.CylinderGeometry(s[0], s[0], s[1], 20);
-      break;
-    case 'sphere':
-      geometry = new THREE.SphereGeometry(s[0], 24, 16);
-      break;
-    case 'cone':
-      geometry = new THREE.ConeGeometry(s[0], s[1], 20);
-      break;
-    case 'ramp':
-      geometry = makePrismGeometry([[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5]]);
-      break;
-    case 'triangle':
-      geometry = makePrismGeometry([[-0.5, -0.5], [0.5, -0.5], [0, 0.5]]);
-      break;
-    case 'torus':
-      geometry = new THREE.TorusGeometry(s[0], s[1], 10, 26);
-      geometry.rotateX(-Math.PI / 2);
-      break;
-    default:
-      geometry = new THREE.BoxGeometry(1, 1, 1);
-  }
-  var mat = new THREE.MeshStandardMaterial({
-    color: data.color || def.color,
-    roughness: 0.7,
-    metalness: 0.05
-  });
-  var mesh = new THREE.Mesh(geometry, mat);
-  mesh.castShadow = mesh.receiveShadow = true;
+  var mesh = kitProxy(def);
   mesh.userData.isProp = true;
   mesh.userData.propType = propType;
   mesh.userData.mapObject = true;
   mesh.userData.mapType = propType;
   mesh.userData.mapName = data.name || def.name;
   mesh.userData.mapColor = data.color || def.color;
-  mesh.position.fromArray(data.position || placementPoint(propType));
+  mesh.position.fromArray(data.position || placementPoint(propType, -def.box[1]));
   mesh.rotation.fromArray(data.rotation || [0, 0, 0]);
   mesh.scale.set(1, 1, 1);
   objectsRoot.add(mesh);
+  attachKitModel(mesh, mesh, def);
   return mesh;
 }
 
@@ -2104,15 +2301,389 @@ function makeSpawnMarker() {
   return g;
 }
 
-function geometryFor(type) {
+var SHAPE_FULL = 359.999;
+var SHAPE_SPECS = {
+  cylinder: { seg: [24, 3, 128, 1], top: [1, 0, 1], bottom: [1, 0, 1], arc: [360, 1, 360] },
+  cone: { seg: [24, 3, 128, 1], arc: [360, 1, 360] },
+  sphere: { seg: [24, 3, 128, 1], rings: [16, 2, 64, 1] },
+  torus: { seg: [32, 3, 128, 1], sides: [12, 3, 64, 1], thick: [0.4, 0.05, 1], arc: [360, 1, 360] },
+  capsule: { seg: [24, 3, 128, 1], rings: [8, 1, 32, 1], cap: [0.25, 0.01, 0.5] },
+  stairs: { steps: [4, 1, 64, 1] },
+  arch: { seg: [16, 2, 128, 1], thick: [0.3, 0.02, 0.98] },
+  tube: { seg: [24, 3, 128, 1], thick: [0.2, 0.02, 0.98], arc: [360, 1, 360] },
+  halfcyl: { seg: [16, 2, 128, 1] },
+  pyramid: { sides: [4, 3, 64, 1], top: [0, 0, 1] }
+};
+var SHAPE_LABELS = {
+  seg: '分段数', rings: '纵向分段', top: '顶部半径', bottom: '底部半径', arc: '弧度(°)',
+  'torus.sides': '截面分段', 'torus.thick': '粗细', 'capsule.cap': '端部高度', steps: '台阶数',
+  'arch.thick': '壁厚', 'tube.thick': '壁厚', 'pyramid.sides': '边数', 'pyramid.top': '顶部大小'
+};
+var SHAPE_STEP = { seg: 1, rings: 1, sides: 1, steps: 1, arc: 5, top: 0.05, bottom: 0.05, thick: 0.02, cap: 0.01 };
+
+function shapeParams(type, raw) {
+  var spec = SHAPE_SPECS[type] || {};
+  var given = raw && typeof raw === 'object' ? raw : {};
+  var out = {};
+  for (var k in spec) {
+    var s = spec[k];
+    var v = +given[k];
+    if (!Number.isFinite(v)) v = s[0];
+    v = Math.max(s[1], Math.min(s[2], v));
+    out[k] = s[3] ? Math.round(v) : v;
+  }
+  return out;
+}
+
+function shapeIsDefault(type, p) {
+  var spec = SHAPE_SPECS[type] || {};
+  for (var k in spec) if (p[k] !== spec[k][0]) return false;
+  return true;
+}
+
+function ShapeBuilder() { this.pos = []; this.nrm = []; this.uv = []; this.idx = []; }
+ShapeBuilder.prototype.vert = function(x, y, z, nx, ny, nz, u, v) {
+  this.pos.push(x, y, z); this.nrm.push(nx, ny, nz); this.uv.push(u, v);
+  return this.pos.length / 3 - 1;
+};
+ShapeBuilder.prototype.quad = function(a, b, c, d) { this.idx.push(a, b, c, a, c, d); };
+ShapeBuilder.prototype.tri = function(a, b, c) { this.idx.push(a, b, c); };
+ShapeBuilder.prototype.count = function() { return this.pos.length / 3; };
+ShapeBuilder.prototype.geometry = function() {
+  var g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nrm, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
+  g.setIndex(this.idx);
+  return g;
+};
+ShapeBuilder.from = function(g) {
+  var m = new ShapeBuilder();
+  m.pos = Array.from(g.attributes.position.array);
+  m.nrm = Array.from(g.attributes.normal.array);
+  m.uv = Array.from(g.attributes.uv.array);
+  m.idx = Array.from(g.index.array);
+  return m;
+};
+
+function shapeNorm2(x, y) {
+  var l = Math.hypot(x, y);
+  return l > 0 ? [x / l, y / l] : [0, 0];
+}
+
+function shapeCut(m, rin, rt, rb, t, sign) {
+  var s = Math.sin(t), c = Math.cos(t);
+  var nx = c * sign, nz = -s * sign;
+  var a = m.vert(rin * s, 0.5, rin * c, nx, 0, nz, rin * 2, 1);
+  var b = m.vert(rt * s, 0.5, rt * c, nx, 0, nz, rt * 2, 1);
+  var cc = m.vert(rb * s, -0.5, rb * c, nx, 0, nz, rb * 2, 0);
+  var d = m.vert(rin * s, -0.5, rin * c, nx, 0, nz, rin * 2, 0);
+  if (sign > 0) m.quad(a, b, cc, d); else m.quad(a, d, cc, b);
+}
+
+function shapeCylinder(rt, rb, seg, arcDeg) {
+  var arc = arcDeg * Math.PI / 180;
+  var g = new THREE.CylinderGeometry(rt, rb, 1, seg, 1, false, 0, arc);
+  if (arcDeg >= SHAPE_FULL) return g;
+  var m = ShapeBuilder.from(g);
+  g.dispose();
+  shapeCut(m, 0, rt, rb, 0, -1);
+  shapeCut(m, 0, rt, rb, arc, 1);
+  return m.geometry();
+}
+
+function shapeTorus(seg, sides, thick, arcDeg) {
+  var m = new ShapeBuilder();
+  var arc = arcDeg * Math.PI / 180;
+  var rh = 0.25 * thick, rc = 0.5 - rh;
+  var j, i, t, s, c, f, r, nn;
+  for (j = 0; j <= seg; j++) {
+    t = j / seg * arc; s = Math.sin(t); c = Math.cos(t);
+    for (i = 0; i <= sides; i++) {
+      f = i / sides * Math.PI * 2;
+      r = rc + rh * Math.cos(f);
+      nn = shapeNorm2(Math.cos(f) / rh, Math.sin(f) / 0.5);
+      m.vert(r * s, 0.5 * Math.sin(f), r * c, nn[0] * s, nn[1], nn[0] * c, j / seg, i / sides);
+    }
+  }
+  for (j = 0; j < seg; j++) {
+    for (i = 0; i < sides; i++) {
+      var a = j * (sides + 1) + i, b = (j + 1) * (sides + 1) + i;
+      m.quad(a, b, b + 1, a + 1);
+    }
+  }
+  if (arcDeg < SHAPE_FULL) {
+    [[0, -1], [arc, 1]].forEach(function(end) {
+      var t2 = end[0], sign = end[1], s2 = Math.sin(t2), c2 = Math.cos(t2);
+      var nx = c2 * sign, nz = -s2 * sign;
+      var centre = m.vert(rc * s2, 0, rc * c2, nx, 0, nz, 0.5, 0.5);
+      var ring = -1;
+      for (var k = 0; k <= sides; k++) {
+        var f2 = k / sides * Math.PI * 2, r2 = rc + rh * Math.cos(f2);
+        var id = m.vert(r2 * s2, 0.5 * Math.sin(f2), r2 * c2, nx, 0, nz, 0.5 + 0.5 * Math.cos(f2), 0.5 + 0.5 * Math.sin(f2));
+        if (k === 0) ring = id;
+      }
+      for (var q = 0; q < sides; q++) {
+        if (sign > 0) m.tri(centre, ring + q + 1, ring + q);
+        else m.tri(centre, ring + q, ring + q + 1);
+      }
+    });
+  }
+  return m.geometry();
+}
+
+function shapeCapsule(seg, rings, cap) {
+  var m = new ShapeBuilder();
+  var half = 0.5 - cap, rows = 0;
+  for (var hemi = 0; hemi < 2; hemi++) {
+    for (var k = 0; k <= rings; k++) {
+      var al = (k / rings + hemi) * Math.PI * 0.5;
+      var r = 0.5 * Math.sin(al);
+      var y = (hemi === 0 ? half : -half) + cap * Math.cos(al);
+      var nn = shapeNorm2(Math.sin(al) / 0.5, Math.cos(al) / cap);
+      for (var i = 0; i <= seg; i++) {
+        var t = i / seg * Math.PI * 2;
+        m.vert(r * Math.sin(t), y, r * Math.cos(t), nn[0] * Math.sin(t), nn[1], nn[0] * Math.cos(t), i / seg, y + 0.5);
+      }
+      rows++;
+    }
+  }
+  for (var row = 0; row < rows - 1; row++) {
+    for (var j = 0; j < seg; j++) {
+      var a = row * (seg + 1) + j, b = (row + 1) * (seg + 1) + j;
+      m.quad(a, b, b + 1, a + 1);
+    }
+  }
+  return m.geometry();
+}
+
+function shapeTube(seg, thick, arcDeg) {
+  var m = new ShapeBuilder();
+  var arc = arcDeg * Math.PI / 180;
+  var ri = 0.5 * (1 - thick);
+  [[0.5, 1], [ri, -1]].forEach(function(wall) {
+    var r = wall[0], out = wall[1], base = m.count();
+    for (var row = 0; row < 2; row++) {
+      for (var i = 0; i <= seg; i++) {
+        var t = i / seg * arc;
+        m.vert(r * Math.sin(t), 0.5 - row, r * Math.cos(t), Math.sin(t) * out, 0, Math.cos(t) * out, i / seg, 1 - row);
+      }
+    }
+    for (var j = 0; j < seg; j++) {
+      var a = base + j, b = base + seg + 1 + j;
+      if (out > 0) m.quad(a, b, b + 1, a + 1); else m.quad(a, a + 1, b + 1, b);
+    }
+  });
+  [0.5, -0.5].forEach(function(cap) {
+    var base = m.count();
+    for (var i = 0; i <= seg; i++) {
+      var t = i / seg * arc;
+      [0.5, ri].forEach(function(r) {
+        var x = r * Math.sin(t), z = r * Math.cos(t);
+        m.vert(x, cap, z, 0, Math.sign(cap), 0, x + 0.5, cap > 0 ? 0.5 - z : z + 0.5);
+      });
+    }
+    for (var j = 0; j < seg; j++) {
+      var o0 = base + j * 2, o1 = o0 + 2;
+      if (cap > 0) m.quad(o0, o1, o1 + 1, o0 + 1); else m.quad(o0, o0 + 1, o1 + 1, o1);
+    }
+  });
+  if (arcDeg < SHAPE_FULL) {
+    shapeCut(m, ri, 0.5, 0.5, 0, -1);
+    shapeCut(m, ri, 0.5, 0.5, arc, 1);
+  }
+  return m.geometry();
+}
+
+function shapeCurve(m, seg, rx, ry, out) {
+  var base = m.count();
+  for (var k = 0; k <= seg; k++) {
+    var f = k / seg * Math.PI;
+    var nn = shapeNorm2(Math.cos(f) / rx, Math.sin(f) / ry);
+    [0.5, -0.5].forEach(function(z) {
+      m.vert(rx * Math.cos(f), -0.5 + ry * Math.sin(f), z, nn[0] * out, nn[1] * out, 0, k / seg, z + 0.5);
+    });
+  }
+  for (var j = 0; j < seg; j++) {
+    var f0 = base + j * 2, f1 = f0 + 2;
+    if (out > 0) m.quad(f0, f0 + 1, f1 + 1, f1); else m.quad(f0, f1, f1 + 1, f0 + 1);
+  }
+  return base;
+}
+
+function shapeFloor(m, x0, x1) {
+  m.quad(m.vert(x1, -0.5, 0.5, 0, -1, 0, x1 + 0.5, 1), m.vert(x0, -0.5, 0.5, 0, -1, 0, x0 + 0.5, 1),
+    m.vert(x0, -0.5, -0.5, 0, -1, 0, x0 + 0.5, 0), m.vert(x1, -0.5, -0.5, 0, -1, 0, x1 + 0.5, 0));
+}
+
+function shapeHalfCyl(seg) {
+  var m = new ShapeBuilder();
+  shapeCurve(m, seg, 0.5, 1, 1);
+  shapeFloor(m, -0.5, 0.5);
+  [0.5, -0.5].forEach(function(z) {
+    var sz = Math.sign(z);
+    var centre = m.vert(0, -0.5, z, 0, 0, sz, 0.5, 0);
+    var rim = -1;
+    for (var k = 0; k <= seg; k++) {
+      var f = k / seg * Math.PI, x = 0.5 * Math.cos(f), y = -0.5 + Math.sin(f);
+      var i = m.vert(x, y, z, 0, 0, sz, x + 0.5, y + 0.5);
+      if (k === 0) rim = i;
+    }
+    for (var q = 0; q < seg; q++) {
+      if (z > 0) m.tri(centre, rim + q, rim + q + 1); else m.tri(centre, rim + q + 1, rim + q);
+    }
+  });
+  return m.geometry();
+}
+
+function shapeArch(seg, thick) {
+  var m = new ShapeBuilder();
+  var rix = 0.5 * (1 - thick), riy = 1 - thick;
+  shapeCurve(m, seg, 0.5, 1, 1);
+  shapeCurve(m, seg, rix, riy, -1);
+  shapeFloor(m, rix, 0.5);
+  shapeFloor(m, -0.5, -rix);
+  [0.5, -0.5].forEach(function(z) {
+    var sz = Math.sign(z), base = m.count();
+    for (var k = 0; k <= seg; k++) {
+      var f = k / seg * Math.PI;
+      [[rix, riy], [0.5, 1]].forEach(function(e) {
+        var x = e[0] * Math.cos(f), y = -0.5 + e[1] * Math.sin(f);
+        m.vert(x, y, z, 0, 0, sz, x + 0.5, y + 0.5);
+      });
+    }
+    for (var q = 0; q < seg; q++) {
+      var i0 = base + q * 2, i1 = i0 + 2;
+      if (z > 0) m.quad(i0, i0 + 1, i1 + 1, i1); else m.quad(i0, i1, i1 + 1, i0 + 1);
+    }
+  });
+  return m.geometry();
+}
+
+function shapeStairs(n) {
+  var m = new ShapeBuilder();
+  for (var i = 0; i < n; i++) {
+    var x0 = -0.5 + i / n, x1 = -0.5 + (i + 1) / n, top = -0.5 + (i + 1) / n, low = -0.5 + i / n;
+    m.quad(m.vert(x0, top, 0.5, 0, 1, 0, 0, 1), m.vert(x1, top, 0.5, 0, 1, 0, x1 - x0, 1),
+      m.vert(x1, top, -0.5, 0, 1, 0, x1 - x0, 0), m.vert(x0, top, -0.5, 0, 1, 0, 0, 0));
+    m.quad(m.vert(x0, low, -0.5, -1, 0, 0, 0, 0), m.vert(x0, low, 0.5, -1, 0, 0, 0, 1),
+      m.vert(x0, top, 0.5, -1, 0, 0, top - low, 1), m.vert(x0, top, -0.5, -1, 0, 0, top - low, 0));
+    [0.5, -0.5].forEach(function(z) {
+      var sz = Math.sign(z);
+      var a = m.vert(x0, -0.5, z, 0, 0, sz, x0 + 0.5, 0);
+      var b = m.vert(x1, -0.5, z, 0, 0, sz, x1 + 0.5, 0);
+      var c = m.vert(x1, top, z, 0, 0, sz, x1 + 0.5, top + 0.5);
+      var d = m.vert(x0, top, z, 0, 0, sz, x0 + 0.5, top + 0.5);
+      if (z > 0) m.quad(a, b, c, d); else m.quad(a, d, c, b);
+    });
+  }
+  m.quad(m.vert(0.5, -0.5, 0.5, 1, 0, 0, 0, 1), m.vert(0.5, -0.5, -0.5, 1, 0, 0, 0, 0),
+    m.vert(0.5, 0.5, -0.5, 1, 0, 0, 1, 0), m.vert(0.5, 0.5, 0.5, 1, 0, 0, 1, 1));
+  shapeFloor(m, -0.5, 0.5);
+  return m.geometry();
+}
+
+function shapeBase(sides) {
+  var pts = [], mx = 0, mz = 0;
+  for (var i = 0; i < sides; i++) {
+    var f = (i + 0.5) / sides * Math.PI * 2;
+    var p = [Math.sin(f), Math.cos(f)];
+    mx = Math.max(mx, Math.abs(p[0]));
+    mz = Math.max(mz, Math.abs(p[1]));
+    pts.push(p);
+  }
+  return pts.map(function(p) { return [p[0] * 0.5 / mx, p[1] * 0.5 / mz]; });
+}
+
+function shapePyramid(sides, top) {
+  var m = new ShapeBuilder();
+  var base = shapeBase(sides);
+  for (var i = 0; i < sides; i++) {
+    var p0 = base[i], p1 = base[(i + 1) % sides];
+    var b0 = new THREE.Vector3(p0[0], -0.5, p0[1]), b1 = new THREE.Vector3(p1[0], -0.5, p1[1]);
+    var t0 = new THREE.Vector3(p0[0] * top, 0.5, p0[1] * top), t1 = new THREE.Vector3(p1[0] * top, 0.5, p1[1] * top);
+    var tm = t0.clone().add(t1).multiplyScalar(0.5).sub(b0);
+    var n = b1.clone().sub(b0).cross(tm).normalize();
+    var mid = b0.clone().add(b1).multiplyScalar(0.5);
+    if (n.x * mid.x + n.z * mid.z < 0) n.negate();
+    m.quad(m.vert(t0.x, t0.y, t0.z, n.x, n.y, n.z, 0, 1), m.vert(b0.x, b0.y, b0.z, n.x, n.y, n.z, 0, 0),
+      m.vert(b1.x, b1.y, b1.z, n.x, n.y, n.z, 1, 0), m.vert(t1.x, t1.y, t1.z, n.x, n.y, n.z, 1, 1));
+  }
+  [-0.5, 0.5].forEach(function(cap) {
+    var k = cap < 0 ? 1 : top;
+    if (k <= 0) return;
+    var sy = Math.sign(cap);
+    var centre = m.vert(0, cap, 0, 0, sy, 0, 0.5, 0.5);
+    var ring = -1;
+    for (var i2 = 0; i2 < sides; i2++) {
+      var x = base[i2][0] * k, z = base[i2][1] * k;
+      var j = m.vert(x, cap, z, 0, sy, 0, x + 0.5, cap < 0 ? z + 0.5 : 0.5 - z);
+      if (i2 === 0) ring = j;
+    }
+    for (var q = 0; q < sides; q++) {
+      var a = ring + q, b = ring + (q + 1) % sides;
+      if (cap < 0) m.tri(centre, b, a); else m.tri(centre, a, b);
+    }
+  });
+  return m.geometry();
+}
+
+function shapeArea(pts) {
+  var a = 0;
+  for (var i = 0; i < pts.length; i++) {
+    var p = pts[i], q = pts[(i + 1) % pts.length];
+    a += p[0] * q[1] - q[0] * p[1];
+  }
+  return Math.abs(a) * 0.5;
+}
+
+function shapeVolumeFraction(type, p) {
+  switch (type) {
+    case 'sphere': return Math.PI / 6;
+    case 'cylinder': {
+      var rt = 0.5 * p.top, rb = 0.5 * p.bottom;
+      return Math.PI / 3 * (rt * rt + rt * rb + rb * rb) * p.arc / 360;
+    }
+    case 'hex': return Math.PI / 4;
+    case 'cone': return Math.PI / 12 * p.arc / 360;
+    case 'ramp': case 'triangle': return 0.5;
+    case 'torus': {
+      var rh = 0.25 * p.thick;
+      return 2 * Math.PI * Math.PI * (0.5 - rh) * rh * 0.5 * p.arc / 360;
+    }
+    case 'capsule': return Math.PI / 4 * (1 - 2 * p.cap) + Math.PI / 3 * p.cap;
+    case 'stairs': return (p.steps + 1) / (2 * p.steps);
+    case 'arch': { var k = 1 - p.thick; return Math.PI / 4 * (1 - k * k); }
+    case 'tube': { var k2 = 1 - p.thick; return Math.PI / 4 * (1 - k2 * k2) * p.arc / 360; }
+    case 'halfcyl': return Math.PI / 4;
+    case 'pyramid': return shapeArea(shapeBase(p.sides)) * (1 + p.top + p.top * p.top) / 3;
+  }
+  return 1;
+}
+
+function geometryFor(type, raw) {
+  var p = shapeParams(type, raw);
   if (type === 'box') return new THREE.BoxGeometry(1, 1, 1);
-  if (type === 'sphere') return new THREE.SphereGeometry(0.5, 24, 16);
-  if (type === 'cylinder') return new THREE.CylinderGeometry(0.5, 0.5, 1, 24);
-  if (type === 'cone') return new THREE.ConeGeometry(0.5, 1, 24);
+  if (type === 'sphere') return new THREE.SphereGeometry(0.5, p.seg, p.rings);
+  if (type === 'cylinder') return shapeCylinder(0.5 * p.top, 0.5 * p.bottom, p.seg, p.arc);
+  if (type === 'cone') return shapeCylinder(0, 0.5, p.seg, p.arc);
   if (type === 'hex') return new THREE.CylinderGeometry(0.5, 0.5, 1, 6);
   if (type === 'ramp') return makePrismGeometry([[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5]]);
   if (type === 'triangle') return makePrismGeometry([[-0.5, -0.5], [0.5, -0.5], [0, 0.5]]);
+  if (type === 'torus') return shapeTorus(p.seg, p.sides, p.thick, p.arc);
+  if (type === 'capsule') return shapeCapsule(p.seg, p.rings, p.cap);
+  if (type === 'stairs') return shapeStairs(p.steps);
+  if (type === 'arch') return shapeArch(p.seg, p.thick);
+  if (type === 'tube') return shapeTube(p.seg, p.thick, p.arc);
+  if (type === 'halfcyl') return shapeHalfCyl(p.seg);
+  if (type === 'pyramid') return shapePyramid(p.sides, p.top);
   return new THREE.BoxGeometry(1, 1, 1);
+}
+
+function shapeRawOf(type, raw) {
+  if (!SHAPE_SPECS[type] || !raw || typeof raw !== 'object') return null;
+  var p = shapeParams(type, raw);
+  return shapeIsDefault(type, p) ? null : p;
 }
 
 function applyObjectColor(root, hex) {
@@ -2124,16 +2695,7 @@ function applyObjectColor(root, hex) {
     refreshWater(root);
     return;
   }
-  if (root.userData.isProp) {
-    root.traverse(function(o) {
-      if (!o.isMesh || !o.material) return;
-      var mats = Array.isArray(o.material) ? o.material : [o.material];
-      for (var i = 0; i < mats.length; i++) {
-        if (mats[i].color) mats[i].color.set(hex);
-      }
-    });
-    return;
-  }
+  if (fixedSize(root) || root.userData.isDoor) return;
   if (root.userData.mapType !== 'model' && root.userData.mapTex) {
     applyObjectSurface(root);
     return;
@@ -2150,7 +2712,7 @@ function applyObjectColor(root, hex) {
 
 function applyObjectSurface(root) {
   if (!root || !root.isMesh) return;
-  if (root.userData.isProp) return;
+  if (fixedSize(root)) return;
   if (root.userData.mapType === 'model' || root.userData.mapType === 'spawn') return;
   var tex = root.userData.mapTex || '';
   var rep = root.userData.mapTexRepeat || 1;
@@ -2168,6 +2730,7 @@ function applyObjectSurface(root) {
       t = new THREE.TextureLoader().load(custom);
       t.wrapS = t.wrapT = THREE.RepeatWrapping;
       t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = renderer.capabilities.getMaxAnisotropy();
       t.repeat.set(rep, rep);
       texCache.set(key, t);
     }
@@ -2204,6 +2767,8 @@ function applyObjectSurface(root) {
     m.side = m.transparent ? THREE.DoubleSide : THREE.FrontSide;
     m.color.set(m.map ? '#ffffff' : (root.userData.mapColor || '#c5c9cf'));
   }
+  m.roughness = custom ? 0.82 : surfaceRoughness(tex);
+  m.metalness = 0;
   m.needsUpdate = true;
 }
 
@@ -2225,17 +2790,19 @@ function createPrimitive(type, data) {
   data = data || {};
   if (type === 'spawn') return createSpawn(data);
   if (PROP_DEFS[type]) return createProp(type, data);
-  var mat = new THREE.MeshStandardMaterial({ color: data.color || '#c5c9cf', roughness: 0.82, metalness: 0.04 });
-  var mesh = new THREE.Mesh(geometryFor(type), mat);
+  var mat = new THREE.MeshStandardMaterial({ color: data.color || '#c5c9cf', roughness: 0.82, metalness: 0 });
+  var mesh = new THREE.Mesh(geometryFor(type, data.shape), mat);
   mesh.castShadow = mesh.receiveShadow = true;
   mesh.userData.mapObject = true;
   mesh.userData.mapType = type;
+  mesh.userData.mapShape = shapeRawOf(type, data.shape);
   mesh.userData.mapName = data.name || primitiveNames[type] || type;
   mesh.userData.mapColor = data.color || '#c5c9cf';
   mesh.userData.mapTex = data.tex || '';
   var repRaw = Array.isArray(data.texRepeat) ? data.texRepeat[0] : data.texRepeat;
   mesh.userData.mapTexRepeat = Number.isFinite(+repRaw) ? +repRaw : 1;
   mesh.userData.mapOpacity = Number.isFinite(+data.opacity) ? +data.opacity : 1;
+  mesh.userData.mapSurface = typeof data.surface === 'string' ? data.surface : '';
   mesh.userData.mapCustom = data.texAsset ? assetUrl(data.texAsset) : (data.customTex || null);
   mesh.userData.mapPhysics = !!data.physics;
   mesh.userData.mapMass = Number.isFinite(+data.mass) ? +data.mass : 0;
@@ -2243,16 +2810,18 @@ function createPrimitive(type, data) {
   mesh.userData.mapCollide = data.collide === undefined ? true : !!data.collide;
   mesh.userData.mapAsset = data.texAsset || null;
   mesh.userData.mapSounds = Array.isArray(data.sounds) ? JSON.parse(JSON.stringify(data.sounds)) : [];
+  mesh.userData.mapBreakable = breakableOf(data.breakable);
   mesh.position.fromArray(data.position !== undefined ? data.position : placementPoint(type));
   mesh.rotation.fromArray(data.rotation || [0, 0, 0]);
-  mesh.scale.fromArray(data.scale || [1, 1, 1]);
+  mesh.scale.fromArray(data.scale || PLACE_SCALE[type] || [1, 1, 1]);
   applyObjectSurface(mesh);
   applyCollideLook(mesh);
   objectsRoot.add(mesh);
   return mesh;
 }
 
-var PLACE_LIFT = { spawn: SPAWN_BODY_LIFT, water: 0.02, light: 2.6, gun: 0.24, model: 0 };
+var PLACE_LIFT = { spawn: SPAWN_BODY_LIFT, water: 0.02, light: 2.6, gun: 0.24, model: 0, torus: 0.1, capsule: 1 };
+var PLACE_SCALE = { torus: [1, 0.2, 1], capsule: [1, 2, 1] };
 
 var PLACE_CFG = {
   range: 60,  // 放置范围(米)：范围内有物体→放在准心命中处；没有→放在这个距离的边界
@@ -2261,8 +2830,9 @@ var PLACE_CFG = {
   // true  = 旧行为：准心没打到物体且朝下看时，强制落到地面高度，并限制 Y 不低于抬升值
   groundAssist: false
 };
-function placementPoint(type) {
-  var lift = PLACE_LIFT[type] !== undefined ? PLACE_LIFT[type] : 0.5;
+function placementPoint(type, liftOverride) {
+  var exact = liftOverride !== undefined;
+  var lift = exact ? liftOverride : (PLACE_LIFT[type] !== undefined ? PLACE_LIFT[type] : 0.5);
   var dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
   var rng = PLACE_CFG.range;
   var p = null, clampY = true;
@@ -2286,6 +2856,7 @@ function placementPoint(type) {
     p = camera.position.clone().addScaledVector(dir, rng);
     clampY = false;
   }
+  if (exact) return p.toArray();
   p.x = Math.round(p.x * 2) / 2;
   p.z = Math.round(p.z * 2) / 2;
   if (type !== 'spawn' && type !== 'water' && type !== 'light') {
@@ -2296,11 +2867,7 @@ function placementPoint(type) {
 }
 
 function syncOutlinePassSelection() {
-  var meshes = [];
-  for (var i = 0; i < selection.length; i++) {
-    selection[i].traverse(function(o) { if (o.isMesh) meshes.push(o); });
-  }
-  outlinePass.selectedObjects = meshes;
+  outlinePass.selectedObjects = selection.slice();
 }
 
 function isSelected(obj) {
@@ -2433,7 +3000,7 @@ var propMass = document.getElementById('propMass');
 var propBounce = document.getElementById('propBounce');
 propTex.innerHTML = TEXTURES.map(function(t) { return '<option value="' + t.id + '">' + t.name + '</option>'; }).join('');
 
-var NON_SURFACE_TYPES = { model: 1, spawn: 1, water: 1, light: 1, gun: 1 };
+var NON_SURFACE_TYPES = { model: 1, spawn: 1, water: 1, light: 1, gun: 1, door: 1 };
 
 function physEditable(obj) {
   var t = obj && obj.userData.mapType;
@@ -2444,11 +3011,7 @@ function shapeVolume(obj) {
   var s = obj.scale;
   var sx = Math.abs(s.x) || 1, sy = Math.abs(s.y) || 1, sz = Math.abs(s.z) || 1;
   var t = obj.userData.mapType;
-  if (t === 'sphere') return Math.PI / 6 * sx * sy * sz;
-  if (t === 'cylinder' || t === 'hex') return Math.PI / 4 * sx * sz * sy;
-  if (t === 'cone') return Math.PI / 12 * sx * sz * sy;
-  if (t === 'ramp' || t === 'triangle') return sx * sy * sz / 2;
-  return sx * sy * sz;
+  return sx * sy * sz * shapeVolumeFraction(t, shapeParams(t, obj.userData.mapShape));
 }
 
 function defaultMass(obj) {
@@ -2520,6 +3083,9 @@ function refreshProps() {
     if (selected.userData.isProp) {
       var def = PROP_DEFS[selected.userData.propType];
       typeName = def ? def.name : '道具';
+    } else if (selected.userData.isGun) {
+      var gdef = GUN_BY_ID[selected.userData.gunId];
+      typeName = gdef ? gdef.name : '枪械';
     }
     if (isGroupSelected) typeName = '📦 ' + commonGroup.name;
     document.getElementById('propType').textContent = typeName;
@@ -2627,7 +3193,7 @@ function scaleMembersAroundWorldPoint(members, center, ratio, minScale) {
   minScale = minScale || SCALE_MIN;
   for (var i = 0; i < members.length; i++) {
     var o = members[i];
-    if (o.userData.isProp) continue;
+    if (fixedSize(o)) continue;
     var parent = o.parent;
 
     var worldPos = o.position.clone();
@@ -2720,7 +3286,7 @@ function applyPreciseScale(e) {
 
   if (target.mode === 'single') {
     var obj = target.obj;
-    if (obj.userData.isProp) { toast('该道具不支持缩放'); return; }
+    if (fixedSize(obj)) { toast('该道具不支持缩放'); return; }
     if (!finalPass && (sx < MIN_SCALE || sy < MIN_SCALE || sz < MIN_SCALE)) {
       // 输入过程中碰到下限：该轴先保持不变，等输入完再检查，仍低于下限才修正
       obj.scale.set(sx < MIN_SCALE ? obj.scale.x : sx, sy < MIN_SCALE ? obj.scale.y : sy, sz < MIN_SCALE ? obj.scale.z : sz);
@@ -2731,7 +3297,7 @@ function applyPreciseScale(e) {
     afterPreciseTransform(obj);
   } else {
     if (sx === 1 && sy === 1 && sz === 1) return;
-    var members = target.members.filter(function(o) { return !o.userData.isProp; });
+    var members = target.members.filter(function(o) { return !fixedSize(o); });
     if (!members.length) return;
     var box = new THREE.Box3();
     for (var i = 0; i < members.length; i++) box.expandByObject(members[i]);
@@ -2841,12 +3407,74 @@ function afterPreciseTransformMulti(target) {
   };
 })();
 
+function refreshShapeParams() {
+  var wrap = document.getElementById('shapeWrap');
+  if (!wrap) return;
+  var o = selection.length === 1 ? selection[0] : null;
+  var type = o && !o.userData.isProp ? o.userData.mapType : '';
+  var spec = SHAPE_SPECS[type];
+  if (!spec) { wrap.style.display = 'none'; wrap.dataset.key = ''; return; }
+  wrap.style.display = 'inline-flex';
+  var p = shapeParams(type, o.userData.mapShape);
+  var key = o.uuid + '|' + type;
+  if (wrap.dataset.key !== key) {
+    wrap.dataset.key = key;
+    wrap.innerHTML = Object.keys(spec).map(function(k) {
+      var s = spec[k];
+      var label = SHAPE_LABELS[type + '.' + k] || SHAPE_LABELS[k] || k;
+      return '<label>' + label + '</label><input class="shapeIn" data-k="' + k + '" type="number" min="' + s[1] +
+        '" max="' + s[2] + '" step="' + (SHAPE_STEP[k] || 0.05) + '" />';
+    }).join('');
+    wrap.querySelectorAll('.shapeIn').forEach(function(inp) {
+      inp.addEventListener('change', function() {
+        var obj = selection.length === 1 ? selection[0] : null;
+        if (!obj || obj.userData.mapType !== type) return;
+        var cur = shapeParams(type, obj.userData.mapShape);
+        cur[this.dataset.k] = +this.value;
+        var next = shapeParams(type, cur);
+        obj.userData.mapShape = shapeIsDefault(type, next) ? null : next;
+        var old = obj.geometry;
+        obj.geometry = geometryFor(type, obj.userData.mapShape);
+        if (old) old.dispose();
+        refreshShapeParams();
+        pushHistory();
+      });
+    });
+  }
+  wrap.querySelectorAll('.shapeIn').forEach(function(inp) {
+    if (document.activeElement !== inp) inp.value = p[inp.dataset.k];
+  });
+}
+
 function refreshPropsExtra() {
   if (!propCollide) return;
   var col = selection.filter(collideEditable);
   var wrap = document.getElementById('collideWrap');
   wrap.style.display = col.length ? 'inline-flex' : 'none';
   if (col.length) propCollide.checked = col[0].userData.mapCollide !== false;
+
+  var sf = selection.filter(surfaceEligible);
+  var sfWrap = document.getElementById('surfaceWrap');
+  if (sfWrap) {
+    sfWrap.style.display = sf.length ? 'inline-flex' : 'none';
+    if (sf.length) document.getElementById('propSurface').value = sf[0].userData.mapSurface || '';
+  }
+
+  refreshShapeParams();
+
+  var bk = selection.filter(physEditable);
+  var bkWrap = document.getElementById('breakWrap');
+  if (bkWrap) {
+    bkWrap.style.display = bk.length ? 'inline-flex' : 'none';
+    if (bk.length) {
+      var b0 = bk[0].userData.mapBreakable;
+      document.getElementById('propBreak').checked = !!b0;
+      document.getElementById('propBreakHp').value = b0 ? b0.hp : BREAK_HP.def;
+      document.getElementById('propBreakPiece').value = b0 ? b0.piece : BREAK_PIECE.def;
+      document.getElementById('propBreakHp').disabled = !b0;
+      document.getElementById('propBreakPiece').disabled = !b0;
+    }
+  }
 
   var snd = selection.filter(soundsCarrier);
   propSoundBtn.style.display = snd.length === 1 ? '' : 'none';
@@ -2881,6 +3509,16 @@ function refreshPropsExtra() {
     lightBox.querySelector('#ltShadow').checked = !!l0.userData.lightShadow;
     lightBox.querySelector('#ltSpotOnly').style.display =
       l0.userData.lightType === 'spot' ? '' : 'none';
+  }
+
+  var dr = selection.filter(function(o) { return o.userData.isDoor; });
+  doorBox.style.display = dr.length ? 'flex' : 'none';
+  if (dr.length) {
+    var ds = doorSize(dr[0]);
+    doorBox.querySelector('#drW').value = +ds[0].toFixed(3);
+    doorBox.querySelector('#drH').value = +ds[1].toFixed(3);
+    doorBox.querySelector('#drT').value = +ds[2].toFixed(3);
+    doorBox.querySelector('#drLocked').checked = !!dr[0].userData.doorLocked;
   }
 }
 
@@ -3019,7 +3657,7 @@ function rotateSelected(deg) {
   } else {
     for (var i = 0; i < selection.length; i++) {
       var o = selection[i];
-      if (o.userData.mapType === 'spawn' || o.userData.isProp) continue;
+      if (o.userData.mapType === 'spawn') continue;
       o.rotation.y += rad;
     }
   }
@@ -3092,6 +3730,7 @@ function serializeAny(o) {
     return { k: 'gun', d: { id: o.userData.gunId, name: o.userData.mapName, p: roundArray(o.position.toArray()), q: roundArray([q.x, q.y, q.z, q.w]) } };
   }
   if (kind === 'water') return { k: 'water', d: serializeWater(o) };
+  if (kind === 'door') return { k: 'door', d: serializeDoor(o) };
   if (kind === 'light') {
     var ld = serializeLight(o);
     ld.quaternion = roundArray(o.quaternion.toArray());
@@ -3112,6 +3751,7 @@ function restoreAny(it) {
     return g;
   }
   if (it.k === 'water') return createWater(d);
+  if (it.k === 'door') return createDoor(d);
   if (it.k === 'light') {
     var l = createLight(d);
     if (l) {
@@ -3382,12 +4022,12 @@ transform.addEventListener('objectChange', function() {
   
   var hasProp = false;
   for (var i = 0; i < members.length; i++) {
-    if (members[i].userData.isProp) { hasProp = true; break; }
+    if (fixedSize(members[i])) { hasProp = true; break; }
   }
   if (hasProp && currentTool === 'scale') {
     transformProxy.scale.set(1, 1, 1);
     for (var i = 0; i < members.length; i++) {
-      if (members[i].userData.isProp) members[i].scale.set(1, 1, 1);
+      if (fixedSize(members[i])) members[i].scale.set(1, 1, 1);
     }
     return;
   }
@@ -3415,7 +4055,7 @@ transform.addEventListener('objectChange', function() {
     for (var i = 0; i < members.length; i++) {
       var o = members[i];
       var st = perObjectStart.get(o);
-      if (!st || o.userData.isProp) continue;
+      if (!st || fixedSize(o)) continue;
       var parent = o.parent;
 
       var worldPos = st.pos.clone();
@@ -3468,7 +4108,7 @@ transform.addEventListener('objectChange', function() {
         o.position.copy(proxyStart.pos).add(arm);
         o.quaternion.copy(spin).multiply(st.quat);
       } else if (currentTool === 'scale') {
-        if (o.userData.isProp) continue;
+        if (fixedSize(o)) continue;
         o.scale.set(
           Math.max(SCALE_MIN, st.scale.x * ratio.x),
           Math.max(SCALE_MIN, st.scale.y * ratio.y),
@@ -3963,6 +4603,11 @@ function duplicateOneObject(obj) {
     wd.name += ' 副本';
     return createWater(wd);
   }
+  if (kind === 'door') {
+    var dd = serializeDoor(obj);
+    dd.name += ' 副本';
+    return createDoor(dd);
+  }
   if (kind === 'light') {
     var ld = serializeLight(obj);
     ld.name += ' 副本';
@@ -4020,6 +4665,8 @@ function disposeObject(root) {
   root.traverse(function(o) {
     if (o.isLight && o.parent) o.parent.remove(o);
     if (!o.isMesh && !o.isLineSegments) return;
+    if (o.userData.kitShared) return;
+    if (o.userData.doorPart) { if (o.geometry) o.geometry.dispose(); return; }
     if (o.geometry) o.geometry.dispose();
     var m = Array.isArray(o.material) ? o.material : [o.material];
     for (var i = 0; i < m.length; i++) { if (m[i]) m[i].dispose(); }
@@ -4114,6 +4761,7 @@ function serializeObject(o) {
     result.bounds = modelData.bounds;
     if (o.userData.mapAsset && PROJECT.assets[o.userData.mapAsset]) result.srcAsset = o.userData.mapAsset;
     if (o.userData.mapCollide === false) result.collide = 0;
+    if (o.userData.mapSurface) result.surface = o.userData.mapSurface;
     var msnd = o.userData.mapSounds;
     if (msnd && msnd.length) result.sounds = JSON.parse(JSON.stringify(msnd));
     return result;
@@ -4126,6 +4774,7 @@ function serializeObject(o) {
     rotation: roundArray([o.rotation.x, o.rotation.y, o.rotation.z]),
     scale: roundArray(o.scale.toArray())
   };
+  if (o.userData.mapShape) b.shape = JSON.parse(JSON.stringify(o.userData.mapShape));
   if (o.userData.mapPhysics && o.userData.mapCollide !== false) {
     b.physics = 1;
     b.mass = Math.max(0.2, Math.min(20000, +o.userData.mapMass || defaultMass(o)));
@@ -4157,6 +4806,9 @@ function serializeObject(o) {
     delete b.customTex;
   }
   if (o.userData.mapCollide === false) b.collide = 0;
+  if (o.userData.mapSurface) b.surface = o.userData.mapSurface;
+  var brk = o.userData.mapBreakable;
+  if (brk && o.userData.mapCollide !== false) b.breakable = { hp: brk.hp, piece: brk.piece };
   var snd = o.userData.mapSounds;
   if (snd && snd.length) b.sounds = JSON.parse(JSON.stringify(snd));
   return b;
@@ -4207,7 +4859,7 @@ function spawnMarkers() {
 }
 
 function stripGroupTags(d) {
-  ['objects', 'props', 'guns', 'waters', 'lights'].forEach(function(k) {
+  ['objects', 'props', 'guns', 'waters', 'lights', 'doors'].forEach(function(k) {
     (d[k] || []).forEach(function(x) { if (x) { delete x.grp; delete x.grpName; } });
   });
 }
@@ -4221,7 +4873,8 @@ function serializeMap(opt) {
   var guns = [];
   var waters = [];
   var lights = [];
-  var lists = { object: [], prop: [], gun: [], water: [], light: [], spawn: [] };
+  var doors = [];
+  var lists = { object: [], prop: [], gun: [], water: [], light: [], spawn: [], door: [] };
   var children = objectsRoot.children;
   for (var i = 0; i < children.length; i++) {
     var child = children[i];
@@ -4251,6 +4904,9 @@ function serializeMap(opt) {
     } else if (kind === 'light') {
       lights.push(serializeLight(child));
       lists.light.push(child);
+    } else if (kind === 'door') {
+      doors.push(serializeDoor(child));
+      lists.door.push(child);
     } else {
       objects.push(serializeObject(child));
       lists.object.push(child);
@@ -4258,7 +4914,7 @@ function serializeMap(opt) {
   }
   var groupsData = groupManager.serializeGroups(lists);
   // [v6.2] 冗余：给每个组成员打 grp 标签，防止 groups 索引表在传输中丢失/错位导致组散架或合并
-  var tagArrays = { object: objects, prop: props, gun: guns, water: waters, light: lights };
+  var tagArrays = { object: objects, prop: props, gun: guns, water: waters, light: lights, door: doors };
   for (var tgi = 0; tgi < groupManager.groups.length; tgi++) {
     var tgG = groupManager.groups[tgi];
     for (var tgj = 0; tgj < tgG.members.length; tgj++) {
@@ -4285,6 +4941,7 @@ function serializeMap(opt) {
   if (guns.length) mapData.guns = guns;
   if (waters.length) mapData.waters = waters;
   if (lights.length) mapData.lights = lights;
+  if (doors.length) mapData.doors = doors;
   if (!opt.noAssets) {
     if (opt.allAssets) {
       mapData.assets = PROJECT.assets;
@@ -4679,7 +5336,7 @@ async function exportGltf() {
     if (exportables.length === 0) { toast('❌ 没有可导出的物体'); return; }
     var exportScene = new THREE.Scene();
     for (var i = 0; i < exportables.length; i++) {
-      var clone = exportables[i].clone(true);
+      var clone = kitExportClone(exportables[i]);
       clone.position.copy(exportables[i].position);
       clone.rotation.copy(exportables[i].rotation);
       clone.scale.copy(exportables[i].scale);
@@ -4724,6 +5381,7 @@ function clearObjects() {
   if (groupManager) groupManager.clear();
   if (waterList) waterList.length = 0;
   if (lightList) lightList.length = 0;
+  doorList.length = 0;
   var children = objectsRoot.children.slice();
   for (var i = 0; i < children.length; i++) {
     objectsRoot.remove(children[i]);
@@ -4803,6 +5461,7 @@ function restoreObject(d) {
       m.userData.mapCollide = d.collide === undefined ? true : !!d.collide;
       m.userData.mapSounds = Array.isArray(d.sounds) ? JSON.parse(JSON.stringify(d.sounds)) : [];
       m.userData.mapAsset = d.srcAsset || null;
+      m.userData.mapSurface = typeof d.surface === 'string' ? d.surface : '';
       applyCollideLook(m);
     }
     return m;
@@ -4818,6 +5477,7 @@ function loadMapData(d, rh) {
   var guns = Array.isArray(d.guns) ? d.guns : [];
   var waters = Array.isArray(d.waters) ? d.waters : [];
   var lights = Array.isArray(d.lights) ? d.lights : [];
+  var doorsIn = Array.isArray(d.doors) ? d.doors : [];
   var spawns = Array.isArray(d.spawns) ? d.spawns : (Array.isArray(d.spawn) ? [d.spawn] : []);
   var groupsData = Array.isArray(d.groups) ? d.groups : [];
   historyLock = true;
@@ -4835,9 +5495,12 @@ function loadMapData(d, rh) {
         : d.env[key];
     }
   }
+  var nativeEnv = !!(d.env && typeof d.env === 'object' && d.env.rdb2 && typeof d.env.rdb2 === 'object');
+  PROJECT.env.rdb2 = nativeEnv ? rdb2Merge(d.env.rdb2) : rdb2FromGen1(PROJECT.env);
   applyEnv();
 
-  var lists = { object: [], prop: [], gun: [], water: [], light: [], spawn: [] };
+  var lists = { object: [], prop: [], gun: [], water: [], light: [], spawn: [], door: [] };
+  var kitSkipped = 0;
   for (var i = 0; i < objs.length; i++) {
     var o = objs[i];
     if (!o || o.type === 'spawn') { lists.object.push(null); continue; }
@@ -4852,7 +5515,7 @@ function loadMapData(d, rh) {
       lists.prop.push(null);
       continue;
     }
-    if (!PROP_DEFS[p.id]) { lists.prop.push(null); continue; }
+    if (!PROP_DEFS[p.id]) { kitSkipped++; lists.prop.push(null); continue; }
     var pobj = restoreObject(p);
     lists.prop.push(pobj || null);
   }
@@ -4860,17 +5523,21 @@ function loadMapData(d, rh) {
     var g = guns[i3];
     if (!g || !g.id) { lists.gun.push(null); continue; }
     var gobj = createGun(g.id, { position: g.p || [0, 0.5, 0] });
-    if (!gobj) { lists.gun.push(null); continue; }
+    if (!gobj) { kitSkipped++; lists.gun.push(null); continue; }
     if (g.q && g.q.length === 4) gobj.quaternion.set(g.q[0], g.q[1], g.q[2], g.q[3]);
     lists.gun.push(gobj);
   }
+  if (kitSkipped && rh) toast('已忽略不属于 RagdollBox 2 的物品：' + kitSkipped);
   for (var i4 = 0; i4 < waters.length; i4++) {
     var w = createWater(waters[i4]);
     lists.water.push(w || null);
   }
   for (var i5 = 0; i5 < lights.length; i5++) {
-    var l = createLight(lights[i5]);
+    var l = createLight(nativeEnv ? lights[i5] : Object.assign({}, lights[i5], { castShadow: false }));
     lists.light.push(l || null);
+  }
+  for (var i7 = 0; i7 < doorsIn.length; i7++) {
+    lists.door.push(doorsIn[i7] ? createDoor(doorsIn[i7]) : null);
   }
   for (var i6 = 0; i6 < spawns.length; i6++) {
     var sp = spawns[i6];
@@ -4883,7 +5550,7 @@ function loadMapData(d, rh) {
   }
   // [v6.2] 兜底：按成员上的 grp 标签重建没能还原的组
   if (groupManager) {
-    var tagSrc = { object: objs, prop: props, gun: guns, water: waters, light: lights };
+    var tagSrc = { object: objs, prop: props, gun: guns, water: waters, light: lights, door: doorsIn };
     var byGrp = {}, grpOrder = [];
     for (var tk in tagSrc) {
       for (var ti = 0; ti < tagSrc[tk].length; ti++) {
@@ -5247,8 +5914,45 @@ var ENV_DEFAULTS = {
   voidY: -120
 };
 
+var RDB2_ENV = {
+  sunElev: 50, sunAzim: -40, sunEnergy: 1.1, sunColor: '#ffffff', sunShadow: true,
+  ambColor: '#8c99ad', ambEnergy: 1, ambSky: 0,
+  exposure: 1, tonemap: 'linear', white: 1,
+  sky: 'atmosphere', skyEnergy: 1, clouds: 0.42, cloudSpeed: 2.236, cloudDir: 63.43,
+  stars: 1, sunDisc: 40, sunSize: 0.45,
+  skyTop: '#2f68b0', skyMid: '#bdd6ef', skyBot: '#9a9482', skyColor: '#9cbcd8', skyImage: '',
+  fog: true, fogColor: '#bdd3e6', fogBegin: 90, fogEnd: 240, fogSky: 0.85, haze: 0.35,
+  amb: 'auto', ambVol: 1, ambLayers: []
+};
+
+var AMB_KIT = (KIT.ambience && Array.isArray(KIT.ambience.profiles)) ? KIT.ambience : {
+  beds: {}, fade: 4,
+  profiles: [{ id: 'field', n: '田野' }, { id: 'outdoor', n: '户外' }, { id: 'town', n: '城镇' }, { id: 'arena', n: '竞技场' }]
+};
+var AMB_FADE = +AMB_KIT.fade || 4;
+
+function ambValid(v, withAuto) {
+  if (typeof v !== 'string') return false;
+  if (v === 'none' || (withAuto && v === 'auto')) return true;
+  if (v.indexOf('asset:') === 0 && v.length > 6) return true;
+  return AMB_KIT.profiles.some(function(p) { return p.id === v; });
+}
+
+function ambLayersOf(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(function(e) { return e && typeof e === 'object'; }).map(function(e) {
+    var y = +e.y, v = +e.v, f = +e.fade;
+    return {
+      y: Number.isFinite(y) ? y : 0,
+      amb: ambValid(e.amb, false) ? e.amb : 'outdoor',
+      v: Number.isFinite(v) ? Math.max(0, Math.min(4, v)) : 1,
+      fade: Number.isFinite(f) ? Math.max(0, Math.min(1000, f)) : AMB_FADE
+    };
+  });
+}
+
 var PROJECT = {
-  env: Object.assign({}, ENV_DEFAULTS),
+  env: Object.assign({}, ENV_DEFAULTS, { rdb2: Object.assign({}, RDB2_ENV) }),
   assets: {},
   thumb: ''
 };
@@ -5289,67 +5993,805 @@ var skyMesh = null;
 var skyMat = null;
 var editorAmbient = null;
 var voidPlane = null;
+var skyKit = null;
+var skyRT = null;
+var skyViewScene = null;
+var skyViewCam = null;
+var skyViewMat = null;
+var skySunKey = '';
+var skyHorizon = new THREE.Color(0.74, 0.83, 0.9);
+var skyAverage = new THREE.Color(0.4, 0.55, 0.8);
+var skyClock = 0;
+var LIGHT_ENERGY_K = (1.1 / 1.9) * Math.PI;
+
+var ATMO_GLSL = `
+#define PI 3.141592653589793
+uniform sampler2D transmittance_lut;
+uniform sampler2D multiscatter_lut;
+const float RG = 6360.0;
+const float RT = 6460.0;
+const vec3 RAY_S = vec3(5.802e-3, 13.558e-3, 33.1e-3);
+const float RAY_H = 8.0;
+const float MIE_S = 3.996e-3;
+const float MIE_E = 4.440e-3;
+const float MIE_H = 1.2;
+const float MIE_G = 0.8;
+const vec3 OZO_A = vec3(0.650e-3, 1.881e-3, 0.085e-3);
+const float MS_N = 32.0;
+const float VIEW_W = 192.0;
+const float VIEW_H = 108.0;
+const float RGBM_RANGE = 16.0;
+const float SUN_E = 10.0;
+
+vec2 sphere_hits(vec3 o, vec3 d, float r) {
+  float b = dot(o, d);
+  float c = dot(o, o) - r * r;
+  float disc = b * b - c;
+  if (disc < 0.0) return vec2(-1.0);
+  float s = sqrt(disc);
+  return vec2(-b - s, -b + s);
+}
+
+float dist_top(float r, float mu) {
+  return -r * mu + sqrt(max(r * r * (mu * mu - 1.0) + RT * RT, 0.0));
+}
+
+vec3 transmittance(float r, float mu) {
+  r = clamp(r, RG, RT);
+  float hh = sqrt(RT * RT - RG * RG);
+  float rho = sqrt(max(r * r - RG * RG, 0.0));
+  float d = dist_top(r, mu);
+  float dmin = RT - r;
+  float dmax = rho + hh;
+  vec2 uv = vec2((d - dmin) / max(dmax - dmin, 1e-4), rho / hh);
+  return exp(-texture2D(transmittance_lut, uv).rgb);
+}
+
+vec3 sun_transmittance(vec3 p, vec3 s) {
+  float r = length(p);
+  vec3 up = p / r;
+  float mu = dot(up, s);
+  vec2 g = sphere_hits(p, s, RG);
+  float lit = g.y > 0.0 ? 0.0 : 1.0;
+  return transmittance(r, mu) * lit;
+}
+
+vec3 multiscatter(float r, float mu_s) {
+  float x = clamp(mu_s * 0.5 + 0.5, 0.0, 1.0);
+  float y = sqrt(clamp((r - RG) / (RT - RG), 0.0, 1.0));
+  vec2 uv = (vec2(x, y) * (MS_N - 1.0) + 0.5) / MS_N;
+  return texture2D(multiscatter_lut, uv).rgb;
+}
+
+float phase_rayleigh(float nu) {
+  return 3.0 / (16.0 * PI) * (1.0 + nu * nu);
+}
+
+float phase_mie(float nu, float g) {
+  float k = 3.0 / (8.0 * PI) * (1.0 - g * g) / (2.0 + g * g);
+  return k * (1.0 + nu * nu) / pow(1.0 + g * g - 2.0 * g * nu, 1.5);
+}
+
+float horizon_beta(float r) {
+  return acos(clamp(sqrt(max(r * r - RG * RG, 0.0)) / r, -1.0, 1.0));
+}
+
+vec2 view_lut_uv(float r, float view_cos, float light_cos) {
+  float beta = horizon_beta(r);
+  float zha = PI - beta;
+  float za = acos(clamp(view_cos, -1.0, 1.0));
+  float v;
+  if (za < zha) {
+    float c = za / zha;
+    c = 1.0 - sqrt(max(1.0 - c, 0.0));
+    v = c * 0.5;
+  } else {
+    float c = (za - zha) / max(beta, 1e-5);
+    v = sqrt(clamp(c, 0.0, 1.0)) * 0.5 + 0.5;
+  }
+  float u = sqrt(clamp(-light_cos * 0.5 + 0.5, 0.0, 1.0));
+  return vec2((u + 0.5 / VIEW_W) * (VIEW_W / (VIEW_W + 1.0)), (v + 0.5 / VIEW_H) * (VIEW_H / (VIEW_H + 1.0)));
+}
+
+vec4 rgbm_encode(vec3 c) {
+  float m = clamp(max(max(c.r, c.g), max(c.b, 1e-6)) / RGBM_RANGE, 1.0 / 255.0, 1.0);
+  m = ceil(m * 255.0) / 255.0;
+  return vec4(clamp(c / (m * RGBM_RANGE), 0.0, 1.0), m);
+}
+
+vec3 rgbm_decode(vec4 e) {
+  return e.rgb * e.a * RGBM_RANGE;
+}
+`;
+
+var SKYVIEW_GLSL = `
+varying vec2 vUv;
+uniform float view_km;
+uniform vec3 sun_dir;
+uniform vec3 ground_albedo;
+
+void main() {
+  vec2 uv = (vUv - 0.5 / vec2(VIEW_W, VIEW_H)) * (vec2(VIEW_W, VIEW_H) / (vec2(VIEW_W, VIEW_H) - 1.0));
+  uv = clamp(uv, 0.0, 1.0);
+  float r = RG + max(view_km, 0.01);
+  float beta = horizon_beta(r);
+  float zha = PI - beta;
+  float za;
+  if (uv.y < 0.5) {
+    float c = 1.0 - 2.0 * uv.y;
+    za = zha * (1.0 - c * c);
+  } else {
+    float c = uv.y * 2.0 - 1.0;
+    za = zha + beta * c * c;
+  }
+  float light_cos = -(uv.x * uv.x * 2.0 - 1.0);
+  float light_sin = sqrt(max(1.0 - light_cos * light_cos, 0.0));
+  vec3 s = normalize(sun_dir);
+  vec2 sh = s.xz;
+  float sl = length(sh);
+  vec2 sx = sl > 1e-5 ? sh / sl : vec2(1.0, 0.0);
+  vec2 sz = vec2(-sx.y, sx.x);
+  float vs = sin(za);
+  vec2 dh = (sx * light_cos + sz * light_sin) * vs;
+  vec3 d = vec3(dh.x, cos(za), dh.y);
+  vec3 o = vec3(0.0, r, 0.0);
+  vec3 lum = vec3(0.0);
+  vec3 thr = vec3(1.0);
+  vec2 top = sphere_hits(o, d, RT);
+  if (top.y > 0.0) {
+    float t0 = max(top.x, 0.0);
+    float t1 = top.y;
+    vec2 gnd = sphere_hits(o, d, RG);
+    bool hit = gnd.x > 0.0;
+    if (hit) t1 = gnd.x;
+    float nu = dot(d, s);
+    float pr = phase_rayleigh(nu);
+    float pm = phase_mie(nu, MIE_G);
+    float span = t1 - t0;
+    float n = 40.0;
+    float prev = 0.0;
+    for (int i = 0; i < 40; i++) {
+      float a = (float(i) + 1.0) / n;
+      float tn = a * a * span;
+      float dt = tn - prev;
+      float t = t0 + (prev + tn) * 0.5;
+      prev = tn;
+      vec3 p = o + d * t;
+      float rp = length(p);
+      float h = rp - RG;
+      float dr = exp(-h / RAY_H);
+      float dm = exp(-h / MIE_H);
+      float dz = max(0.0, 1.0 - abs(h - 25.0) / 15.0);
+      vec3 rs = RAY_S * dr;
+      float ms = MIE_S * dm;
+      vec3 ext = rs + vec3(MIE_E * dm) + OZO_A * dz;
+      vec3 up = p / rp;
+      float mu_s = dot(up, s);
+      vec3 ts = sun_transmittance(p, s);
+      vec3 psi = multiscatter(rp, mu_s);
+      vec3 src = ts * (rs * pr + ms * pm) + psi * (rs + ms);
+      vec3 st = exp(-ext * dt);
+      vec3 sint = (src - src * st) / max(ext, vec3(1e-7));
+      lum += thr * sint;
+      thr *= st;
+    }
+    if (hit) {
+      vec3 p = o + d * t1;
+      vec3 up = normalize(p);
+      float ndl = max(dot(up, s), 0.0);
+      vec3 ts = sun_transmittance(p + up * 0.01, s);
+      vec3 amb = multiscatter(RG + 0.01, dot(up, s)) * 1.2;
+      lum += thr * ground_albedo * (ts * ndl / PI + amb);
+    }
+  }
+  gl_FragColor = rgbm_encode(lum * SUN_E);
+}
+`;
+
+var SKY_GLSL = `
+varying vec3 vDir;
+uniform sampler2D sky_view;
+uniform sampler2D noise_rgb;
+uniform sampler2D noise_a;
+uniform sampler2D pano;
+uniform int sky_mode;
+uniform float view_km;
+uniform vec2 cam_km;
+uniform vec3 sun_dir;
+uniform vec3 sun_col;
+uniform float time;
+uniform float haze;
+uniform vec3 haze_color;
+uniform float star_gain;
+uniform float cloud_coverage;
+uniform vec2 flat_wind;
+uniform float sun_disc;
+uniform float sun_radius_deg;
+uniform float sky_energy;
+uniform vec3 g_top;
+uniform vec3 g_mid;
+uniform vec3 g_bot;
+
+const float shoulder = 0.7;
+const float flat_density = 5.0;
+const float flat_height = 3.2;
+const float flat_thickness = 0.9;
+const float flat_tile = 9.0;
+const float flat_erosion = 0.8;
+const float cloud_ambient = 1.0;
+const float cloud_sun = 1.0;
+
+vec4 noise4(vec2 uv) {
+  return vec4(texture2D(noise_rgb, uv).rgb, texture2D(noise_a, uv).r);
+}
+
+vec3 atmosphere(vec3 d, vec3 s) {
+  float r = RG + max(view_km, 0.01);
+  vec2 dh = d.xz;
+  vec2 sh = s.xz;
+  float c = dot(dh, sh) * inversesqrt(max(dot(dh, dh) * dot(sh, sh), 1e-12));
+  vec2 px = view_lut_uv(r, d.y, c) * vec2(VIEW_W, VIEW_H) - 0.5;
+  vec2 f = fract(px);
+  ivec2 i0 = ivec2(floor(px));
+  ivec2 hi = ivec2(int(VIEW_W) - 1, int(VIEW_H) - 1);
+  vec3 a = rgbm_decode(texelFetch(sky_view, clamp(i0, ivec2(0), hi), 0));
+  vec3 b = rgbm_decode(texelFetch(sky_view, clamp(i0 + ivec2(1, 0), ivec2(0), hi), 0));
+  vec3 e = rgbm_decode(texelFetch(sky_view, clamp(i0 + ivec2(0, 1), ivec2(0), hi), 0));
+  vec3 g = rgbm_decode(texelFetch(sky_view, clamp(i0 + ivec2(1, 1), ivec2(0), hi), 0));
+  return mix(mix(a, b, f.x), mix(e, g, f.x), f.y);
+}
+
+vec3 air_trans(vec3 o, vec3 d, float t) {
+  vec3 a = o;
+  if (length(o) > RT) {
+    vec2 top = sphere_hits(o, d, RT);
+    a = o + d * max(top.x, 0.0);
+  }
+  vec3 p = o + d * t;
+  float ra = length(a);
+  float rp = length(p);
+  float mua = dot(a, d) / ra;
+  float mup = dot(p, d) / rp;
+  vec2 g = sphere_hits(o, d, RG);
+  if (g.x > 0.0) {
+    return min(transmittance(rp, -mup) / max(transmittance(ra, -mua), vec3(1e-4)), vec3(1.0));
+  }
+  return min(transmittance(ra, mua) / max(transmittance(rp, mup), vec3(1e-4)), vec3(1.0));
+}
+
+vec3 soft(vec3 c) {
+  vec3 k = vec3(shoulder);
+  vec3 over = k + (1.0 - k) * (1.0 - exp(-(c - k) / (1.0 - k)));
+  return mix(c, over, step(k, c));
+}
+
+float hg(float nu, float g) {
+  float d = 1.0 + g * g - 2.0 * g * nu;
+  return (1.0 - g * g) / (d * sqrt(d));
+}
+
+float cover(float n, float cov) {
+  return clamp((n - (1.0 - cov)) / max(cov, 0.02), 0.0, 1.0);
+}
+
+float hash13(vec3 p) {
+  p = fract(p * 0.1031);
+  p += dot(p, p.zyx + 31.32);
+  return fract((p.x + p.y) * p.z);
+}
+
+vec3 star_field(vec3 d) {
+  vec3 p = d * 180.0;
+  vec3 c = floor(p);
+  vec3 f = fract(p);
+  float h = hash13(c);
+  if (h < 0.985) return vec3(0.0);
+  vec3 o = vec3(hash13(c + 17.0), hash13(c + 41.0), hash13(c + 73.0)) * 0.7 + 0.15;
+  float k = length(f - o);
+  float b = pow((h - 0.985) / 0.015, 4.0);
+  float t = hash13(c + 91.0);
+  vec3 tint = mix(vec3(1.0, 0.85, 0.7), vec3(0.75, 0.85, 1.0), t);
+  return tint * b * smoothstep(0.2, 0.0, k) * 8.0;
+}
+
+vec3 sun_light(vec3 s, float r, vec3 sc) {
+  return sc * transmittance(r, s.y) / transmittance(RG, 1.0);
+}
+
+vec4 flat_clouds(vec3 d, vec3 s, vec3 sky, vec3 sc, float tm) {
+  vec3 o = vec3(0.0, RG + max(view_km, 0.01), 0.0);
+  vec2 hc = sphere_hits(o, d, RG + flat_height);
+  vec2 hgnd = sphere_hits(o, d, RG);
+  float t;
+  bool above = view_km > flat_height;
+  if (above) {
+    if (hc.x < 0.0) return vec4(0.0, 0.0, 0.0, 1.0);
+    t = hc.x;
+  } else {
+    if (hgnd.x > 0.0 && d.y < -0.02) return vec4(0.0, 0.0, 0.0, 1.0);
+    t = hc.y;
+  }
+  vec3 p = o + d * t;
+  vec2 wind = flat_wind * flat_tile * tm / 3600.0;
+  vec2 uv = (p.xz + cam_km + wind) / flat_tile;
+  float weather = noise4(uv / 7.0 + vec2(0.37, 0.11)).a;
+  float cov = clamp(cloud_coverage + (weather - 0.5) * 0.6, 0.0, 1.0);
+  vec4 nz = noise4(uv);
+  float sh = cover(nz.r, cov);
+  vec4 m = noise4(uv * 4.0 + vec2(0.31, 0.67));
+  float det = nz.g * 0.5 + m.g * 0.3 + m.b * 0.2;
+  float e = det * flat_erosion;
+  float dens = clamp((sh - e) / max(1.0 - e, 0.05), 0.0, 1.0);
+  float bump = mix(0.72, 1.18, nz.g * 0.6 + m.g * 0.4);
+  vec2 sdir = s.xz * inversesqrt(max(dot(s.xz, s.xz), 1e-8));
+  float run = min(flat_thickness * sqrt(max(1.0 - s.y * s.y, 0.0)) / max(s.y, 0.08), 4.0);
+  float od = sh * 0.5;
+  for (int i = 1; i <= 3; i++) {
+    vec2 q = uv + sdir * (run * float(i) / 3.0) / flat_tile;
+    od += cover(noise4(q).r, cov);
+  }
+  od = od / 3.5 * flat_density * flat_thickness / max(s.y, 0.15);
+  float view_up = above ? 0.25 : 0.35 + 0.65 * abs(d.y);
+  float lit = exp(-od * view_up) * bump;
+  float nu = dot(d, s);
+  float ph = mix(hg(nu, 0.6), hg(nu, -0.2), 0.35);
+  float powder = 1.0 - exp(-dens * flat_density * 2.0);
+  vec3 zen = atmosphere(vec3(0.0, 1.0, 0.0), s);
+  vec3 amb = zen * 1.1 * cloud_ambient * (1.0 - 0.45 * dens);
+  vec3 lc = sun_light(s, RG + flat_height, sc) * cloud_sun * lit * (0.55 + 0.45 * ph) * mix(1.0, powder, 0.5) + amb * 0.55;
+  float path = 1.0 + 2.5 * (1.0 - smoothstep(0.0, 0.35, abs(d.y)));
+  float alpha = 1.0 - exp(-dens * dens * flat_density * path * 1.6);
+  if (!above) alpha *= smoothstep(-0.02, 0.03, d.y);
+  vec3 ta = air_trans(o, d, t);
+  lc = lc * ta + sky * (1.0 - ta);
+  return vec4(lc * alpha, 1.0 - alpha);
+}
+
+vec3 sky_base(vec3 d, vec3 s) {
+  vec3 col = soft(atmosphere(d, s));
+  float near = haze * (1.0 - smoothstep(0.3, 2.0, view_km));
+  if (near > 0.0) {
+    float band = exp(-abs(d.y) / 0.06);
+    col = mix(col, haze_color, near * band);
+  }
+  return col;
+}
+
+vec3 sky_extras(vec3 d, vec3 s, vec3 col, vec3 sc, float clear) {
+  vec3 o = vec3(0.0, RG + max(view_km, 0.01), 0.0);
+  vec2 hgnd = sphere_hits(o, d, RG);
+  if (hgnd.x > 0.0) return col;
+  float r = RG + max(view_km, 0.01);
+  vec3 tv = transmittance(r, d.y);
+  float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
+  col += star_field(d) * star_gain * clear * tv * clamp(1.0 - lum * 12.0, 0.0, 1.0);
+  float a = acos(clamp(dot(d, s), -1.0, 1.0)) / radians(sun_radius_deg);
+  if (a < 1.2) {
+    float limb = 1.0 - 0.6 * (1.0 - sqrt(max(1.0 - a * a, 0.0)));
+    col += sc * tv / transmittance(RG, 1.0) * sun_disc * limb * smoothstep(1.0, 0.85, a) * clear;
+  }
+  return col;
+}
+
+vec3 procedural(vec3 d, vec3 s) {
+  float v_angle = acos(clamp(d.y, -1.0, 1.0));
+  float c = 1.0 - v_angle / (PI * 0.5);
+  vec3 sky = mix(g_mid, g_top, clamp(1.0 - pow(max(1.0 - c, 0.0), 1.0 / 0.15), 0.0, 1.0));
+  float sa = acos(clamp(dot(s, d), -1.0, 1.0));
+  float amax = radians(30.0);
+  if (sa < amax) {
+    float c2 = sa / amax;
+    sky = mix(sun_col, sky, clamp(1.0 - pow(max(1.0 - c2, 0.0), 1.0 / 0.15), 0.0, 1.0));
+  }
+  float cg = (v_angle - PI * 0.5) / (PI * 0.5);
+  vec3 ground = mix(g_mid, g_bot, clamp(1.0 - pow(max(1.0 - cg, 0.0), 1.0 / 0.02), 0.0, 1.0));
+  return d.y >= 0.0 ? sky : ground;
+}
+
+void main() {
+  vec3 d = normalize(vDir);
+  vec3 s = normalize(sun_dir);
+  vec3 col;
+  if (sky_mode == 0) {
+    vec3 base = sky_base(d, s);
+    vec4 cl = flat_clouds(d, s, base, sun_col, time);
+    col = sky_extras(d, s, base * cl.a + cl.rgb, sun_col, cl.a);
+  } else if (sky_mode == 1) {
+    col = procedural(d, s);
+  } else {
+    vec2 pc = vec2(atan(d.x, -d.z), acos(clamp(d.y, -1.0, 1.0)));
+    if (pc.x < 0.0) pc.x += PI * 2.0;
+    pc /= vec2(PI * 2.0, PI);
+    col = texture2D(pano, pc).rgb;
+  }
+  gl_FragColor = vec4(col * sky_energy, 1.0);
+}
+`;
+
+function rdb2Merge(raw) {
+  var out = Object.assign({}, RDB2_ENV);
+  if (raw && typeof raw === 'object') {
+    for (var k in RDB2_ENV) if (raw[k] !== undefined && raw[k] !== null) out[k] = raw[k];
+  }
+  if (!ambValid(out.amb, true)) out.amb = 'auto';
+  out.ambVol = Number.isFinite(+out.ambVol) ? Math.max(0, Math.min(4, +out.ambVol)) : 1;
+  out.ambLayers = ambLayersOf(out.ambLayers);
+  return out;
+}
+
+function ambOptions(cur, withAuto) {
+  var opt = function(v, n) { return '<option value="' + escapeHtml(v) + '"' + (v === cur ? ' selected' : '') + '>' + escapeHtml(n) + '</option>'; };
+  var h = withAuto ? opt('auto', '自动（按地图）') : '';
+  AMB_KIT.profiles.forEach(function(p) { h += opt(p.id, p.n || p.id); });
+  h += opt('none', '无');
+  var snds = assetList('sound');
+  if (snds.length) {
+    h += '<optgroup label="项目资源">' + snds.map(function(e) { return opt('asset:' + e.key, e.asset.name || e.key); }).join('') + '</optgroup>';
+  }
+  if (cur && cur.indexOf('asset:') === 0 && !PROJECT.assets[cur.slice(6)]) h += opt(cur, cur);
+  return h;
+}
+
+function ambZones() {
+  var r = rdb2Env();
+  var base = r.amb === 'auto' || !ambValid(r.amb, true) ? 'outdoor' : r.amb;
+  var zones = [{ amb: base, v: +r.ambVol, y: -Infinity, fade: 0 }];
+  return zones.concat(ambLayersOf(r.ambLayers).sort(function(a, b) { return a.y - b.y; }));
+}
+
+function ambWeights(zones, y) {
+  var out = new Array(zones.length), keep = 1;
+  for (var k = zones.length - 1; k >= 0; k--) {
+    var rise = 1;
+    if (k > 0) {
+      var h = zones[k].y, f = zones[k].fade;
+      if (f <= 0) rise = y >= h ? 1 : 0;
+      else {
+        var t = Math.max(0, Math.min(1, (y - (h - f * 0.5)) / f));
+        rise = t * t * (3 - 2 * t);
+      }
+    }
+    out[k] = rise * keep;
+    keep *= 1 - rise;
+  }
+  return out;
+}
+
+var ambPreview = null;
+
+function ambPreviewToggle() {
+  if (ambPreview) {
+    for (var id in ambPreview) { ambPreview[id].pause(); ambPreview[id].src = ''; }
+    ambPreview = null;
+  } else {
+    ambPreview = {};
+    ambPreviewTick();
+  }
+  var b = panelProject && panelProject.querySelector('#pvAmbPlay');
+  if (b) b.textContent = ambPreview ? '■ 停止试听' : '▶ 试听（按当前视角高度）';
+}
+
+function ambPreviewTick() {
+  if (!ambPreview) return;
+  var zones = ambZones();
+  var w = ambWeights(zones, camera.position.y);
+  var gains = {};
+  zones.forEach(function(z, k) {
+    var g = w[k] * z.v;
+    if (z.amb.indexOf('asset:') === 0) {
+      gains[z.amb] = (gains[z.amb] || 0) + g;
+      return;
+    }
+    var p = AMB_KIT.profiles.filter(function(x) { return x.id === z.amb; })[0];
+    if (!p || !p.beds) return;
+    for (var bed in p.beds) gains[bed] = (gains[bed] || 0) + g * Math.pow(10, p.beds[bed] / 20);
+  });
+  for (var id in gains) {
+    if (!ambPreview[id]) {
+      var url = id.indexOf('asset:') === 0 ? assetUrl(id.slice(6)) : (AMB_KIT.beds[id] ? KIT_BASE + AMB_KIT.beds[id] : '');
+      if (!url) continue;
+      var au = new Audio(url);
+      au.loop = true;
+      au.volume = 0;
+      au.play().catch(function() { });
+      ambPreview[id] = au;
+    }
+  }
+  for (var k2 in ambPreview) ambPreview[k2].volume = Math.max(0, Math.min(1, gains[k2] || 0));
+}
+
+function renderAmbLayers() {
+  if (!panelProject) return;
+  var host = panelProject.querySelector('#pvAmbLayers');
+  var r = rdb2Env();
+  var list = ambLayersOf(r.ambLayers);
+  host.innerHTML = '';
+  list.forEach(function(e, i) {
+    var row = document.createElement('div');
+    row.className = 'ambRow envRow';
+    row.innerHTML = '<label>高度</label><input class="aY" type="number" step="1" value="' + e.y + '" />' +
+      '<select class="aA">' + ambOptions(e.amb, false) + '</select>' +
+      '<label>音量</label><input class="aV" type="number" min="0" max="4" step="0.1" value="' + e.v + '" />' +
+      '<label>过渡</label><input class="aF" type="number" min="0" max="1000" step="0.5" value="' + e.fade + '" />' +
+      '<button class="btn-small danger aDel">删</button>';
+    var set = function(key, val) {
+      var next = ambLayersOf(rdb2Env().ambLayers);
+      if (key === null) next.splice(i, 1); else next[i][key] = val;
+      rdb2Env().ambLayers = next;
+      renderAmbLayers();
+      pushHistory();
+    };
+    row.querySelector('.aY').onchange = function() { set('y', +this.value || 0); };
+    row.querySelector('.aA').onchange = function() { set('amb', this.value); };
+    row.querySelector('.aV').onchange = function() { set('v', Math.max(0, Math.min(4, +this.value || 0))); };
+    row.querySelector('.aF').onchange = function() { set('fade', Math.max(0, Math.min(1000, +this.value || 0))); };
+    row.querySelector('.aDel').onclick = function() { set(null); };
+    row.querySelectorAll('input').forEach(function(inp) { inp.addEventListener('keydown', function(ev) { ev.stopPropagation(); }); });
+    host.appendChild(row);
+  });
+}
+
+function rdb2Env() {
+  if (!PROJECT.env.rdb2) PROJECT.env.rdb2 = Object.assign({}, RDB2_ENV);
+  return PROJECT.env.rdb2;
+}
+
+function envNum(v, def) {
+  var n = +v;
+  return Number.isFinite(n) ? n : def;
+}
+
+function envClamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+function srgbTriplet(hex, def) {
+  var c = new THREE.Color();
+  try { c.setStyle(hex || def, THREE.SRGBColorSpace); } catch (e) { c.setStyle(def, THREE.SRGBColorSpace); }
+  var o = { r: 0, g: 0, b: 0 };
+  c.getRGB(o, THREE.SRGBColorSpace);
+  return [o.r, o.g, o.b];
+}
+
+function tripletHex(t) {
+  var c = new THREE.Color();
+  c.setRGB(envClamp(t[0], 0, 1), envClamp(t[1], 0, 1), envClamp(t[2], 0, 1), THREE.SRGBColorSpace);
+  return '#' + c.getHexString(THREE.SRGBColorSpace);
+}
+
+function gen1Differs(e, k) {
+  var a = e[k];
+  var b = ENV_DEFAULTS[k];
+  if (a === undefined || a === null) return false;
+  if (Array.isArray(b)) {
+    if (!Array.isArray(a) || a.length < b.length) return true;
+    for (var i = 0; i < b.length; i++) if (+a[i] !== +b[i]) return true;
+    return false;
+  }
+  if (typeof b === 'number') return +a !== b;
+  return String(a) !== String(b);
+}
+
+function rdb2FromGen1(e) {
+  var d = ENV_DEFAULTS;
+  var r = Object.assign({}, RDB2_ENV);
+  r.sunEnergy = +(1.1 * envClamp(envNum(e.sunIntensity, d.sunIntensity), 0, 8) / d.sunIntensity).toFixed(4);
+  r.sunColor = gen1Differs(e, 'sunColor') ? e.sunColor : '#ffffff';
+  if (gen1Differs(e, 'sunDir')) {
+    var v = new THREE.Vector3(envNum(e.sunDir[0], 0), envNum(e.sunDir[1], 0), envNum(e.sunDir[2], 0));
+    if (v.length() > 1e-4) {
+      v.normalize();
+      r.sunElev = +(Math.asin(envClamp(v.y, -1, 1)) * 180 / Math.PI).toFixed(2);
+      r.sunAzim = +(Math.atan2(v.x, v.z) * 180 / Math.PI).toFixed(2);
+    }
+  }
+  r.sunShadow = e.sunShadow !== false;
+  var hemiI = envClamp(envNum(e.hemiIntensity, d.hemiIntensity), 0, 6);
+  var ambI = envClamp(envNum(e.ambientIntensity, d.ambientIntensity), 0, 6);
+  var total = hemiI + ambI;
+  r.ambEnergy = +(total / d.hemiIntensity).toFixed(4);
+  var c = [0.55, 0.60, 0.68];
+  if (gen1Differs(e, 'hemiSky') || gen1Differs(e, 'hemiGround')) {
+    var hs = srgbTriplet(e.hemiSky, d.hemiSky), hg = srgbTriplet(e.hemiGround, d.hemiGround);
+    var ds = srgbTriplet(d.hemiSky, d.hemiSky), dg = srgbTriplet(d.hemiGround, d.hemiGround);
+    for (var i = 0; i < 3; i++) {
+      var now = (hs[i] + hg[i]) * 0.5, was = (ds[i] + dg[i]) * 0.5;
+      c[i] = c[i] * now / Math.max(was, 0.01);
+    }
+  }
+  if (ambI > 0 && total > 0) {
+    var ac = srgbTriplet(e.ambientColor, '#ffffff');
+    for (var j = 0; j < 3; j++) c[j] = c[j] + (ac[j] - c[j]) * (ambI / total);
+  }
+  r.ambColor = tripletHex(c);
+  r.exposure = envClamp(envNum(e.exposure, 1), 0.1, 4);
+  var mode = e.skyMode || d.skyMode;
+  if (mode === 'image' && e.skyImage) {
+    r.sky = 'image';
+    r.skyImage = e.skyImage;
+  } else if (mode === 'color') {
+    r.sky = 'color';
+    r.skyColor = e.skyColor || d.skyColor;
+  } else if (mode === 'gradient' && (gen1Differs(e, 'skyTop') || gen1Differs(e, 'skyMid') || gen1Differs(e, 'skyBot'))) {
+    r.sky = 'gradient';
+    r.skyTop = e.skyTop || d.skyTop;
+    r.skyMid = e.skyMid || d.skyMid;
+    r.skyBot = e.skyBot || d.skyBot;
+  }
+  r.fog = e.fog === undefined ? d.fog : !!e.fog;
+  r.fogColor = e.fogColor || d.fogColor;
+  r.fogBegin = envClamp(envNum(e.fogNear, d.fogNear), 0, 4000);
+  r.fogEnd = Math.max(r.fogBegin + 1, envClamp(envNum(e.fogFar, d.fogFar), 1, 8000));
+  r.haze = r.fog ? 0.35 : 0;
+  return r;
+}
+
+function sunVector(r) {
+  var el = envClamp(envNum(r.sunElev, 50), -90, 90) * Math.PI / 180;
+  var az = envNum(r.sunAzim, -40) * Math.PI / 180;
+  return new THREE.Vector3(Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az));
+}
+
+function loadSkyKit() {
+  var k = KIT.sky;
+  if (!k || !k.transmittance || !k.multiscatter || !k.noise_rgb || !k.noise_a) return Promise.resolve(null);
+  var bin = function(e) {
+    return fetch(KIT_BASE + e.file).then(function(res) { return res.arrayBuffer(); }).then(function(buf) {
+      var f = new Float32Array(buf);
+      var n = e.w * e.h;
+      var h = new Uint16Array(n * 4);
+      var one = THREE.DataUtils.toHalfFloat(1);
+      for (var i = 0; i < n; i++) {
+        h[i * 4] = THREE.DataUtils.toHalfFloat(f[i * 3]);
+        h[i * 4 + 1] = THREE.DataUtils.toHalfFloat(f[i * 3 + 1]);
+        h[i * 4 + 2] = THREE.DataUtils.toHalfFloat(f[i * 3 + 2]);
+        h[i * 4 + 3] = one;
+      }
+      var t = new THREE.DataTexture(h, e.w, e.h, THREE.RGBAFormat, THREE.HalfFloatType);
+      t.minFilter = t.magFilter = THREE.LinearFilter;
+      t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+      t.generateMipmaps = false;
+      t.needsUpdate = true;
+      return t;
+    });
+  };
+  var png = function(file) {
+    return new Promise(function(done) {
+      var t = new THREE.TextureLoader().load(KIT_BASE + file, function() { done(t); }, undefined, function() { done(null); });
+      t.flipY = false;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.colorSpace = THREE.NoColorSpace;
+      t.minFilter = THREE.LinearMipmapLinearFilter;
+    });
+  };
+  return Promise.all([bin(k.transmittance), bin(k.multiscatter), png(k.noise_rgb), png(k.noise_a)]).then(function(r) {
+    if (!r[0] || !r[1] || !r[2] || !r[3]) return null;
+    return { trans: r[0], multi: r[1], noiseRGB: r[2], noiseA: r[3] };
+  }).catch(function() { return null; });
+}
 
 function buildEditorSky() {
+  skyRT = new THREE.WebGLRenderTarget(192, 108, {
+    type: THREE.UnsignedByteType, format: THREE.RGBAFormat,
+    minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter,
+    depthBuffer: false, generateMipmaps: false
+  });
+  var blank = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
+  blank.needsUpdate = true;
+  skyViewMat = new THREE.ShaderMaterial({
+    uniforms: {
+      transmittance_lut: { value: blank },
+      multiscatter_lut: { value: blank },
+      view_km: { value: 0.05 },
+      sun_dir: { value: new THREE.Vector3(0, 0.7, 0.7) },
+      ground_albedo: { value: new THREE.Vector3(0.08, 0.10, 0.07) }
+    },
+    vertexShader: 'varying vec2 vUv;\nvoid main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+    fragmentShader: ATMO_GLSL + SKYVIEW_GLSL,
+    depthTest: false,
+    depthWrite: false
+  });
+  skyViewScene = new THREE.Scene();
+  var quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), skyViewMat);
+  quad.frustumCulled = false;
+  skyViewScene.add(quad);
+  skyViewCam = new THREE.Camera();
+
   skyMat = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
     fog: false,
     uniforms: {
-      uTop: { value: new THREE.Color(ENV_DEFAULTS.skyTop) },
-      uMid: { value: new THREE.Color(ENV_DEFAULTS.skyMid) },
-      uBot: { value: new THREE.Color(ENV_DEFAULTS.skyBot) },
-      uSun: { value: new THREE.Vector3(0.4, 0.8, 0.3) },
-      uSunCol: { value: new THREE.Color(0xfff4d8) },
-      uTime: { value: 0 }
+      transmittance_lut: { value: blank },
+      multiscatter_lut: { value: blank },
+      sky_view: { value: skyRT.texture },
+      noise_rgb: { value: blank },
+      noise_a: { value: blank },
+      pano: { value: blank },
+      sky_mode: { value: 1 },
+      view_km: { value: 0.05 },
+      cam_km: { value: new THREE.Vector2(0, 0) },
+      sun_dir: { value: new THREE.Vector3(0, 0.7, 0.7) },
+      sun_col: { value: new THREE.Vector3(1.1, 1.1, 1.1) },
+      time: { value: 0 },
+      haze: { value: 0.35 },
+      haze_color: { value: new THREE.Color(RDB2_ENV.fogColor) },
+      star_gain: { value: 1 },
+      cloud_coverage: { value: 0.42 },
+      flat_wind: { value: new THREE.Vector2(2, 1) },
+      sun_disc: { value: 40 },
+      sun_radius_deg: { value: 0.45 },
+      sky_energy: { value: 1 },
+      g_top: { value: new THREE.Color(RDB2_ENV.skyTop) },
+      g_mid: { value: new THREE.Color(RDB2_ENV.skyMid) },
+      g_bot: { value: new THREE.Color(RDB2_ENV.skyBot) }
     },
     vertexShader: [
       'varying vec3 vDir;',
       'void main() {',
-      '  vDir = normalize(position);',
-      '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+      '  vDir = position;',
+      '  vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+      '  p.z = p.w * 0.99999;',
+      '  gl_Position = p;',
       '}'
     ].join('\n'),
-    fragmentShader: [
-      'precision highp float;',
-      'varying vec3 vDir;',
-      'uniform vec3 uTop, uMid, uBot, uSun, uSunCol;',
-      'uniform float uTime;',
-      'float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
-      'float noise(vec2 p){',
-      '  vec2 i = floor(p), f = fract(p);',
-      '  vec2 u = f * f * (3.0 - 2.0 * f);',
-      '  return mix(mix(hash(i), hash(i + vec2(1,0)), u.x),',
-      '             mix(hash(i + vec2(0,1)), hash(i + vec2(1,1)), u.x), u.y);',
-      '}',
-      'float fbm(vec2 p){',
-      '  float v = 0.0, a = 0.5;',
-      '  for(int i = 0; i < 4; i++){ v += a * noise(p); p *= 2.03; a *= 0.5; }',
-      '  return v;',
-      '}',
-      'void main(){',
-      '  vec3 d = normalize(vDir);',
-      '  float h = d.y;',
-      '  vec3 col = h > 0.0',
-      '    ? mix(uMid, uTop, sqrt(clamp(h, 0.0, 1.0)))',
-      '    : mix(uMid, uBot, clamp(-h * 3.0, 0.0, 1.0));',
-      '  if (h > 0.02) {',
-      '    vec2 uv = d.xz / (h + 0.35);',
-      '    float c = fbm(uv * 1.6 + vec2(uTime * 0.008, uTime * 0.004));',
-      '    c = smoothstep(0.55, 0.95, c) * smoothstep(0.02, 0.28, h);',
-      '    col = mix(col, vec3(1.0, 0.99, 0.97), clamp(c, 0.0, 1.0) * 0.6);',
-      '  }',
-      '  float sd = max(dot(d, normalize(uSun)), 0.0);',
-      '  col += uSunCol * pow(sd, 220.0) * 1.4;',
-      '  col += uSunCol * pow(sd, 8.0) * 0.06;',
-      '  gl_FragColor = vec4(min(max(col, vec3(0.0)), vec3(4.0)), 1.0);',
-      '}'
-    ].join('\n')
+    fragmentShader: ATMO_GLSL + SKY_GLSL
   });
-  skyMesh = new THREE.Mesh(new THREE.SphereGeometry(340, 32, 16), skyMat);
+  skyMesh = new THREE.Mesh(new THREE.SphereGeometry(300, 48, 24), skyMat);
   skyMesh.frustumCulled = false;
-  skyMesh.renderOrder = 999;
   scene.add(skyMesh);
+
+  loadSkyKit().then(function(k) {
+    if (!k) return;
+    skyKit = k;
+    skyViewMat.uniforms.transmittance_lut.value = k.trans;
+    skyViewMat.uniforms.multiscatter_lut.value = k.multi;
+    skyMat.uniforms.transmittance_lut.value = k.trans;
+    skyMat.uniforms.multiscatter_lut.value = k.multi;
+    skyMat.uniforms.noise_rgb.value = k.noiseRGB;
+    skyMat.uniforms.noise_a.value = k.noiseA;
+    skySunKey = '';
+    applyEnv();
+  });
+}
+
+function decodeSkyRow(buf, w) {
+  var r = 0, g = 0, b = 0;
+  for (var i = 0; i < w; i++) {
+    var m = buf[i * 4 + 3] / 255 * 16 / 255;
+    r += buf[i * 4] * m;
+    g += buf[i * 4 + 1] * m;
+    b += buf[i * 4 + 2] * m;
+  }
+  return new THREE.Color(r / w, g / w, b / w);
+}
+
+function skyRowFor(viewCos) {
+  var r = 6360 + 0.05;
+  var beta = Math.acos(envClamp(Math.sqrt(r * r - 6360 * 6360) / r, -1, 1));
+  var zha = Math.PI - beta;
+  var za = Math.acos(envClamp(viewCos, -1, 1));
+  var v;
+  if (za < zha) v = (1 - Math.sqrt(Math.max(1 - za / zha, 0))) * 0.5;
+  else v = Math.sqrt(envClamp((za - zha) / Math.max(beta, 1e-5), 0, 1)) * 0.5 + 0.5;
+  return Math.max(0, Math.min(107, Math.floor(v * 108)));
+}
+
+function refreshSkyView(dir) {
+  if (!skyKit || !skyRT) return;
+  var key = dir.x.toFixed(4) + ',' + dir.y.toFixed(4) + ',' + dir.z.toFixed(4);
+  if (key === skySunKey) return;
+  skySunKey = key;
+  skyViewMat.uniforms.sun_dir.value.copy(dir);
+  var prev = renderer.getRenderTarget();
+  renderer.setRenderTarget(skyRT);
+  renderer.render(skyViewScene, skyViewCam);
+  var buf = new Uint8Array(192 * 4);
+  renderer.readRenderTargetPixels(skyRT, 0, skyRowFor(0.05), 192, 1, buf);
+  skyHorizon.copy(decodeSkyRow(buf, 192));
+  renderer.readRenderTargetPixels(skyRT, 0, skyRowFor(0.5), 192, 1, buf);
+  skyAverage.copy(decodeSkyRow(buf, 192));
+  renderer.setRenderTarget(prev);
 }
 
 function buildVoidPlane() {
@@ -5365,61 +6807,100 @@ function buildVoidPlane() {
 }
 
 var envSkyTexture = null;
+var envSkyUrl = '';
 
 function applyEnv() {
+  var r = rdb2Env();
   var e = PROJECT.env;
-  hemi.color.set(e.hemiSky);
-  hemi.groundColor.set(e.hemiGround);
-  hemi.intensity = e.hemiIntensity;
+  var dir = sunVector(r);
+  var energy = envClamp(envNum(r.sunEnergy, 1.1), 0, 16);
+  hemi.intensity = 0;
+  sun.color.set(r.sunColor);
+  sun.intensity = energy * Math.PI;
+  sun.position.copy(dir).multiplyScalar(60);
+  sun.castShadow = r.sunShadow !== false;
 
-  sun.color.set(e.sunColor);
-  sun.intensity = e.sunIntensity;
-  sun.position.set(e.sunDir[0], e.sunDir[1], e.sunDir[2]);
-  sun.castShadow = !!e.sunShadow;
-
-  if (e.ambientIntensity > 0) {
-    if (!editorAmbient) { editorAmbient = new THREE.AmbientLight(0xffffff, 1); scene.add(editorAmbient); }
-    editorAmbient.color.set(e.ambientColor);
-    editorAmbient.intensity = e.ambientIntensity;
-  } else if (editorAmbient) {
-    scene.remove(editorAmbient); editorAmbient = null;
+  var u = skyMat.uniforms;
+  var mode = r.sky;
+  if (mode === 'image' && !r.skyImage) mode = 'atmosphere';
+  if (mode !== 'image' && mode !== 'color' && mode !== 'gradient') mode = 'atmosphere';
+  var atmo = mode === 'atmosphere' && !!skyKit;
+  if (atmo) refreshSkyView(dir);
+  u.sun_dir.value.copy(dir);
+  var sc = new THREE.Color(r.sunColor).multiplyScalar(energy);
+  u.sun_col.value.set(sc.r, sc.g, sc.b);
+  u.sky_energy.value = envClamp(envNum(r.skyEnergy, 1), 0, 16);
+  scene.background = null;
+  skyMesh.visible = true;
+  if (mode === 'image') {
+    var url = resolveTexUrl(r.skyImage);
+    if (url !== envSkyUrl) {
+      if (envSkyTexture) envSkyTexture.dispose();
+      envSkyTexture = new THREE.TextureLoader().load(url);
+      envSkyTexture.colorSpace = THREE.SRGBColorSpace;
+      envSkyTexture.flipY = false;
+      envSkyTexture.wrapS = THREE.RepeatWrapping;
+      envSkyUrl = url;
+    }
+    u.pano.value = envSkyTexture;
+    u.sky_mode.value = 2;
+  } else if (mode === 'color') {
+    u.sky_mode.value = 1;
+    u.g_top.value.set(r.skyColor);
+    u.g_mid.value.set(r.skyColor);
+    u.g_bot.value.set(r.skyColor);
+  } else if (mode === 'gradient' || !atmo) {
+    u.sky_mode.value = 1;
+    u.g_top.value.set(r.skyTop);
+    u.g_mid.value.set(r.skyMid);
+    u.g_bot.value.set(r.skyBot);
+  } else {
+    u.sky_mode.value = 0;
+    var wd = envNum(r.cloudDir, 63.43) * Math.PI / 180;
+    var ws = envClamp(envNum(r.cloudSpeed, 2.236), 0, 400);
+    u.flat_wind.value.set(Math.sin(wd) * ws, Math.cos(wd) * ws);
+    u.cloud_coverage.value = envClamp(envNum(r.clouds, 0.42), 0, 1);
+    u.star_gain.value = envClamp(envNum(r.stars, 1), 0, 16);
+    u.sun_disc.value = envClamp(envNum(r.sunDisc, 40), 0, 400);
+    u.sun_radius_deg.value = envClamp(envNum(r.sunSize, 0.45), 0.05, 10);
+    u.haze_color.value.set(r.fogColor);
+    u.haze.value = envClamp(envNum(r.haze, 0.35), 0, 1);
   }
 
-  if (e.fog) {
-    if (!scene.fog) scene.fog = new THREE.Fog(e.fogColor, e.fogNear, e.fogFar);
-    scene.fog.color.set(e.fogColor);
-    scene.fog.near = e.fogNear;
-    scene.fog.far = Math.max(e.fogNear + 1, e.fogFar);
+  if (!editorAmbient) {
+    editorAmbient = new THREE.AmbientLight(0xffffff, 1);
+    scene.add(editorAmbient);
+  }
+  var amb = new THREE.Color(r.ambColor);
+  var skyMix = envClamp(envNum(r.ambSky, 0), 0, 1);
+  if (skyMix > 0) amb.lerp(atmo ? skyAverage : u.g_mid.value, skyMix);
+  editorAmbient.color.copy(amb);
+  editorAmbient.intensity = envClamp(envNum(r.ambEnergy, 1), 0, 16) * Math.PI;
+
+  if (r.fog !== false) {
+    var fc = new THREE.Color(r.fogColor);
+    if (atmo) fc.lerp(skyHorizon, envClamp(envNum(r.fogSky, 0.85), 0, 1));
+    var fb = envClamp(envNum(r.fogBegin, 90), 0, 4000);
+    var fe = Math.max(fb + 1, envClamp(envNum(r.fogEnd, 240), 1, 8000));
+    if (!scene.fog) scene.fog = new THREE.Fog(fc, fb, fe);
+    scene.fog.color.copy(fc);
+    scene.fog.near = fb;
+    scene.fog.far = fe;
   } else {
     scene.fog = null;
   }
 
-  if (envSkyTexture) { envSkyTexture.dispose(); envSkyTexture = null; }
-  if (e.skyMode === 'image' && e.skyImage) {
-    skyMesh.visible = false;
-    envSkyTexture = new THREE.TextureLoader().load(resolveTexUrl(e.skyImage));
-    envSkyTexture.mapping = THREE.EquirectangularReflectionMapping;
-    envSkyTexture.colorSpace = THREE.SRGBColorSpace;
-    scene.background = envSkyTexture;
-  } else if (e.skyMode === 'color') {
-    skyMesh.visible = false;
-    scene.background = new THREE.Color(e.skyColor);
-  } else {
-    skyMesh.visible = true;
-    scene.background = null;
-    skyMat.uniforms.uTop.value.set(e.skyTop);
-    skyMat.uniforms.uMid.value.set(e.skyMid);
-    skyMat.uniforms.uBot.value.set(e.skyBot);
-    skyMat.uniforms.uSun.value.copy(sun.position).normalize();
-  }
-
-  renderer.toneMapping = Math.abs(e.exposure - 1) < 0.01 ? THREE.NoToneMapping : THREE.LinearToneMapping;
-  renderer.toneMappingExposure = e.exposure;
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.toneMappingExposure = 1;
+  tonePass.uniforms.uExposure.value = envClamp(envNum(r.exposure, 1), 0.05, 8);
+  tonePass.uniforms.uWhite.value = envClamp(envNum(r.white, 1), 0.1, 16);
+  tonePass.uniforms.uMode.value = r.tonemap === 'filmic' ? 1 : (r.tonemap === 'aces' ? 2 : 0);
 
   if (voidPlane) {
     voidPlane.position.y = e.voidY;
     voidPlane.visible = e.voidY > -60;
   }
+  for (var i = 0; i < lightList.length; i++) refreshLight(lightList[i]);
   syncWaterLighting();
 }
 
@@ -5836,11 +7317,12 @@ function refreshWater(root) {
 }
 
 function syncWaterLighting() {
-  var e = PROJECT.env;
-  var dir = new THREE.Vector3(e.sunDir[0], e.sunDir[1], e.sunDir[2]).normalize();
-  var sunCol = new THREE.Color(e.sunColor).multiplyScalar(Math.max(0.1, e.sunIntensity * 0.5));
-  var skyCol = new THREE.Color(e.skyMode === 'gradient' ? e.skyMid : e.skyColor);
-  var irradiance = e.sunIntensity * 0.55 + e.hemiIntensity * 0.9;
+  var r = rdb2Env();
+  var dir = sunVector(r);
+  var energy = envClamp(envNum(r.sunEnergy, 1.1), 0, 16);
+  var sunCol = new THREE.Color(r.sunColor).multiplyScalar(Math.max(0.1, energy * 0.864));
+  var skyCol = new THREE.Color(r.sky === 'gradient' ? r.skyMid : (r.sky === 'color' ? r.skyColor : RDB2_ENV.skyMid));
+  var irradiance = energy * 0.95 + envNum(r.ambEnergy, 1) * 0.675;
   var ambient = 0.07 + 0.93 * Math.pow(Math.max(0, Math.min(1, irradiance / 1.72)), 0.75);
   for (var i = 0; i < waterList.length; i++) {
     var w = waterList[i];
@@ -6080,7 +7562,7 @@ function refreshLight(root) {
   if (!root || root.userData.mapType !== 'light') return;
   var l = root.userData.light;
   l.color.set(root.userData.mapColor);
-  l.intensity = root.userData.lightIntensity;
+  l.intensity = root.userData.lightIntensity * LIGHT_ENERGY_K;
   l.distance = root.userData.lightDistance;
   l.decay = root.userData.lightDecay;
   root.userData.lightGizmo.material.color.set(root.userData.mapColor);
@@ -6093,7 +7575,7 @@ function refreshLight(root) {
       cone.geometry = lightConeGeometry(root.userData.lightAngle, Math.min(root.userData.lightDistance || 12, 24));
     }
   }
-  l.castShadow = false;
+  l.castShadow = !!root.userData.lightShadow;
 }
 
 function lightTargetWorld(root) {
@@ -6124,7 +7606,7 @@ function ensureThumbRenderer() {
   thumbCam = new THREE.PerspectiveCamera(35, 1, 0.05, 200);
 }
 
-function renderThumb(mesh) {
+function renderThumb(mesh, keep) {
   ensureThumbRenderer();
   thumbScene.add(mesh);
   var box = new THREE.Box3().setFromObject(mesh);
@@ -6136,6 +7618,7 @@ function renderThumb(mesh) {
   thumbRenderer.render(thumbScene, thumbCam);
   var url = thumbRenderer.domElement.toDataURL('image/png');
   thumbScene.remove(mesh);
+  if (keep) return url;
   mesh.traverse(function(o) {
     if (o.isMesh || o.isLineSegments) {
       if (o.geometry) o.geometry.dispose();
@@ -6169,67 +7652,237 @@ function primitiveThumb(type) {
 }
 
 function itemThumb(id) {
-  var key = 'i:' + id;
-  if (thumbCache.has(key)) return thumbCache.get(key);
-  var it = ITEM_BY_ID[id];
-  var geo;
-  if (!it) geo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-  else if (it.s === 'cyl') geo = new THREE.CylinderGeometry(it.d[1], it.d[1], it.d[0], 20);
-  else if (it.s === 'torus') geo = new THREE.TorusGeometry(it.d[0], it.d[1], 10, 24);
-  else geo = new THREE.BoxGeometry(it.d[0], it.d[1], it.d[2]);
-  if (it && it.s === 'torus') geo.rotateX(-Math.PI / 2);
-  var mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-    color: it ? it.c : '#8d9299', roughness: 0.7, metalness: 0.06
-  }));
-  var url = renderThumb(mesh);
-  thumbCache.set(key, url);
-  return url;
+  var def = ITEM_BY_ID[id] || GUN_BY_ID[id];
+  return def && def.icon ? def.icon : primitiveThumb('box');
 }
 
 function gunThumb(id) {
-  var key = 'g:' + id;
-  if (thumbCache.has(key)) return thumbCache.get(key);
-  var g = GUN_BY_ID[id];
-  var s = GUN_SIZE[(g && g.cat) || 'other'];
-  var root = new THREE.Group();
-  var mat = new THREE.MeshStandardMaterial({ color: 0x30353c, roughness: 0.55, metalness: 0.4 });
-  var body = new THREE.Mesh(new THREE.BoxGeometry(s[0], s[1] * 0.45, s[2]), mat);
-  root.add(body);
-  var grip = new THREE.Mesh(new THREE.BoxGeometry(s[0] * 0.22, s[1] * 0.85, s[2] * 0.9), mat);
-  grip.position.set(-s[0] * 0.24, -s[1] * 0.5, 0);
-  grip.rotation.z = 0.22;
-  root.add(grip);
-  var url = renderThumb(root);
-  thumbCache.set(key, url);
-  return url;
+  return itemThumb(id);
 }
 
 function createGun(gunId, data) {
   data = data || {};
-  var g = GUN_BY_ID[gunId];
-  if (!g) return null;
-  var s = GUN_SIZE[g.cat || 'other'];
+  var def = GUN_BY_ID[gunId];
+  if (!def) return null;
   var root = new THREE.Group();
-  var mat = new THREE.MeshStandardMaterial({ color: 0x30353c, roughness: 0.55, metalness: 0.4 });
-  var body = new THREE.Mesh(new THREE.BoxGeometry(s[0], s[1] * 0.45, s[2]), mat);
-  body.castShadow = body.receiveShadow = true;
-  root.add(body);
-  var grip = new THREE.Mesh(new THREE.BoxGeometry(s[0] * 0.22, s[1] * 0.85, s[2] * 0.9), mat);
-  grip.position.set(-s[0] * 0.24, -s[1] * 0.5, 0);
-  grip.rotation.z = 0.22;
-  grip.castShadow = grip.receiveShadow = true;
-  root.add(grip);
-
+  var proxy = kitProxy(def);
+  root.add(proxy);
   root.userData.mapObject = true;
   root.userData.mapType = 'gun';
   root.userData.isGun = true;
   root.userData.gunId = gunId;
-  root.userData.mapName = data.name || g.n;
+  root.userData.mapName = data.name || def.name;
   root.userData.mapColor = '#30353c';
-  root.position.fromArray(data.position || placementPoint('gun'));
+  root.position.fromArray(data.position || placementPoint('gun', kitGunLift(def)));
   if (data.rotation) root.rotation.fromArray(data.rotation);
+  else root.rotation.set(0, 0, Math.PI / 2);
   objectsRoot.add(root);
+  attachKitModel(root, proxy, def);
   return root;
+}
+
+var DOOR_DEFAULT = [0.9, 2.1, 0.045];
+var DOOR_MIN = [0.3, 0.5, 0.02];
+var DOOR_MAX = [4, 5, 0.3];
+var DOOR_RAIL = { h: 0.12, t: 0.012, gap: 0.04, at: [0.18, 0.82] };
+var doorList = [];
+var doorMats = null;
+var DOOR_PROXY_GEO = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+var DOOR_PROXY_MAT = new THREE.MeshBasicMaterial({ visible: false });
+
+function doorMaterials() {
+  if (doorMats) return doorMats;
+  var srgb = function(r, g, b) { return new THREE.Color().setRGB(r, g, b, THREE.SRGBColorSpace); };
+  doorMats = {
+    wood: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.82, metalness: 0, map: kitTexture('wood', 1) }),
+    rail: new THREE.MeshStandardMaterial({ color: srgb(0.72, 0.68, 0.64), roughness: 0.82, metalness: 0, map: kitTexture('wood', 1) }),
+    metal: new THREE.MeshStandardMaterial({ color: srgb(0.48, 0.48, 0.47), roughness: 0.38, metalness: 0.7 }),
+    dark: new THREE.MeshStandardMaterial({ color: srgb(0.05, 0.05, 0.05), roughness: 0.6, metalness: 0 }),
+    swing: new THREE.LineBasicMaterial({ color: 0xffd479, transparent: true, opacity: 0.7 })
+  };
+  if (!doorMats.wood.map) doorMats.wood.color.set('#8a5f34');
+  if (!doorMats.rail.map) doorMats.rail.color.set('#6b4a28');
+  return doorMats;
+}
+
+function doorSize(o) {
+  var s = [Math.abs(o.scale.x), Math.abs(o.scale.y), Math.abs(o.scale.z)];
+  for (var i = 0; i < 3; i++) s[i] = Math.max(DOOR_MIN[i], Math.min(DOOR_MAX[i], s[i] || DOOR_DEFAULT[i]));
+  return s;
+}
+
+function doorPivot(s) {
+  var inset = Math.max(0.06, Math.min(0.2, s[0] * 0.13));
+  return [s[0] - inset, Math.min(1.0, s[1] * 0.5), -s[2] * 0.5];
+}
+
+function doorPartBox(w, h, t, uw, uh, mat) {
+  var g = new THREE.BoxGeometry(w, h, t);
+  var uv = g.attributes.uv;
+  for (var i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * uw, uv.getY(i) * uh);
+  var m = new THREE.Mesh(g, mat);
+  m.castShadow = m.receiveShadow = true;
+  m.userData.doorPart = true;
+  return m;
+}
+
+function doorCylinder(rTop, rBot, h, mat) {
+  var m = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, 20), mat);
+  m.castShadow = m.receiveShadow = true;
+  m.userData.doorPart = true;
+  return m;
+}
+
+function buildDoorParts(s) {
+  var M = doorMaterials();
+  var w = s[0], h = s[1], t = s[2];
+  var off = new THREE.Group();
+  off.position.set(-w / 2, 0, t / 2);
+  var slab = doorPartBox(w, h, t, w, h, M.wood);
+  slab.position.set(w / 2, h / 2, -t / 2);
+  off.add(slab);
+  var rw = Math.max(w - DOOR_RAIL.gap * 2, 0.05);
+  for (var k = 0; k < DOOR_RAIL.at.length; k++) {
+    var y = h * DOOR_RAIL.at[k];
+    for (var sd = -1; sd <= 1; sd += 2) {
+      var rail = doorPartBox(rw, DOOR_RAIL.h, DOOR_RAIL.t, rw, DOOR_RAIL.h, M.rail);
+      rail.position.set(w / 2, y, sd > 0 ? DOOR_RAIL.t / 2 : -t - DOOR_RAIL.t / 2);
+      off.add(rail);
+    }
+  }
+  var p = doorPivot(s);
+  var lever = new THREE.Group();
+  lever.position.set(p[0], p[1], p[2]);
+  off.add(lever);
+  for (var side = -1; side <= 1; side += 2) {
+    var rose = doorCylinder(0.027, 0.027, 0.008, M.metal);
+    rose.rotation.x = Math.PI / 2;
+    rose.position.z = side * (t / 2 + 0.004);
+    lever.add(rose);
+    var neck = doorCylinder(0.009, 0.009, 0.05, M.metal);
+    neck.rotation.x = Math.PI / 2;
+    neck.position.z = side * (t / 2 + 0.025);
+    lever.add(neck);
+    var bar = doorPartBox(0.12, 0.018, 0.022, 1, 1, M.metal);
+    bar.position.set(-0.06 + 0.009, 0, side * (t / 2 + 0.05));
+    lever.add(bar);
+    var face = side > 0 ? 0 : -t;
+    var lockRose = doorCylinder(0.026, 0.028, 0.008, M.metal);
+    lockRose.rotation.x = Math.PI / 2 * side;
+    lockRose.position.set(p[0], p[1] + 0.152, face + side * 0.004);
+    off.add(lockRose);
+    if (side > 0) {
+      var thumb = doorPartBox(0.012, 0.042, 0.016, 1, 1, M.metal);
+      thumb.position.set(p[0], p[1] + 0.152, face + 0.016);
+      off.add(thumb);
+    } else {
+      var slot = doorPartBox(0.003, 0.011, 0.002, 1, 1, M.dark);
+      slot.position.set(p[0], p[1] + 0.152 - 0.004, face - 0.0085);
+      off.add(slot);
+    }
+  }
+  for (var i = 0; i < 4; i++) {
+    var hy = 0.254 + (h - 0.127 - 0.254) * i / 3;
+    var knuckle = doorCylinder(0.008, 0.008, 0.089, M.metal);
+    knuckle.position.set(-0.001, hy, 0.004);
+    off.add(knuckle);
+  }
+  var arc = [];
+  for (var a = 0; a < 16; a++) {
+    var a0 = a / 16 * Math.PI / 2, a1 = (a + 1) / 16 * Math.PI / 2;
+    arc.push(Math.cos(a0) * w, 0.01, Math.sin(a0) * w, Math.cos(a1) * w, 0.01, Math.sin(a1) * w);
+  }
+  arc.push(0, 0.01, 0, 0, 0.01, w);
+  var ag = new THREE.BufferGeometry();
+  ag.setAttribute('position', new THREE.Float32BufferAttribute(arc, 3));
+  var swing = new THREE.LineSegments(ag, M.swing);
+  swing.userData.doorPart = true;
+  swing.userData.editorOnly = true;
+  off.add(swing);
+  return off;
+}
+
+function refreshDoor(root, force) {
+  var s = doorSize(root);
+  var sc = root.scale;
+  if (Math.abs(sc.x) !== s[0] || Math.abs(sc.y) !== s[1] || Math.abs(sc.z) !== s[2] || sc.x < 0 || sc.y < 0 || sc.z < 0) {
+    sc.set(s[0], s[1], s[2]);
+  }
+  var key = s.map(function(v) { return v.toFixed(4); }).join(',');
+  if (!force && root.userData.doorKey === key) return;
+  root.userData.doorKey = key;
+  var old = root.userData.doorVisual;
+  if (old) {
+    root.remove(old);
+    old.traverse(function(o) { if (o.geometry) o.geometry.dispose(); });
+  }
+  var g = new THREE.Group();
+  g.scale.set(1 / s[0], 1 / s[1], 1 / s[2]);
+  g.add(buildDoorParts(s));
+  root.add(g);
+  root.userData.doorVisual = g;
+  if (isSelected(root)) syncOutlinePassSelection();
+}
+
+function createDoor(data) {
+  data = data || {};
+  var root = new THREE.Mesh(DOOR_PROXY_GEO, DOOR_PROXY_MAT);
+  root.userData.kitShared = true;
+  root.userData.mapObject = true;
+  root.userData.mapType = 'door';
+  root.userData.isDoor = true;
+  root.userData.mapName = data.name || '门';
+  root.userData.mapColor = '#8a5f34';
+  root.userData.doorLocked = !!data.locked;
+  var size = Array.isArray(data.size) && data.size.length >= 3 ? data.size : DOOR_DEFAULT;
+  root.scale.set(+size[0] || DOOR_DEFAULT[0], +size[1] || DOOR_DEFAULT[1], +size[2] || DOOR_DEFAULT[2]);
+  root.position.fromArray(data.p || data.position || placementPoint('door', 0));
+  if (Array.isArray(data.q) && data.q.length === 4) root.quaternion.set(+data.q[0], +data.q[1], +data.q[2], +data.q[3]).normalize();
+  else if (Array.isArray(data.rotation)) root.rotation.fromArray(data.rotation);
+  objectsRoot.add(root);
+  doorList.push(root);
+  refreshDoor(root, true);
+  return root;
+}
+
+function serializeDoor(o) {
+  var q = new THREE.Quaternion().copy(o.quaternion);
+  return {
+    name: o.userData.mapName || '门',
+    p: roundArray(o.position.toArray()),
+    q: roundArray([q.x, q.y, q.z, q.w]),
+    size: roundArray(doorSize(o), 4),
+    locked: !!o.userData.doorLocked
+  };
+}
+
+function syncDoors() {
+  for (var i = doorList.length - 1; i >= 0; i--) {
+    var d = doorList[i];
+    if (!d.parent) { doorList.splice(i, 1); continue; }
+    refreshDoor(d, false);
+  }
+}
+
+function doorThumb() {
+  var key = 'p:door';
+  if (thumbCache.has(key)) return thumbCache.get(key);
+  var g = new THREE.Group();
+  var slab = new THREE.Mesh(new THREE.BoxGeometry(0.9, 2.1, 0.045), new THREE.MeshStandardMaterial({ color: 0x8a5f34, roughness: 0.8 }));
+  slab.position.y = 1.05;
+  g.add(slab);
+  for (var k = 0; k < 2; k++) {
+    var rail = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.12, 0.06), new THREE.MeshStandardMaterial({ color: 0x6b4a28, roughness: 0.8 }));
+    rail.position.y = 2.1 * DOOR_RAIL.at[k];
+    g.add(rail);
+  }
+  var bar = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.03, 0.12), new THREE.MeshStandardMaterial({ color: 0xc8c8c4, roughness: 0.4, metalness: 0.6 }));
+  bar.position.set(0.28, 1.0, 0);
+  g.add(bar);
+  g.rotation.y = -0.5;
+  var url = renderThumb(g);
+  thumbCache.set(key, url);
+  return url;
 }
 
 var SOUND_TRIGGERS = [
@@ -6239,7 +7892,8 @@ var SOUND_TRIGGERS = [
   { id: 'gun', label: '被枪械射击' },
   { id: 'collide', label: '产生碰撞' },
   { id: 'step', label: '在上面走路' },
-  { id: 'loop', label: '循环播放' }
+  { id: 'loop', label: '循环播放' },
+  { id: 'break', label: '碎裂时' }
 ];
 var COLLIDE_SOURCES = [
   { id: 'any', label: '任意' },
@@ -6255,7 +7909,7 @@ function objectSounds(o) {
 
 function soundsCarrier(o) {
   var t = o && o.userData.mapType;
-  return t && t !== 'spawn' && t !== 'light' && t !== 'water' && t !== 'gun' && !o.userData.isProp;
+  return t && t !== 'spawn' && t !== 'light' && t !== 'water' && t !== 'gun' && t !== 'door' && !o.userData.isProp;
 }
 
 var hierPanel = null;
@@ -6366,6 +8020,7 @@ function objKindOf(o) {
   if (!o || !o.userData) return 'object';
   if (o.userData.isProp) return 'prop';
   if (o.userData.isGun) return 'gun';
+  if (o.userData.isDoor) return 'door';
   if (o.userData.mapType === 'water') return 'water';
   if (o.userData.mapType === 'light') return 'light';
   if (o.userData.mapType === 'spawn') return 'spawn';
@@ -6520,7 +8175,7 @@ function refreshHierarchy() {
 }
 
 var panelGameProps = null;
-var gamePropsTab = 'item';
+var gamePropsTab = '';
 var gamePropsSearch = '';
 
 function tileButton(label, thumbUrl, onClick) {
@@ -6547,11 +8202,12 @@ function buildPlacePanel() {
     '<div class="placeSec">地形</div><div class="tileGrid" id="tilesPrim"></div>' +
     '<div class="placeSec">场景</div><div class="tileGrid" id="tilesScene"></div>' +
     '<div class="placeSec">游戏内容</div>' +
-    '<button id="btnGameProps" class="accent" style="text-align:center">🎮 游戏道具 / 枪械</button>' +
+    '<button id="btnGameProps" class="accent" style="text-align:center">🎮 游戏物品</button>' +
     '<button id="btnPlaceAsset" style="text-align:center">📦 从项目资源放模型</button>';
 
   var prim = host.querySelector('#tilesPrim');
-  var prims = ['box', 'sphere', 'cylinder', 'cone', 'hex', 'ramp', 'triangle'];
+  var prims = ['box', 'sphere', 'cylinder', 'cone', 'hex', 'ramp', 'triangle',
+    'torus', 'capsule', 'stairs', 'arch', 'tube', 'halfcyl', 'pyramid'];
   for (var i = 0; i < prims.length; i++) {
     (function(t) {
       prim.appendChild(tileButton(primitiveNames[t] || t, primitiveThumb(t), function() {
@@ -6563,6 +8219,9 @@ function buildPlacePanel() {
   var sc = host.querySelector('#tilesScene');
   sc.appendChild(tileButton('出生点', primitiveThumb('spawn'), function() {
     placeAndSelect(createPrimitive('spawn'));
+  }));
+  sc.appendChild(tileButton('门', doorThumb(), function() {
+    placeAndSelect(createDoor(), '门');
   }));
   // 【水体放置入口】由顶部 WATER_PLACEMENT_ENABLED 控制（搜索该关键字即可修改）
   if (WATER_PLACEMENT_ENABLED) {
@@ -6585,46 +8244,72 @@ function buildGamePropsPanel() {
   panelGameProps = document.createElement('div');
   panelGameProps.id = 'panelGameProps';
   panelGameProps.className = 'sheet';
+  var tabs = (KIT.categories || []).map(function(c) {
+    return '<button class="gpTab" data-cat="' + escapeHtml(c.id) + '">' + escapeHtml(c.n) + '</button>';
+  }).join('');
   panelGameProps.innerHTML =
     '<div class="handle"></div>' +
     '<div class="sheetTop"><button id="gpBack" class="btn-small">← 返回</button>' +
-    '<div class="title" style="flex:1;margin:0">游戏道具</div></div>' +
-    '<div class="row" style="margin-bottom:8px">' +
-    '<button id="gpTabItem" class="active">道具（' + GAME_ITEMS.length + '）</button>' +
-    '<button id="gpTabGun">枪械（' + GAME_GUNS.length + '）</button></div>' +
+    '<div class="title" style="flex:1;margin:0">游戏物品</div></div>' +
+    '<div class="row" id="gpTabs" style="margin-bottom:8px;flex-wrap:wrap;gap:6px">' + tabs + '</div>' +
     '<input id="gpSearch" type="text" placeholder="🔍 搜索名称……" />' +
     '<div class="tileGrid" id="gpGrid" style="max-height:46vh;overflow-y:auto"></div>';
   document.body.appendChild(panelGameProps);
+  if (KIT.categories && KIT.categories.length) gamePropsTab = KIT.categories[0].id;
 
   panelGameProps.querySelector('#gpBack').onclick = function() { openSheet(panelPlace); };
-  panelGameProps.querySelector('#gpTabItem').onclick = function() { gamePropsTab = 'item'; refreshGameProps(); };
-  panelGameProps.querySelector('#gpTabGun').onclick = function() { gamePropsTab = 'gun'; refreshGameProps(); };
+  panelGameProps.querySelectorAll('.gpTab').forEach(function(b) {
+    b.onclick = function() { gamePropsTab = b.dataset.cat; refreshGameProps(); };
+  });
   var si = panelGameProps.querySelector('#gpSearch');
-  si.addEventListener('input', function() { gamePropsSearch = this.value.toLowerCase(); refreshGameProps(); });
+  si.addEventListener('input', function() { gamePropsSearch = this.value.trim().toLowerCase(); refreshGameProps(); });
   si.addEventListener('keydown', function(e) { e.stopPropagation(); });
+}
+
+function kitMatches(e) {
+  if (!gamePropsSearch) return true;
+  var q = gamePropsSearch;
+  return e.n.toLowerCase().indexOf(q) >= 0 || e.id.toLowerCase().indexOf(q) >= 0 ||
+    (KIT_EN[e.n] || '').toLowerCase().indexOf(q) >= 0;
+}
+
+function kitTile(e) {
+  var b = tileButton(e.n, itemThumb(e.id), function() {
+    placeAndSelect(e.kind === 'weapon' ? createGun(e.id) : createProp(e.id), e.n);
+  });
+  if (!e.icon) kitThumb(e).then(function(url) { if (url) b.querySelector('img').src = url; });
+  return b;
 }
 
 function refreshGameProps() {
   if (!panelGameProps) return;
-  panelGameProps.querySelector('#gpTabItem').classList.toggle('active', gamePropsTab === 'item');
-  panelGameProps.querySelector('#gpTabGun').classList.toggle('active', gamePropsTab === 'gun');
+  panelGameProps.querySelectorAll('.gpTab').forEach(function(b) {
+    b.classList.toggle('active', !gamePropsSearch && b.dataset.cat === gamePropsTab);
+  });
   var grid = panelGameProps.querySelector('#gpGrid');
   grid.textContent = '';
-  var list = gamePropsTab === 'item' ? GAME_ITEMS : GAME_GUNS;
-  for (var i = 0; i < list.length; i++) {
-    var e = list[i];
-    if (gamePropsSearch && e.n.toLowerCase().indexOf(gamePropsSearch) < 0 &&
-      e.id.indexOf(gamePropsSearch) < 0) continue;
-    (function(entry, isItem) {
-      grid.appendChild(tileButton(entry.n, isItem ? itemThumb(entry.id) : gunThumb(entry.id), function() {
-        placeAndSelect(isItem ? createProp(entry.id) : createGun(entry.id), entry.n);
-      }));
-    })(e, gamePropsTab === 'item');
+  var all = GAME_ITEMS.concat(GAME_GUNS);
+  var cats = KIT.categories || [];
+  for (var ci = 0; ci < cats.length; ci++) {
+    var c = cats[ci];
+    if (!gamePropsSearch && c.id !== gamePropsTab) continue;
+    var secs = c.sections || [];
+    for (var sj = 0; sj < secs.length; sj++) {
+      var sec = secs[sj];
+      var list = all.filter(function(e) { return e.cat === c.id && e.sec === sec[0] && kitMatches(e); });
+      if (!list.length) continue;
+      var head = document.createElement('div');
+      head.className = 'placeSec';
+      head.style.width = '100%';
+      head.textContent = gamePropsSearch ? c.n + ' · ' + sec[1] : sec[1];
+      grid.appendChild(head);
+      for (var k = 0; k < list.length; k++) grid.appendChild(kitTile(list[k]));
+    }
   }
   if (!grid.children.length) {
     var d = document.createElement('div');
-    d.style.cssText = 'grid-column:1/-1;text-align:center;color:var(--muted);padding:18px';
-    d.textContent = '没有匹配的内容';
+    d.style.cssText = 'width:100%;text-align:center;color:var(--muted);padding:18px';
+    d.textContent = KIT_FAILED ? '游戏物品清单没有加载成功' : '没有匹配的内容';
     grid.appendChild(d);
   }
 }
@@ -6795,7 +8480,7 @@ function assetUsage(key) {
     var list = o.userData.mapSounds || [];
     for (var j = 0; j < list.length; j++) if (list[j].a === key) snd++;
   }
-  var sky = PROJECT.env.skyImage === 'asset:' + key;
+  var sky = rdb2Env().skyImage === 'asset:' + key;
   return { tex: tex, snd: snd, sky: sky, total: tex + snd + (sky ? 1 : 0) };
 }
 
@@ -6812,9 +8497,9 @@ function dropAssetRefs(key) {
     if (!list || !list.length) continue;
     o.userData.mapSounds = list.filter(function(x) { return x.a !== key; });
   }
-  if (PROJECT.env.skyImage === 'asset:' + key) {
-    PROJECT.env.skyImage = '';
-    if (PROJECT.env.skyMode === 'image') PROJECT.env.skyMode = 'gradient';
+  if (rdb2Env().skyImage === 'asset:' + key) {
+    rdb2Env().skyImage = '';
+    if (rdb2Env().sky === 'image') rdb2Env().sky = 'atmosphere';
     applyEnv();
   }
 }
@@ -6884,9 +8569,10 @@ function buildSoundPanel() {
   document.body.appendChild(panelSound);
   panelSound.querySelector('#sndAdd').onclick = function() {
     var snds = assetList('sound');
-    if (!snds.length) { toast('先在项目资源里导入声音'); return; }
+    var first = snds.length ? snds[0].key : (KIT_SOUNDS.length ? KIT_SOUNDS[0].id : '');
+    if (!first) { toast('先在项目资源里导入声音'); return; }
     if (!soundTargetObj) return;
-    objectSounds(soundTargetObj).push({ a: snds[0].key, t: 'gun', from: 'any', v: 1, r: 22, cd: 0.12, p: 1 });
+    objectSounds(soundTargetObj).push({ a: first, t: 'gun', from: 'any', v: 1, r: 22, cd: 0.12, p: 1 });
     refreshSoundPanel();
     pushHistory();
   };
@@ -6916,11 +8602,14 @@ function refreshSoundPanel() {
     (function(s, idx) {
       var row = document.createElement('div');
       row.className = 'sndRow';
-      if (!PROJECT.assets[s.a]) row.style.borderColor = 'var(--danger)';
-      var opts = snds.map(function(e) {
-        return '<option value="' + e.key + '"' + (e.key === s.a ? ' selected' : '') + '>' +
-          escapeHtml(e.asset.name || e.key) + '</option>';
-      }).join('');
+      if (!soundExists(s.a)) row.style.borderColor = 'var(--danger)';
+      var opts = (KIT_SOUNDS.length ? '<optgroup label="游戏预制">' + KIT_SOUNDS.map(function(e) {
+        return '<option value="' + e.id + '"' + (e.id === s.a ? ' selected' : '') + '>' + escapeHtml(e.n) + '</option>';
+      }).join('') + '</optgroup>' : '') +
+        (snds.length ? '<optgroup label="项目资源">' + snds.map(function(e) {
+          return '<option value="' + e.key + '"' + (e.key === s.a ? ' selected' : '') + '>' +
+            escapeHtml(e.asset.name || e.key) + '</option>';
+        }).join('') + '</optgroup>' : '');
       var trg = SOUND_TRIGGERS.map(function(t) {
         return '<option value="' + t.id + '"' + (t.id === s.t ? ' selected' : '') + '>' + t.label + '</option>';
       }).join('');
@@ -6946,8 +8635,13 @@ function refreshSoundPanel() {
       row.querySelector('.sC').onchange = function() { s.cd = +this.value || 0; pushHistory(); };
       row.querySelector('.sP').onchange = function() { s.p = +this.value || 1; pushHistory(); };
       row.querySelector('.sPlay').onclick = function() {
-        var u = assetUrl(s.a);
-        if (u) new Audio(u).play().catch(function() { });
+        var u = soundUrl(s.a);
+        if (!u) return;
+        var au = new Audio(u);
+        au.volume = Math.max(0, Math.min(1, +s.v || 0));
+        au.preservesPitch = false;
+        au.playbackRate = Math.max(0.2, Math.min(4, +s.p || 1));
+        au.play().catch(function() { });
       };
       row.querySelector('.sDel').onclick = function() {
         list.splice(idx, 1);
@@ -6971,31 +8665,51 @@ function buildProjectPanel() {
   panelProject.className = 'sheet';
   panelProject.innerHTML =
     '<div class="handle"></div><div class="title">⚙️ 项目设置</div>' +
-    '<div class="envSec">环境光</div>' +
-    envRow('天空光颜色', '<input id="pvHemiSky" type="color" />') +
-    envRow('地面反光颜色', '<input id="pvHemiGnd" type="color" />') +
-    envRow('环境光强度', '<input id="pvHemiI" type="number" min="0" max="6" step="0.05" />') +
-    envRow('全局补光颜色', '<input id="pvAmbC" type="color" />') +
-    envRow('全局补光强度', '<input id="pvAmbI" type="number" min="0" max="6" step="0.05" />') +
+    '<div class="envSec">太阳</div>' +
+    envRow('高度角 / 方位角',
+      '<input id="pvSunEl" type="number" min="-90" max="90" step="1" /><input id="pvSunAz" type="number" min="-180" max="180" step="1" />') +
+    envRow('太阳强度', '<input id="pvSunE" type="number" min="0" max="16" step="0.05" />') +
     envRow('太阳颜色', '<input id="pvSunC" type="color" />') +
-    envRow('太阳强度', '<input id="pvSunI" type="number" min="0" max="8" step="0.05" />') +
-    envRow('太阳方向 X/Y/Z',
-      '<input id="pvSunX" type="number" step="1" /><input id="pvSunY" type="number" step="1" />' +
-      '<input id="pvSunZ" type="number" step="1" />') +
     envRow('太阳投影', '<input id="pvSunS" type="checkbox" />') +
-    envRow('曝光', '<input id="pvExp" type="number" min="0.1" max="4" step="0.05" />') +
+    '<div class="envSec">环境光</div>' +
+    envRow('环境光颜色', '<input id="pvAmbC" type="color" />') +
+    envRow('环境光强度', '<input id="pvAmbE" type="number" min="0" max="16" step="0.05" />') +
+    envRow('天空光占比', '<input id="pvAmbSky" type="number" min="0" max="1" step="0.05" />') +
+    '<div class="envSec">曝光</div>' +
+    envRow('曝光', '<input id="pvExp" type="number" min="0.05" max="8" step="0.05" />') +
+    envRow('色调映射', '<select id="pvTone"><option value="linear">线性</option>' +
+      '<option value="filmic">电影</option><option value="aces">ACES</option></select>') +
+    envRow('白点', '<input id="pvWhite" type="number" min="0.1" max="16" step="0.1" />') +
+    '<div class="envSec">天空盒</div>' +
+    envRow('模式', '<select id="pvSkyMode"><option value="atmosphere">大气</option>' +
+      '<option value="gradient">渐变天空</option><option value="color">纯色</option>' +
+      '<option value="image">自定义全景图</option></select>') +
+    envRow('天空亮度', '<input id="pvSkyE" type="number" min="0" max="16" step="0.05" />') +
+    '<div id="pvAtmoRows">' +
+    envRow('云量', '<input id="pvClouds" type="range" min="0" max="1" step="0.01" />') +
+    envRow('云速 km/h / 云向 °',
+      '<input id="pvCloudS" type="number" min="0" max="400" step="0.5" /><input id="pvCloudD" type="number" min="-360" max="360" step="5" />') +
+    envRow('星星亮度', '<input id="pvStars" type="number" min="0" max="16" step="0.1" />') +
+    envRow('太阳圆盘亮度 / 大小 °',
+      '<input id="pvDisc" type="number" min="0" max="400" step="1" /><input id="pvDiscSize" type="number" min="0.05" max="10" step="0.05" />') +
+    envRow('地平线雾霭', '<input id="pvHaze" type="range" min="0" max="1" step="0.01" />') +
+    '</div>' +
+    '<div id="pvGradRows">' + envRow('渐变 顶 / 中 / 底',
+      '<input id="pvSkyTop" type="color" /><input id="pvSkyMid" type="color" /><input id="pvSkyBot" type="color" />') + '</div>' +
+    '<div id="pvColorRows">' + envRow('纯色', '<input id="pvSkyColor" type="color" />') + '</div>' +
+    '<div id="pvImageRows">' + envRow('全景图资源', '<select id="pvSkyImage"></select>') + '</div>' +
     '<div class="envSec">雾</div>' +
     envRow('开启雾', '<input id="pvFogOn" type="checkbox" />') +
     envRow('雾颜色', '<input id="pvFogC" type="color" />') +
     envRow('雾起点 / 终点',
       '<input id="pvFogN" type="number" min="0" step="1" /><input id="pvFogF" type="number" min="1" step="1" />') +
-    '<div class="envSec">天空盒</div>' +
-    envRow('模式', '<select id="pvSkyMode"><option value="gradient">渐变天空</option>' +
-      '<option value="color">纯色</option><option value="image">自定义全景图</option></select>') +
-    envRow('渐变 顶 / 中 / 底',
-      '<input id="pvSkyTop" type="color" /><input id="pvSkyMid" type="color" /><input id="pvSkyBot" type="color" />') +
-    envRow('纯色', '<input id="pvSkyColor" type="color" />') +
-    envRow('全景图资源', '<select id="pvSkyImage"></select>') +
+    envRow('雾取天空色', '<input id="pvFogSky" type="range" min="0" max="1" step="0.01" />') +
+    '<div class="envSec">环境音</div>' +
+    envRow('环境音', '<select id="pvAmb"></select>') +
+    envRow('音量', '<input id="pvAmbVol" type="number" min="0" max="4" step="0.1" />') +
+    '<div id="pvAmbLayers"></div>' +
+    '<button id="pvAmbAdd" style="text-align:center">＋ 添加高度分层</button>' +
+    '<button id="pvAmbPlay" style="text-align:center">▶ 试听（按当前视角高度）</button>' +
     '<div class="envSec">世界</div>' +
     envRow('地图下限（低于此高度＝虚空）', '<input id="pvVoidY" type="number" min="-145" max="400" step="1" />') +
     '<div class="envSec">资源与预览图</div>' +
@@ -7022,28 +8736,48 @@ function buildProjectPanel() {
     return el;
   };
   var E = function() { return PROJECT.env; };
-  bind('pvHemiSky', 0, function(el) { E().hemiSky = el.value; }, 'input');
-  bind('pvHemiGnd', 0, function(el) { E().hemiGround = el.value; }, 'input');
-  bind('pvHemiI', 0, function(el) { E().hemiIntensity = +el.value || 0; });
-  bind('pvAmbC', 0, function(el) { E().ambientColor = el.value; }, 'input');
-  bind('pvAmbI', 0, function(el) { E().ambientIntensity = +el.value || 0; });
-  bind('pvSunC', 0, function(el) { E().sunColor = el.value; }, 'input');
-  bind('pvSunI', 0, function(el) { E().sunIntensity = +el.value || 0; });
-  bind('pvSunX', 0, function(el) { E().sunDir[0] = +el.value || 0; });
-  bind('pvSunY', 0, function(el) { E().sunDir[1] = +el.value || 0; });
-  bind('pvSunZ', 0, function(el) { E().sunDir[2] = +el.value || 0; });
-  bind('pvSunS', 0, function(el) { E().sunShadow = el.checked; });
-  bind('pvExp', 0, function(el) { E().exposure = +el.value || 1; });
-  bind('pvFogOn', 0, function(el) { E().fog = el.checked; });
-  bind('pvFogC', 0, function(el) { E().fogColor = el.value; }, 'input');
-  bind('pvFogN', 0, function(el) { E().fogNear = +el.value || 0; });
-  bind('pvFogF', 0, function(el) { E().fogFar = +el.value || 1; });
-  bind('pvSkyMode', 0, function(el) { E().skyMode = el.value; });
-  bind('pvSkyTop', 0, function(el) { E().skyTop = el.value; }, 'input');
-  bind('pvSkyMid', 0, function(el) { E().skyMid = el.value; }, 'input');
-  bind('pvSkyBot', 0, function(el) { E().skyBot = el.value; }, 'input');
-  bind('pvSkyColor', 0, function(el) { E().skyColor = el.value; }, 'input');
-  bind('pvSkyImage', 0, function(el) { E().skyImage = el.value ? 'asset:' + el.value : ''; });
+  var R = function() { return rdb2Env(); };
+  bind('pvSunEl', 0, function(el) { R().sunElev = envClamp(+el.value || 0, -90, 90); });
+  bind('pvSunAz', 0, function(el) { R().sunAzim = +el.value || 0; });
+  bind('pvSunE', 0, function(el) { R().sunEnergy = Math.max(0, +el.value || 0); });
+  bind('pvSunC', 0, function(el) { R().sunColor = el.value; }, 'input');
+  bind('pvSunS', 0, function(el) { R().sunShadow = el.checked; });
+  bind('pvAmbC', 0, function(el) { R().ambColor = el.value; }, 'input');
+  bind('pvAmbE', 0, function(el) { R().ambEnergy = Math.max(0, +el.value || 0); });
+  bind('pvAmbSky', 0, function(el) { R().ambSky = envClamp(+el.value || 0, 0, 1); });
+  bind('pvExp', 0, function(el) { R().exposure = envClamp(+el.value || 1, 0.05, 8); });
+  bind('pvTone', 0, function(el) { R().tonemap = el.value; });
+  bind('pvWhite', 0, function(el) { R().white = envClamp(+el.value || 1, 0.1, 16); });
+  bind('pvSkyMode', 0, function(el) { R().sky = el.value; refreshSkyRows(); });
+  bind('pvSkyE', 0, function(el) { R().skyEnergy = Math.max(0, +el.value || 0); });
+  bind('pvClouds', 0, function(el) { R().clouds = envClamp(+el.value || 0, 0, 1); }, 'input');
+  bind('pvCloudS', 0, function(el) { R().cloudSpeed = Math.max(0, +el.value || 0); });
+  bind('pvCloudD', 0, function(el) { R().cloudDir = +el.value || 0; });
+  bind('pvStars', 0, function(el) { R().stars = Math.max(0, +el.value || 0); });
+  bind('pvDisc', 0, function(el) { R().sunDisc = Math.max(0, +el.value || 0); });
+  bind('pvDiscSize', 0, function(el) { R().sunSize = envClamp(+el.value || 0.45, 0.05, 10); });
+  bind('pvHaze', 0, function(el) { R().haze = envClamp(+el.value || 0, 0, 1); }, 'input');
+  bind('pvSkyTop', 0, function(el) { R().skyTop = el.value; }, 'input');
+  bind('pvSkyMid', 0, function(el) { R().skyMid = el.value; }, 'input');
+  bind('pvSkyBot', 0, function(el) { R().skyBot = el.value; }, 'input');
+  bind('pvSkyColor', 0, function(el) { R().skyColor = el.value; }, 'input');
+  bind('pvSkyImage', 0, function(el) { R().skyImage = el.value ? 'asset:' + el.value : ''; });
+  bind('pvFogOn', 0, function(el) { R().fog = el.checked; });
+  bind('pvFogC', 0, function(el) { R().fogColor = el.value; }, 'input');
+  bind('pvFogN', 0, function(el) { R().fogBegin = Math.max(0, +el.value || 0); });
+  bind('pvFogF', 0, function(el) { R().fogEnd = Math.max(1, +el.value || 1); });
+  bind('pvFogSky', 0, function(el) { R().fogSky = envClamp(+el.value || 0, 0, 1); }, 'input');
+  bind('pvAmb', 0, function(el) { R().amb = ambValid(el.value, true) ? el.value : 'auto'; });
+  bind('pvAmbVol', 0, function(el) { R().ambVol = envClamp(+el.value || 0, 0, 4); });
+  panelProject.querySelector('#pvAmbAdd').onclick = function() {
+    var cur = ambLayersOf(R().ambLayers);
+    var top = cur.reduce(function(m, e) { return Math.max(m, e.y); }, 0);
+    cur.push({ y: Math.round(top + 20), amb: 'outdoor', v: 1, fade: AMB_FADE });
+    R().ambLayers = cur;
+    renderAmbLayers();
+    pushHistory();
+  };
+  panelProject.querySelector('#pvAmbPlay').onclick = ambPreviewToggle;
   bind('pvVoidY', 0, function(el) {
     E().voidY = Math.max(-145, Math.min(400, +el.value || -120));
   });
@@ -7059,7 +8793,7 @@ function buildProjectPanel() {
   panelProject.querySelector('#pvExportFolder').onclick = exportProjectFolder;
   panelProject.querySelector('#pvImportFolder').onclick = function() { folderInput.click(); };
   panelProject.querySelector('#pvReset').onclick = function() {
-    PROJECT.env = Object.assign({}, ENV_DEFAULTS, { sunDir: ENV_DEFAULTS.sunDir.slice() });
+    PROJECT.env = Object.assign({}, ENV_DEFAULTS, { sunDir: ENV_DEFAULTS.sunDir.slice(), rdb2: Object.assign({}, RDB2_ENV) });
     applyEnv();
     refreshProjectPanel();
     pushHistory();
@@ -7067,35 +8801,58 @@ function buildProjectPanel() {
   };
 }
 
+function refreshSkyRows() {
+  if (!panelProject) return;
+  var m = rdb2Env().sky;
+  var show = function(id, on) { var el = panelProject.querySelector('#' + id); if (el) el.style.display = on ? '' : 'none'; };
+  show('pvAtmoRows', m === 'atmosphere');
+  show('pvGradRows', m === 'gradient');
+  show('pvColorRows', m === 'color');
+  show('pvImageRows', m === 'image');
+}
+
 function refreshProjectPanel() {
   if (!panelProject) return;
   var e = PROJECT.env;
+  var r = rdb2Env();
   var q = function(id) { return panelProject.querySelector('#' + id); };
-  q('pvHemiSky').value = e.hemiSky;
-  q('pvHemiGnd').value = e.hemiGround;
-  q('pvHemiI').value = e.hemiIntensity;
-  q('pvAmbC').value = e.ambientColor;
-  q('pvAmbI').value = e.ambientIntensity;
-  q('pvSunC').value = e.sunColor;
-  q('pvSunI').value = e.sunIntensity;
-  q('pvSunX').value = e.sunDir[0];
-  q('pvSunY').value = e.sunDir[1];
-  q('pvSunZ').value = e.sunDir[2];
-  q('pvSunS').checked = !!e.sunShadow;
-  q('pvExp').value = e.exposure;
-  q('pvFogOn').checked = !!e.fog;
-  q('pvFogC').value = e.fogColor;
-  q('pvFogN').value = e.fogNear;
-  q('pvFogF').value = e.fogFar;
-  q('pvSkyMode').value = e.skyMode;
-  q('pvSkyTop').value = e.skyTop;
-  q('pvSkyMid').value = e.skyMid;
-  q('pvSkyBot').value = e.skyBot;
-  q('pvSkyColor').value = e.skyColor;
+  q('pvSunEl').value = r.sunElev;
+  q('pvSunAz').value = r.sunAzim;
+  q('pvSunE').value = r.sunEnergy;
+  q('pvSunC').value = r.sunColor;
+  q('pvSunS').checked = r.sunShadow !== false;
+  q('pvAmbC').value = r.ambColor;
+  q('pvAmbE').value = r.ambEnergy;
+  q('pvAmbSky').value = r.ambSky;
+  q('pvExp').value = r.exposure;
+  q('pvTone').value = r.tonemap === 'filmic' || r.tonemap === 'aces' ? r.tonemap : 'linear';
+  q('pvWhite').value = r.white;
+  q('pvSkyMode').value = r.sky;
+  q('pvSkyE').value = r.skyEnergy;
+  q('pvClouds').value = r.clouds;
+  q('pvCloudS').value = r.cloudSpeed;
+  q('pvCloudD').value = r.cloudDir;
+  q('pvStars').value = r.stars;
+  q('pvDisc').value = r.sunDisc;
+  q('pvDiscSize').value = r.sunSize;
+  q('pvHaze').value = r.haze;
+  q('pvSkyTop').value = r.skyTop;
+  q('pvSkyMid').value = r.skyMid;
+  q('pvSkyBot').value = r.skyBot;
+  q('pvSkyColor').value = r.skyColor;
+  q('pvFogOn').checked = r.fog !== false;
+  q('pvFogC').value = r.fogColor;
+  q('pvFogN').value = r.fogBegin;
+  q('pvFogF').value = r.fogEnd;
+  q('pvFogSky').value = r.fogSky;
+  refreshSkyRows();
+  q('pvAmb').innerHTML = ambOptions(ambValid(r.amb, true) ? r.amb : 'auto', true);
+  q('pvAmbVol').value = Number.isFinite(+r.ambVol) ? +r.ambVol : 1;
+  renderAmbLayers();
   q('pvVoidY').value = e.voidY;
 
   var sel = q('pvSkyImage');
-  var cur = e.skyImage && e.skyImage.indexOf('asset:') === 0 ? e.skyImage.slice(6) : '';
+  var cur = r.skyImage && r.skyImage.indexOf('asset:') === 0 ? r.skyImage.slice(6) : '';
   sel.innerHTML = '<option value="">（未选择）</option>' + assetList('texture').map(function(a) {
     return '<option value="' + a.key + '"' + (a.key === cur ? ' selected' : '') + '>' +
       escapeHtml(a.asset.name || a.key) + '</option>';
@@ -7425,6 +9182,7 @@ var propCollide = null;
 var propSoundBtn = null;
 var waterBox = null;
 var lightBox = null;
+var doorBox = null;
 
 function buildPropsExtras() {
   var bar = document.getElementById('propsBar');
@@ -7437,6 +9195,50 @@ function buildPropsExtras() {
   propCollide.id = 'propCollide';
   collideWrap.appendChild(propCollide);
   bar.insertBefore(collideWrap, document.getElementById('groupInfo'));
+
+  var surfaceWrap = document.createElement('span');
+  surfaceWrap.id = 'surfaceWrap';
+  surfaceWrap.innerHTML = '<label>材质</label><select id="propSurface">' +
+    SURFACES.map(function(x) { return '<option value="' + x.id + '">' + x.name + '</option>'; }).join('') +
+    '</select><button id="propSurfacePlay" class="btn-small" title="试听脚步">▶</button>';
+  bar.insertBefore(surfaceWrap, document.getElementById('groupInfo'));
+  surfaceWrap.querySelector('#propSurface').addEventListener('change', function() {
+    var v = this.value;
+    for (var i = 0; i < selection.length; i++) {
+      if (surfaceEligible(selection[i])) selection[i].userData.mapSurface = v;
+    }
+    pushHistory();
+  });
+  surfaceWrap.querySelector('#propSurfacePlay').onclick = function() {
+    var o = selection.filter(surfaceEligible)[0];
+    var e = o && KIT_SOUND_BY_ID['game:foot_walk_' + surfaceOf(o)];
+    if (e) new Audio(e.url).play().catch(function() { });
+  };
+
+  var shapeWrap = document.createElement('span');
+  shapeWrap.id = 'shapeWrap';
+  shapeWrap.style.display = 'none';
+  bar.insertBefore(shapeWrap, document.getElementById('groupInfo'));
+
+  var breakWrap = document.createElement('span');
+  breakWrap.id = 'breakWrap';
+  breakWrap.innerHTML = '<label>可破坏</label><input id="propBreak" type="checkbox" />' +
+    '<label>耐久</label><input id="propBreakHp" type="number" min="1" max="100000" step="10" value="60" />' +
+    '<label>碎块大小</label><input id="propBreakPiece" type="number" min="0.1" max="2" step="0.05" value="0.35" />';
+  bar.insertBefore(breakWrap, document.getElementById('groupInfo'));
+  var applyBreak = function() {
+    var on = document.getElementById('propBreak').checked;
+    var hp = clampNum(document.getElementById('propBreakHp').value, BREAK_HP);
+    var piece = clampNum(document.getElementById('propBreakPiece').value, BREAK_PIECE);
+    for (var i = 0; i < selection.length; i++) {
+      if (physEditable(selection[i])) selection[i].userData.mapBreakable = on ? { hp: hp, piece: piece } : null;
+    }
+    refreshPropsExtra();
+    pushHistory();
+  };
+  breakWrap.querySelector('#propBreak').addEventListener('change', applyBreak);
+  breakWrap.querySelector('#propBreakHp').addEventListener('change', applyBreak);
+  breakWrap.querySelector('#propBreakPiece').addEventListener('change', applyBreak);
 
   propSoundBtn = document.createElement('button');
   propSoundBtn.id = 'btnSounds';
@@ -7484,6 +9286,45 @@ function buildPropsExtras() {
     '<label>边缘柔化</label><input id="ltPenumbra" type="range" min="0" max="1" step="0.05" /></span>' +
     '<label>投影</label><input id="ltShadow" type="checkbox" />';
   bar.appendChild(lightBox);
+
+  doorBox = document.createElement('div');
+  doorBox.id = 'doorBox';
+  doorBox.style.cssText = 'display:none;width:100%;gap:6px;flex-wrap:wrap;align-items:center;' +
+    'border-top:1px solid var(--line);padding-top:6px;margin-top:4px';
+  doorBox.innerHTML =
+    '<span class="group-badge" style="border-color:#d9a066;color:#d9a066;background:rgba(217,160,102,.14)">🚪 门</span>' +
+    '<label>宽 / 高 / 厚</label><input id="drW" type="number" min="0.3" max="4" step="0.05" />' +
+    '<input id="drH" type="number" min="0.5" max="5" step="0.05" />' +
+    '<input id="drT" type="number" min="0.02" max="0.3" step="0.005" />' +
+    '<label>开局上锁</label><input id="drLocked" type="checkbox" />' +
+    '<button id="drFlip" class="btn-small">⇄ 翻转开门方向</button>';
+  bar.appendChild(doorBox);
+  var dq = function(id) { return doorBox.querySelector('#' + id); };
+  var setDoor = function(fn) {
+    for (var i = 0; i < selection.length; i++) {
+      if (!selection[i].userData.isDoor) continue;
+      fn(selection[i]);
+      refreshDoor(selection[i], false);
+    }
+    refreshProps();
+    pushHistory();
+  };
+  ['drW', 'drH', 'drT'].forEach(function(id, axis) {
+    dq(id).addEventListener('keydown', function(e) { e.stopPropagation(); });
+    dq(id).onchange = function() {
+      var v = +this.value;
+      if (!(v > 0)) return;
+      setDoor(function(o) {
+        var s = doorSize(o);
+        s[axis] = v;
+        o.scale.set(s[0], s[1], s[2]);
+      });
+    };
+  });
+  dq('drLocked').onchange = function() { var v = this.checked; setDoor(function(o) { o.userData.doorLocked = v; }); };
+  dq('drFlip').onclick = function() {
+    setDoor(function(o) { o.rotateY(Math.PI); });
+  };
 
   var wq = function(id) { return waterBox.querySelector('#' + id); };
   var setWater = function(fn) {
@@ -7562,7 +9403,7 @@ function rebuildWaterShape(root, shape) {
 function collideEditable(o) {
   var t = o && o.userData.mapType;
   return t === 'box' || t === 'sphere' || t === 'cylinder' || t === 'cone' ||
-    t === 'hex' || t === 'ramp' || t === 'triangle' || t === 'model';
+    t === 'hex' || t === 'ramp' || t === 'triangle' || t === 'model' || !!SHAPE_SPECS[t];
 }
 
 function applyCollideLook(o) {
@@ -7663,7 +9504,13 @@ function frame(now) {
   camera.rotation.set(pitch, yaw, 0);
 
   updateWater(dt);
-  if (skyMat) skyMat.uniforms.uTime.value = (skyMat.uniforms.uTime.value + dt) % 600;
+  syncDoors();
+  ambPreviewTick();
+  if (skyMat) {
+    skyClock += dt;
+    skyMat.uniforms.time.value = skyClock;
+    skyMesh.position.copy(camera.position);
+  }
 
   if (previewOn) {
     stepPreview(dt);
@@ -8620,6 +10467,98 @@ Object.assign(I18N_CFG.en, {
   "删除水：ragdollbox2 加入水之前将不支持放置水，但已有的地图水仍然能够编辑": "Water removed: placing water is no longer supported until water is added to RagdollBox 2, but water already in existing maps can still be edited",
   "修复了跨设备传输地图时组会变成一整个物体，而不是它原本的样子的 bug": "Fixed a bug where groups turned into a single object instead of staying as they were when transferring a map across devices",
   "修复了放置物体时 Y 轴被强制压到世界地面的问题，现在完全以屏幕中心的准心为准": "Fixed an issue where the Y axis was forced down to world ground level when placing objects; placement now follows the center crosshair exactly"
+});
+// ---- RagdollBox 2 物品 ----
+Object.assign(I18N_CFG.en, KIT_EN);
+Object.assign(I18N_CFG.en, {
+  "🎮 游戏物品": "🎮 Game Items",
+  "游戏物品": "Game Items",
+  "游戏物品清单没有加载成功": "The game item list did not load",
+  "已忽略不属于 RagdollBox 2 的物品：": "Skipped items that are not in RagdollBox 2: "
+});
+Object.assign(I18N_CFG.en, {
+  "太阳": "Sun",
+  "高度角 / 方位角": "Elevation / Azimuth",
+  "太阳强度": "Sun Energy",
+  "太阳颜色": "Sun Color",
+  "太阳投影": "Sun Shadows",
+  "环境光": "Ambient Light",
+  "环境光颜色": "Ambient Color",
+  "环境光强度": "Ambient Energy",
+  "天空光占比": "Sky Contribution",
+  "曝光": "Exposure",
+  "色调映射": "Tonemapping",
+  "线性": "Linear",
+  "电影": "Filmic",
+  "白点": "White Point",
+  "天空盒": "Skybox",
+  "大气": "Atmosphere",
+  "渐变天空": "Gradient Sky",
+  "纯色": "Solid Color",
+  "自定义全景图": "Custom Panorama",
+  "天空亮度": "Sky Energy",
+  "云量": "Cloud Cover",
+  "云速 km/h / 云向 °": "Cloud Speed km/h / Direction °",
+  "星星亮度": "Star Brightness",
+  "太阳圆盘亮度 / 大小 °": "Sun Disc Brightness / Size °",
+  "地平线雾霭": "Horizon Haze",
+  "渐变 顶 / 中 / 底": "Gradient Top / Middle / Bottom",
+  "全景图资源": "Panorama Asset",
+  "开启雾": "Enable Fog",
+  "雾颜色": "Fog Color",
+  "雾起点 / 终点": "Fog Start / End",
+  "雾取天空色": "Fog Sky Color"
+});
+Object.assign(I18N_CFG.en, {
+  "门": "Door",
+  "宽 / 高 / 厚": "Width / Height / Thickness",
+  "开局上锁": "Locked at Start",
+  "⇄ 翻转开门方向": "⇄ Flip Swing Side",
+  "🚪 门": "🚪 Door"
+});
+Object.assign(I18N_CFG.en, {
+  "材质": "Material",
+  "自动（按贴图）": "Auto (by texture)",
+  "混凝土": "Concrete",
+  "木头": "Wood",
+  "金属": "Metal",
+  "试听脚步": "Preview footstep",
+  "可破坏": "Breakable",
+  "耐久": "Durability",
+  "碎块大小": "Piece size",
+  "碎裂时": "On break",
+  "环境音": "Ambience",
+  "自动（按地图）": "Auto (by map)",
+  "田野": "Field",
+  "户外": "Outdoor",
+  "城镇": "Town",
+  "竞技场": "Arena",
+  "过渡": "Blend",
+  "高度": "Height",
+  "＋ 添加高度分层": "+ Add Height Layer",
+  "▶ 试听（按当前视角高度）": "▶ Preview (at view height)",
+  "■ 停止试听": "■ Stop Preview",
+  "圆环": "Torus",
+  "胶囊": "Capsule",
+  "台阶": "Stairs",
+  "拱": "Arch",
+  "空心管": "Tube",
+  "半圆柱": "Half Cylinder",
+  "棱锥": "Pyramid",
+  "分段数": "Segments",
+  "纵向分段": "Rings",
+  "顶部半径": "Top Radius",
+  "底部半径": "Bottom Radius",
+  "弧度(°)": "Arc (°)",
+  "截面分段": "Tube Segments",
+  "粗细": "Thickness",
+  "端部高度": "Cap Height",
+  "台阶数": "Steps",
+  "壁厚": "Wall",
+  "边数": "Sides",
+  "顶部大小": "Top Size",
+  "游戏预制": "Game Presets",
+  "项目资源": "Project Assets"
 });
 // ---- 英文表结束（后续批次插在此行之前）----
 </script>
