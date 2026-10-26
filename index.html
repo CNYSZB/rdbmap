@@ -856,7 +856,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 7.0.0</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 7.0.1</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
@@ -996,13 +996,13 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">7.0.0</div>
+    <div class="version" id="updateVersion">7.0.1</div>
     <div class="sub">RagdollBox 地图编辑器</div>
-<ul class="changelog" id="updateChangelog">
-  <li>🎉 本次为一次大更新，由 Jindinghe 更新</li>
-  <li>更新内容非常多，公告写不完，请大家进游戏自行探索！</li>
-  <li>如果遇到 bug，欢迎反馈！</li>
-</ul>
+    <ul class="changelog" id="updateChangelog">
+      <li>修复了因上传文件时出错，导致物品栏中的游戏物品无法正常加载的问题</li>
+      <li>重新将水加入至地图编辑器</li>
+      <li>如果遇到 bug，欢迎反馈！</li>
+    </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
 </div>
@@ -1052,7 +1052,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
-const APP_VERSION = '7.0.0';
+const APP_VERSION = '7.0.1';
 
 // ╔══════════════════════════════════════════════════════════════╗
 // ║ 【水体放置开关】搜索关键字：WATER_PLACEMENT_ENABLED            ║
@@ -1061,7 +1061,7 @@ const APP_VERSION = '7.0.0';
 // ║  只影响"放置新水体"的入口；地图里已有的水照常读取/渲染/编辑/   ║
 // ║  保存/传输，不受此开关影响。                                   ║
 // ╚══════════════════════════════════════════════════════════════╝
-const WATER_PLACEMENT_ENABLED = false;
+const WATER_PLACEMENT_ENABLED = true;
 const LAST_VERSION_KEY = 'ragdollbox_last_version';
 const TUTORIAL_SHOWN_KEY = 'ragdollbox_tutorial_shown';
 const GROUP_LIBRARY_KEY = 'ragdollbox_group_library';
@@ -1530,7 +1530,7 @@ class GroupLibrary {
 var groupManager = new GroupManager();
 var groupLibrary = new GroupLibrary();
 
-var KIT_BASE = 'rdb2/';
+var KIT_BASE = ''; // 同级目录（原 rdb2/）
 var KIT = await fetch(KIT_BASE + 'kit.json', { cache: 'no-cache' })
   .then(function(r) { return r.ok ? r.json() : null; })
   .catch(function() { return null; });
@@ -4912,7 +4912,7 @@ function serializeMap(opt) {
     }
   }
   var groupsData = groupManager.serializeGroups(lists);
-  // [v6.2] 冗余：给每个组成员打 grp 标签，防止 groups 索引表在传输中丢失/错位导致组散架或合并
+  // [v7.0.1] 冗余：给每个组成员打 grp 标签，防止 groups 索引表在传输中丢失/错位导致组散架或合并
   var tagArrays = { object: objects, prop: props, gun: guns, water: waters, light: lights, door: doors };
   for (var tgi = 0; tgi < groupManager.groups.length; tgi++) {
     var tgG = groupManager.groups[tgi];
@@ -5547,7 +5547,7 @@ function loadMapData(d, rh) {
   if (groupsData.length > 0 && groupManager) {
     groupManager.deserializeGroups(groupsData, lists);
   }
-  // [v6.2] 兜底：按成员上的 grp 标签重建没能还原的组
+  // [v7.0.1] 兜底：按成员上的 grp 标签重建没能还原的组
   if (groupManager) {
     var tagSrc = { object: objs, prop: props, gun: guns, water: waters, light: lights, door: doorsIn };
     var byGrp = {}, grpOrder = [];
@@ -10054,7 +10054,6 @@ Object.assign(I18N_CFG.en, {
   "将你编辑好的地图导入到 RagdollBox 游戏中": "Import your finished map into the RagdollBox game",
   "我知道了": "Got it",
   "新版本": "New Version",
-  "删除了瓦片贴图，这个功能带来的bug太多了…": "Removed tile textures — that feature caused too many bugs…",
   "我知道了，开始编辑！": "Got it, start editing!",
   "怎么选中物体": "How to select objects",
   "在物体上": "On an object,",
@@ -10102,95 +10101,23 @@ Object.assign(I18N_CFG.en, {
   "电视": "TV",
   "木箱": "Wooden Crate",
   "铁桶": "Steel Barrel",
-  "爆炸油桶": "Explosive Barrel",
-  "旋转锯": "Spinning Saw",
   "收音机": "Radio",
   "摄像机": "Camera",
   "绷带": "Bandage",
   "小型医疗箱": "Small Medkit",
   "中型医疗箱": "Medium Medkit",
-  "现金": "Cash",
-  "轻型弹药箱": "Light Ammo Box",
   "存档空间不足": "Storage Full",
   "当前地图可能较大，浏览器暂时无法自动保存。你可以在菜单里先「导出地图」备份，或精简地图后再试。": "The map may be large, so the browser can't auto-save right now. Back it up first via Menu → \"Export Map\", or slim the map down and try again.",
   "我已知晓": "Got it"
 });
 // ---- 英文表 第2批 ----
 Object.assign(I18N_CFG.en, {
-  "重型弹药箱": "Heavy Ammo Box",
-  "狙击弹药箱": "Sniper Ammo Box",
-  "榴弹弹药箱": "Grenade Ammo Box",
   "长木板": "Long Plank",
   "台灯": "Desk Lamp",
   "桌子": "Table",
   "床": "Bed",
-  "防弹衣": "Body Armor",
-  "战术防弹衣": "Tactical Body Armor",
-  "战术头盔": "Tactical Helmet",
-  "重型头盔": "Heavy Helmet",
-  "轻型防弹衣": "Light Body Armor",
-  "重型防弹衣": "Heavy Body Armor",
-  "头戴式双眼夜视仪": "Head-Mounted Binocular Night Vision",
-  "旧式钢盔": "Old Steel Helmet",
-  "武警头盔": "Riot Police Helmet",
-  "武警头盔(带面罩)": "Riot Police Helmet (with Visor)",
-  "鸭舌帽": "Peaked Cap",
-  "鸭舌帽2": "Peaked Cap 2",
-  "牛仔帽": "Cowboy Hat",
-  "安全帽": "Hard Hat",
-  "艾路迪克口罩": "Ailudike Mask",
-  "口罩": "Face Mask",
-  "草帽": "Straw Hat",
-  "礼帽": "Fedora",
-  "高礼帽": "Top Hat",
-  "毛线帽": "Beanie",
-  "面具": "Mask",
-  "曲棍球面具": "Hockey Mask",
-  "面罩兜帽": "Face-Cover Hood",
-  "战术护目镜(红)": "Tactical Goggles (Red)",
-  "战术护目镜(绿)": "Tactical Goggles (Green)",
-  "战术护目镜(白)": "Tactical Goggles (White)",
-  "厨师帽": "Chef Hat",
-  "瘟疫医生面具": "Plague Doctor Mask",
-  "雷锋帽": "Ushanka",
-  "防毒面具": "Gas Mask",
-  "方块头套": "Block Head",
-  "军绿布帽": "Olive Cloth Cap",
-  "重型防毒面具": "Heavy Gas Mask",
-  "耳机": "Headphones",
-  "圣诞帽": "Santa Hat",
-  "潜水镜": "Diving Goggles",
-  "红色游泳圈": "Red Swim Ring",
-  "蓝色游泳圈": "Blue Swim Ring",
-  "工具枪": "Tool Gun",
-  "重力枪": "Gravity Gun",
-  "手电筒": "Flashlight",
-  "手枪": "Pistol",
-  "左轮手枪": "Revolver",
-  "冲锋枪": "SMG",
-  "波波沙": "PPSh",
-  "霰弹枪": "Shotgun",
-  "SPAS 霰弹枪": "SPAS Shotgun",
-  "突击步枪": "Assault Rifle",
-  "轻型狙击枪": "Light Sniper Rifle",
-  "狙击枪": "Sniper Rifle",
-  "钉枪": "Nail Gun",
-  "彩蛋枪": "Paintball Gun",
-  "手雷": "Grenade",
-  "摔炮手榴弹": "Snap-Pop Grenade",
-  "遥控炸弹": "Remote Bomb",
-  "地雷": "Landmine",
-  "菜刀": "Cleaver",
-  "回血药剂": "Health Potion",
-  "毒药": "Poison",
-  "止血针剂": "Bleed-Stop Injection",
-  "V5针剂": "V5 Injection",
-  "突击步枪B": "Assault Rifle B",
-  "M79 榴弹发射器": "M79 Grenade Launcher",
   "撬棍": "Crowbar",
   "军刀": "Combat Knife",
-  "警棍": "Baton",
-  "小医疗箱": "Small Medkit",
   "已清理旧自动存档": "Old auto-save cleared",
   "自动存档": "Auto-save",
   "已保存": "Saved",
@@ -10335,7 +10262,6 @@ Object.assign(I18N_CFG.en, {
   "地形": "Terrain",
   "场景": "Scene",
   "游戏内容": "Game Content",
-  "游戏道具 / 枪械": "Game Props / Guns",
   "从项目资源放模型": "Place a model from project assets",
   "返回": "Back",
   "搜索名称": "Search name",
@@ -10375,14 +10301,9 @@ Object.assign(I18N_CFG.en, {
   "音调": "Pitch",
   "项目设置": "Project Settings",
   "环境光": "Ambient Light",
-  "天空光颜色": "Sky Light Color",
-  "地面反光颜色": "Ground Bounce Color",
   "环境光强度": "Ambient Intensity",
-  "全局补光颜色": "Fill Light Color",
-  "全局补光强度": "Fill Light Intensity",
   "太阳颜色": "Sun Color",
   "太阳强度": "Sun Intensity",
-  "太阳方向 X/Y/Z": "Sun Direction X/Y/Z",
   "太阳投影": "Sun Shadows",
   "曝光": "Exposure",
   "雾": "Fog",
@@ -10439,16 +10360,6 @@ Object.assign(I18N_CFG.en, {
   "视野已保存": "FOV saved"
 });
 Object.assign(I18N_CFG.en, {
-  "对英语进行了支持": "Added English language support"
-});
-Object.assign(I18N_CFG.en, {
-  "层级栏现在可以拖动底部调整高度，会自适应屏幕，不会挡住按钮": "The hierarchy panel can now be resized by dragging its bottom edge; it adapts to the screen and never covers the buttons",
-  "跨设备转移现在会保留组，并新增「上传组」：可单独传输选中的组或整个组库": "Cross-device transfer now keeps groups, and a new \"Upload Group(s)\" option sends the selected group or the whole library",
-  "修复组库放置、复制组时灯光等特殊物体失效的问题（旧组库里已存的灯需重新保存）": "Fixed lights and other special objects breaking when placing from the library or copying groups (lights already stored in the old library must be saved again)",
-  "修复点击组时误选中组内物体的问题": "Fixed clicking a group sometimes selecting an object inside it instead",
-  "修复撤销、读档后组可能被拆散的问题": "Fixed groups possibly breaking apart after undo or loading a save",
-  "精确输入：小数点不再被吞掉；缩放下限降为 0.001，输入时碰到下限会等输入完再修正": "Precise input: decimal points are no longer swallowed; the scale minimum is now 0.001, and hitting it while typing is only corrected once you finish typing",
-  "放置物体改为按范围放置：范围内放在准心命中处，范围外放在范围边界": "Placement now uses a range: objects go where the crosshair hits within range, or at the range boundary if nothing is hit",
   "📦 上传组（选中了组就传该组，否则传整个组库）": "📦 Upload Group(s) (selected group, or the whole library if none selected)",
   "另一台设备输入分享码下载，会自动存入组库": "Download on another device with the share code; groups are saved into the library automatically",
   "没有可上传的组：请先选中一个组，或先把组保存到组库": "No groups to upload: select a group first, or save groups to the library",
@@ -10461,10 +10372,10 @@ Object.assign(I18N_CFG.en, {
 Object.assign(I18N_CFG.en, {
   "如果遇到 bug，欢迎反馈！": "If you run into any bugs, please let us know!"
 });
-// ---- v7.0.0 ----
+// ---- v7.0.1 ----
 Object.assign(I18N_CFG.en, {
-  "🎉 本次为一次大更新，由 Jindinghe 更新": "🎉 This is a major update, brought to you by Jindinghe",
-  "更新内容非常多，公告写不完，请大家进游戏自行探索！": "There's so much new content that this changelog can't cover it all — jump in and explore for yourself!"
+  "修复了因上传文件时出错，导致物品栏中的游戏物品无法正常加载的问题": "Fixed an issue where in-game items in the inventory failed to load properly due to an error during file upload",
+  "重新将水加入至地图编辑器": "Water has been added back to the map editor"
 });
 // ---- RagdollBox 2 物品 ----
 Object.assign(I18N_CFG.en, KIT_EN);
