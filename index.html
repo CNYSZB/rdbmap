@@ -1531,7 +1531,7 @@ class GroupLibrary {
 var groupManager = new GroupManager();
 var groupLibrary = new GroupLibrary();
 
-var KIT_BASE = 'rdb2/';
+var KIT_BASE = ''; // 同级目录（原 rdb2/）
 var KIT = await fetch(KIT_BASE + 'kit.json', { cache: 'no-cache' })
   .then(function(r) { return r.ok ? r.json() : null; })
   .catch(function() { return null; });
