@@ -233,6 +233,25 @@
     }
     body.preview #previewHud { display: flex; }
     #previewHud b { color: var(--text); }
+    .pvBtn {
+      display: none; position: absolute; z-index: 46; width: 72px; height: 72px; border-radius: 50%;
+      align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff;
+      background: rgba(50,61,75,.8); border: 1.5px solid rgba(255,255,255,.2);
+      touch-action: none; user-select: none; -webkit-user-select: none;
+    }
+    body.preview.touch .pvBtn { display: flex; }
+    .pvBtn.on { background: #65a9ff; }
+    body.pvEdit .pvBtn, body.pvEdit #dpadMove { outline: 2px dashed rgba(255,255,255,.5); }
+    body.pvEdit .pvSel { outline: 2px solid #65a9ff; }
+    #pvEditBar {
+      display: none; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 60;
+      gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap; max-width: 94vw;
+      padding: 8px 12px; border-radius: 12px; font-size: 12px;
+      background: rgba(18,24,32,.92); border: 1px solid var(--line); color: var(--text);
+    }
+    body.pvEdit #pvEditBar { display: flex; }
+    #pvEditBar input[type=range] { width: 110px; }
+    #pvEditBar button, #pvCustomize { pointer-events: auto; padding: 5px 10px; font-size: 11px; border-radius: 7px; }
     #previewExit { pointer-events: auto; padding: 5px 10px; font-size: 11px; border-radius: 7px; }
 
     #hintBar {
@@ -793,7 +812,8 @@
   <div id="hintBar">右键拖动 = 视角 · 滚轮 = 前后 · Shift+左键 = 加选 · 点击组切换选中/单独选中物体</div>
 
   <div id="previewHud">
-    <span>预览中 · <b id="previewHint">WASD 移动 · 空格 跳 · Shift 跑</b></span>
+    <span>预览中 · <b id="previewHint">WASD 移动 · 空格 跳 · C 下蹲 · Shift 跑</b></span>
+    <button id="pvCustomize">⚙ 按键</button>
     <button id="previewExit">退出预览 (Esc)</button>
   </div>
 
@@ -812,6 +832,9 @@
   </div>
 
   <div id="dpadMove"><canvas id="canvasMove"></canvas></div>
+  <div class="pvBtn" id="pvJump">跳跃</div>
+  <div class="pvBtn" id="pvCrouch">下蹲</div>
+  <div id="pvEditBar"><b id="pvSelName">十字键</b><span>大小</span><input type="range" id="pvScale" min="50" max="200" value="100"><button id="pvReset">重置</button><button id="pvDone">完成</button><span style="flex-basis:100%;height:0"></span><span>灵敏度</span><input type="range" id="pvSens" min="50" max="400" value="100"><b id="pvSensVal">1.0x</b></div>
 
   <div id="bottomBar">
     <button id="btnSelect" class="active"><span class="icon">☝️</span>选中</button>
@@ -856,7 +879,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 7.0.1</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 7.2.0</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
@@ -996,12 +1019,11 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">7.0.1</div>
+    <div class="version" id="updateVersion">7.2.0</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li>修复了因上传文件时出错，导致物品栏中的游戏物品无法正常加载的问题</li>
-      <li>重新将水加入至地图编辑器</li>
-      <li>如果遇到 bug，欢迎反馈！</li>
+      <li>增加了半拱</li>
+      <li>优化了预览模式：操作 UI 更接近游戏内（可自定义按键位置和大小），碰撞改为胶囊碰撞箱，现在可以进入室内</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -1052,7 +1074,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
-const APP_VERSION = '7.0.1';
+const APP_VERSION = '7.2.0';
 
 // ╔══════════════════════════════════════════════════════════════╗
 // ║ 【水体放置开关】搜索关键字：WATER_PLACEMENT_ENABLED            ║
@@ -1301,7 +1323,7 @@ document.body.classList.add(DESKTOP ? 'desktop' : 'touch');
 
 if (IS_TOUCH) transform.setSize(1.15);
 var previewHint = document.getElementById('previewHint');
-if (previewHint) previewHint.textContent = IS_TOUCH ? '单指拖动＝转视角 · 十字键移动 · ⇧跳 · ⇩下落' : 'WASD 移动 · 空格 跳 · Shift 跑';
+if (previewHint) previewHint.textContent = IS_TOUCH ? '单指拖动＝转视角 · 十字键移动 · 跳跃/下蹲按钮' : 'WASD 移动 · 空格 跳 · C 下蹲 · Shift 跑';
 
 var lookLocked = false;
 var previewOn = false;
@@ -1310,7 +1332,7 @@ var shiftHeld = false;
 var primitiveNames = {
   box: '方块', sphere: '球体', cylinder: '圆柱体', cone: '圆锥',
   hex: '六边形体', ramp: '斜坡', triangle: '三角体', model: '导入模型',
-  torus: '圆环', capsule: '胶囊', stairs: '台阶', arch: '拱', tube: '空心管', halfcyl: '半圆柱', pyramid: '棱锥',
+  torus: '圆环', capsule: '胶囊', stairs: '台阶', arch: '拱', halfarch: '半拱', tube: '空心管', halfcyl: '半圆柱', pyramid: '棱锥',
   spawn: '出生点', water: '水体', light: '光源', gun: '枪械', door: '门'
 };
 
@@ -2309,6 +2331,7 @@ var SHAPE_SPECS = {
   capsule: { seg: [24, 3, 128, 1], rings: [8, 1, 32, 1], cap: [0.25, 0.01, 0.5] },
   stairs: { steps: [4, 1, 64, 1] },
   arch: { seg: [16, 2, 128, 1], thick: [0.3, 0.02, 0.98] },
+  halfarch: { seg: [8, 1, 64, 1], thick: [0.3, 0.02, 0.98] },
   tube: { seg: [24, 3, 128, 1], thick: [0.2, 0.02, 0.98], arc: [360, 1, 360] },
   halfcyl: { seg: [16, 2, 128, 1] },
   pyramid: { sides: [4, 3, 64, 1], top: [0, 0, 1] }
@@ -2316,7 +2339,7 @@ var SHAPE_SPECS = {
 var SHAPE_LABELS = {
   seg: '分段数', rings: '纵向分段', top: '顶部半径', bottom: '底部半径', arc: '弧度(°)',
   'torus.sides': '截面分段', 'torus.thick': '粗细', 'capsule.cap': '端部高度', steps: '台阶数',
-  'arch.thick': '壁厚', 'tube.thick': '壁厚', 'pyramid.sides': '边数', 'pyramid.top': '顶部大小'
+  'arch.thick': '壁厚', 'halfarch.thick': '壁厚', 'tube.thick': '壁厚', 'pyramid.sides': '边数', 'pyramid.top': '顶部大小'
 };
 var SHAPE_STEP = { seg: 1, rings: 1, sides: 1, steps: 1, arc: 5, top: 0.05, bottom: 0.05, thick: 0.02, cap: 0.01 };
 
@@ -2494,13 +2517,15 @@ function shapeTube(seg, thick, arcDeg) {
   return m.geometry();
 }
 
-function shapeCurve(m, seg, rx, ry, out) {
+function shapeCurve(m, seg, rx, ry, out, cx, span) {
+  cx = cx || 0;
+  span = span || Math.PI;
   var base = m.count();
   for (var k = 0; k <= seg; k++) {
-    var f = k / seg * Math.PI;
+    var f = k / seg * span;
     var nn = shapeNorm2(Math.cos(f) / rx, Math.sin(f) / ry);
     [0.5, -0.5].forEach(function(z) {
-      m.vert(rx * Math.cos(f), -0.5 + ry * Math.sin(f), z, nn[0] * out, nn[1] * out, 0, k / seg, z + 0.5);
+      m.vert(cx + rx * Math.cos(f), -0.5 + ry * Math.sin(f), z, nn[0] * out, nn[1] * out, 0, k / seg, z + 0.5);
     });
   }
   for (var j = 0; j < seg; j++) {
@@ -2548,6 +2573,31 @@ function shapeArch(seg, thick) {
       var f = k / seg * Math.PI;
       [[rix, riy], [0.5, 1]].forEach(function(e) {
         var x = e[0] * Math.cos(f), y = -0.5 + e[1] * Math.sin(f);
+        m.vert(x, y, z, 0, 0, sz, x + 0.5, y + 0.5);
+      });
+    }
+    for (var q = 0; q < seg; q++) {
+      var i0 = base + q * 2, i1 = i0 + 2;
+      if (z > 0) m.quad(i0, i0 + 1, i1 + 1, i1); else m.quad(i0, i1, i1 + 1, i0 + 1);
+    }
+  });
+  return m.geometry();
+}
+
+function shapeHalfArch(seg, thick) {
+  var m = new ShapeBuilder();
+  var k = 1 - thick, lo = -0.5 + k, h = Math.PI / 2;
+  shapeCurve(m, seg, 1, 1, 1, -0.5, h);
+  shapeCurve(m, seg, k, k, -1, -0.5, h);
+  shapeFloor(m, lo, 0.5);
+  m.quad(m.vert(-0.5, lo, -0.5, -1, 0, 0, 0, lo + 0.5), m.vert(-0.5, lo, 0.5, -1, 0, 0, 1, lo + 0.5),
+    m.vert(-0.5, 0.5, 0.5, -1, 0, 0, 1, 1), m.vert(-0.5, 0.5, -0.5, -1, 0, 0, 0, 1));
+  [0.5, -0.5].forEach(function(z) {
+    var sz = Math.sign(z), base = m.count();
+    for (var i = 0; i <= seg; i++) {
+      var f = i / seg * h;
+      [k, 1].forEach(function(r) {
+        var x = -0.5 + r * Math.cos(f), y = -0.5 + r * Math.sin(f);
         m.vert(x, y, z, 0, 0, sz, x + 0.5, y + 0.5);
       });
     }
@@ -2652,7 +2702,7 @@ function shapeVolumeFraction(type, p) {
     }
     case 'capsule': return Math.PI / 4 * (1 - 2 * p.cap) + Math.PI / 3 * p.cap;
     case 'stairs': return (p.steps + 1) / (2 * p.steps);
-    case 'arch': { var k = 1 - p.thick; return Math.PI / 4 * (1 - k * k); }
+    case 'arch': case 'halfarch': { var k = 1 - p.thick; return Math.PI / 4 * (1 - k * k); }
     case 'tube': { var k2 = 1 - p.thick; return Math.PI / 4 * (1 - k2 * k2) * p.arc / 360; }
     case 'halfcyl': return Math.PI / 4;
     case 'pyramid': return shapeArea(shapeBase(p.sides)) * (1 + p.top + p.top * p.top) / 3;
@@ -2673,6 +2723,7 @@ function geometryFor(type, raw) {
   if (type === 'capsule') return shapeCapsule(p.seg, p.rings, p.cap);
   if (type === 'stairs') return shapeStairs(p.steps);
   if (type === 'arch') return shapeArch(p.seg, p.thick);
+  if (type === 'halfarch') return shapeHalfArch(p.seg, p.thick);
   if (type === 'tube') return shapeTube(p.seg, p.thick, p.arc);
   if (type === 'halfcyl') return shapeHalfCyl(p.seg);
   if (type === 'pyramid') return shapePyramid(p.sides, p.top);
@@ -4188,8 +4239,9 @@ function endLook() {
 }
 
 function turnCamera(dx, dy) {
-  yaw -= dx * 0.0028;
-  pitch -= dy * 0.0028;
+  var sens = (previewOn && PV_SENS) ? PV_SENS : 1;   // 预览灵敏度倍率
+  yaw -= dx * 0.0028 * sens;
+  pitch -= dy * 0.0028 * sens;
   pitch = Math.max(-Math.PI / 2 + 0.02, Math.min(Math.PI / 2 - 0.02, pitch));
 }
 
@@ -4420,10 +4472,12 @@ function drawDpad() {
   ctx.strokeStyle = 'rgba(255,255,255,0.1)';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.rect(4, btns.topBtn.y - BTN_R - 10, W - 8, btns.center.y + BTN_R - btns.topBtn.y + BTN_R + 20);
+  if (previewOn) ctx.rect(4, CY - DIR_DIST - BTN_R - 10, W - 8, 2 * (DIR_DIST + BTN_R + 10));
+  else ctx.rect(4, btns.topBtn.y - BTN_R - 10, W - 8, btns.center.y + BTN_R - btns.topBtn.y + BTN_R + 20);
   ctx.fill();
   ctx.stroke();
   for (var key in btns) {
+    if (previewOn && (key === 'topBtn' || key === 'center')) continue;
     var b = btns[key];
     var active = moveState[b.id];
     ctx.fillStyle = active ? '#65a9ff' : 'rgba(50,61,75,0.8)';
@@ -4453,6 +4507,7 @@ function getTouchedButton(cx, cy, canvas) {
   var best = null;
   var bestDist = Infinity;
   for (var key in btns) {
+    if (previewOn && (key === 'topBtn' || key === 'center')) continue;
     var b = btns[key];
     var dist = Math.hypot(x - b.x, y - b.y);
     if (dist < b.r + 5 && dist < bestDist) { best = b.id; bestDist = dist; }
@@ -4461,6 +4516,7 @@ function getTouchedButton(cx, cy, canvas) {
 }
 
 function updateMoveState(touches) {
+  if (typeof PV_UI !== 'undefined' && PV_UI.edit) return;
   var ns = { up: false, down: false, left: false, right: false, topBtn: false, center: false };
   for (var i = 0; i < touches.length; i++) {
     var id = getTouchedButton(touches[i].clientX, touches[i].clientY, canvasMove);
@@ -5713,24 +5769,36 @@ fbxInput.addEventListener('change', async function(e) {
 });
 
 var PREVIEW = {
-  walk: 4.6,
-  run: 7.5,
-  jump: 6.4,
-  gUp: 16,
-  gUpCut: 38,
-  gFall: 26,
-  radius: SPAWN_RADIUS,
-  half: SPAWN_HALF,
-  foot: SPAWN_HALF + SPAWN_RADIUS,
+  walk: 4.6,          // 步行速度
+  run: 7.5,           // 跑步速度(Shift)
+  crouchMul: 0.5,     // 下蹲时速度倍率
+  jump: 6.4,          // 起跳初速度
+  gUp: 16,            // 上升重力(按住跳跃)
+  gUpCut: 38,         // 上升重力(松开跳跃)
+  gFall: 26,          // 下落重力
+  radius: SPAWN_RADIUS,                 // 胶囊半径
+  half: SPAWN_HALF,                     // 站立时胶囊中线半长
+  crouchHalf: 0.25,                     // 下蹲时胶囊中线半长
+  foot: SPAWN_HALF + SPAWN_RADIUS,      // 站立时 位置→脚底 的距离
   eye: PLAYER_EYE,
-  stepUp: 0.45
+  eyeBelowTop: 0.13,  // 视线比头顶低多少
+  stepUp: 0.45,       // 可自动迈上的台阶高度
+  snapDown: 0.5,      // 下台阶/下坡时的吸地距离
+  walkableNY: 0.7,    // 法线y大于此值才算可站立地面(约45°)
+  cell: 2,            // 碰撞网格大小(米)
+  iters: 4            // 每帧最大推出迭代次数
 };
+var pvHold = { jump: false, crouch: false };
+var PV_SENS = 1;   // 预览视角灵敏度倍率(0.5~4)，存 localStorage
+try { var _sv = parseFloat(localStorage.getItem('rb_pv_sens')); if (_sv >= 0.5 && _sv <= 4) PV_SENS = _sv; } catch (_e) {}
 
 var previewState = {
   pos: new THREE.Vector3(),
   vy: 0,
   grounded: false,
   jumpHeld: false,
+  crouch: false,
+  eyeH: 1.57,
   camYaw: 0,
   camPitch: 0
 };
@@ -5754,24 +5822,125 @@ function solidTargets() {
   return result;
 }
 
-function groundBelow(x, y, z, reach) {
-  _probe.set(x, y, z);
-  _ray.set(_probe, _down);
-  _ray.far = reach;
-  var hits = _ray.intersectObjects(solidTargets(), true);
-  return hits.length ? hits[0].point.y : null;
+// ===== 胶囊碰撞：进入预览时把实体三角面缓存成世界坐标 + 网格索引 =====
+var PV_COL = null;
+var _pvCand = [];
+var _pvQ = [0, 0, 0];
+var _pvRes = { ground: false, ceil: false, depth: 0 };
+
+function pvCellKey(ix, iy, iz) {
+  return (ix + 1024) * 4194304 + (iy + 1024) * 2048 + (iz + 1024);
 }
 
-function blockedTowards(from, dir, dist) {
-  var offsets = [-PREVIEW.half * 0.7, 0, PREVIEW.half * 0.85];
-  for (var i = 0; i < offsets.length; i++) {
-    _probe.set(from.x, from.y + offsets[i], from.z);
-    _ray.set(_probe, dir);
-    _ray.far = dist + PREVIEW.radius;
-    var hits = _ray.intersectObjects(solidTargets(), true);
-    if (hits.length) return true;
+function buildCollision() {
+  var T = [], grid = new Map(), big = [], cs = PREVIEW.cell, n = 0;
+  var vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
+  solidTargets().forEach(function(root) {
+    root.updateMatrixWorld(true);
+    root.traverse(function(o) {
+      var g = o.geometry;
+      if (!o.isMesh || !g || !g.attributes || !g.attributes.position) return;
+      var pa = g.attributes.position, ix = g.index, cnt = ix ? ix.count : pa.count, mw = o.matrixWorld;
+      for (var i = 0; i + 2 < cnt; i += 3) {
+        vA.fromBufferAttribute(pa, ix ? ix.getX(i) : i).applyMatrix4(mw);
+        vB.fromBufferAttribute(pa, ix ? ix.getX(i + 1) : i + 1).applyMatrix4(mw);
+        vC.fromBufferAttribute(pa, ix ? ix.getX(i + 2) : i + 2).applyMatrix4(mw);
+        T.push(vA.x, vA.y, vA.z, vB.x, vB.y, vB.z, vC.x, vC.y, vC.z);
+        var id = n++;
+        var x0 = Math.floor(Math.min(vA.x, vB.x, vC.x) / cs), x1 = Math.floor(Math.max(vA.x, vB.x, vC.x) / cs);
+        var y0 = Math.floor(Math.min(vA.y, vB.y, vC.y) / cs), y1 = Math.floor(Math.max(vA.y, vB.y, vC.y) / cs);
+        var z0 = Math.floor(Math.min(vA.z, vB.z, vC.z) / cs), z1 = Math.floor(Math.max(vA.z, vB.z, vC.z) / cs);
+        if ((x1 - x0 + 1) * (y1 - y0 + 1) * (z1 - z0 + 1) > 64) { big.push(id); continue; }
+        for (var a = x0; a <= x1; a++) for (var b = y0; b <= y1; b++) for (var c = z0; c <= z1; c++) {
+          var k = pvCellKey(a, b, c), arr = grid.get(k);
+          if (arr) arr.push(id); else grid.set(k, [id]);
+        }
+      }
+    });
+  });
+  return { T: new Float32Array(T), grid: grid, big: big, mark: new Int32Array(n), stamp: 0, cs: cs, n: n };
+}
+
+function pvQuery(x0, y0, z0, x1, y1, z1) {
+  var C = PV_COL, out = _pvCand, cs = C.cs;
+  out.length = 0;
+  C.stamp++;
+  var i0 = Math.floor(x0 / cs), i1 = Math.floor(x1 / cs), j0 = Math.floor(y0 / cs), j1 = Math.floor(y1 / cs);
+  var k0 = Math.floor(z0 / cs), k1 = Math.floor(z1 / cs);
+  for (var a = i0; a <= i1; a++) for (var b = j0; b <= j1; b++) for (var c = k0; c <= k1; c++) {
+    var arr = C.grid.get(pvCellKey(a, b, c));
+    if (!arr) continue;
+    for (var m = 0; m < arr.length; m++) {
+      var t = arr[m];
+      if (C.mark[t] !== C.stamp) { C.mark[t] = C.stamp; out.push(t); }
+    }
   }
-  return false;
+  for (var q = 0; q < C.big.length; q++) {
+    var t2 = C.big[q];
+    if (C.mark[t2] !== C.stamp) { C.mark[t2] = C.stamp; out.push(t2); }
+  }
+  return out;
+}
+
+// 点到三角形的最近点 -> _pvQ
+function pvClosest(px, py, pz, o) {
+  var T = PV_COL.T, Q = _pvQ;
+  var ax = T[o], ay = T[o + 1], az = T[o + 2], bx = T[o + 3], by = T[o + 4], bz = T[o + 5], cx = T[o + 6], cy = T[o + 7], cz = T[o + 8];
+  var abx = bx - ax, aby = by - ay, abz = bz - az, acx = cx - ax, acy = cy - ay, acz = cz - az;
+  var apx = px - ax, apy = py - ay, apz = pz - az;
+  var d1 = abx * apx + aby * apy + abz * apz, d2 = acx * apx + acy * apy + acz * apz;
+  if (d1 <= 0 && d2 <= 0) { Q[0] = ax; Q[1] = ay; Q[2] = az; return; }
+  var bpx = px - bx, bpy = py - by, bpz = pz - bz;
+  var d3 = abx * bpx + aby * bpy + abz * bpz, d4 = acx * bpx + acy * bpy + acz * bpz;
+  if (d3 >= 0 && d4 <= d3) { Q[0] = bx; Q[1] = by; Q[2] = bz; return; }
+  var vc = d1 * d4 - d3 * d2;
+  if (vc <= 0 && d1 >= 0 && d3 <= 0) { var v = d1 / (d1 - d3); Q[0] = ax + v * abx; Q[1] = ay + v * aby; Q[2] = az + v * abz; return; }
+  var cpx = px - cx, cpy = py - cy, cpz = pz - cz;
+  var d5 = abx * cpx + aby * cpy + abz * cpz, d6 = acx * cpx + acy * cpy + acz * cpz;
+  if (d6 >= 0 && d5 <= d6) { Q[0] = cx; Q[1] = cy; Q[2] = cz; return; }
+  var vb = d5 * d2 - d1 * d6;
+  if (vb <= 0 && d2 >= 0 && d6 <= 0) { var w = d2 / (d2 - d6); Q[0] = ax + w * acx; Q[1] = ay + w * acy; Q[2] = az + w * acz; return; }
+  var va = d3 * d6 - d5 * d4;
+  if (va <= 0 && (d4 - d3) >= 0 && (d5 - d6) >= 0) {
+    var w2 = (d4 - d3) / ((d4 - d3) + (d5 - d6));
+    Q[0] = bx + w2 * (cx - bx); Q[1] = by + w2 * (cy - by); Q[2] = bz + w2 * (cz - bz); return;
+  }
+  var den = 1 / (va + vb + vc), v2 = vb * den, w3 = vc * den;
+  Q[0] = ax + abx * v2 + acx * w3; Q[1] = ay + aby * v2 + acy * w3; Q[2] = az + abz * v2 + acz * w3;
+}
+
+// 胶囊(3球近似)与场景求交。apply=true 时把 pos 推出穿透；false 只检测，结果在 _pvRes.depth
+function pvResolve(pos, crouch, apply) {
+  var R = PREVIEW.radius, half = crouch ? PREVIEW.crouchHalf : PREVIEW.half, res = _pvRes;
+  res.ground = false; res.ceil = false; res.depth = 0;
+  if (!PV_COL || !PV_COL.n) return res;
+  for (var it = 0; it < (apply ? PREVIEW.iters : 1); it++) {
+    var c0 = pos.y - PREVIEW.foot + R + half;
+    var cand = pvQuery(pos.x - R, c0 - half - R, pos.z - R, pos.x + R, c0 + half + R, pos.z + R);
+    var moved = false;
+    for (var s = 0; s < 3; s++) {
+      for (var j = 0; j < cand.length; j++) {
+        var sy = pos.y - PREVIEW.foot + R + half + (s - 1) * half;
+        pvClosest(pos.x, sy, pos.z, cand[j] * 9);
+        var dx = pos.x - _pvQ[0], dy = sy - _pvQ[1], dz = pos.z - _pvQ[2];
+        var d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 >= R * R) continue;
+        var d = Math.sqrt(d2), nx = 0, ny = 1, nz = 0;
+        if (d > 1e-6) { nx = dx / d; ny = dy / d; nz = dz / d; }
+        var depth = R - d;
+        if (depth > res.depth) res.depth = depth;
+        if (!apply) continue;
+        if (ny > PREVIEW.walkableNY) { res.ground = true; pos.y += depth / ny; }
+        else {
+          pos.x += nx * depth; pos.y += ny * depth; pos.z += nz * depth;
+          if (ny < -0.5) res.ceil = true;
+        }
+        moved = true;
+      }
+    }
+    if (!moved) break;
+  }
+  return res;
 }
 
 function enterPreview() {
@@ -5788,6 +5957,11 @@ function enterPreview() {
   previewState.pos.copy(at);
   previewState.vy = 0;
   previewState.grounded = false;
+  previewState.crouch = false;
+  previewState.eyeH = PREVIEW.foot + PREVIEW.eye;
+  PV_COL = buildCollision();
+  pvHold.jump = pvHold.crouch = false;
+  if (IS_TOUCH) { pvApplyLayout(); drawDpad(); }
   pitch = 0;
   keys.clear();
   pointerIsDown = false;
@@ -5799,6 +5973,11 @@ function enterPreview() {
 function exitPreview() {
   if (!previewOn) return;
   previewOn = false;
+  PV_COL = null;
+  pvEndEdit();
+  pvClearLayout();
+  pvHold.jump = pvHold.crouch = false;
+  drawDpad();
   document.body.classList.remove('preview');
   document.body.classList.remove('locked');
   if (document.pointerLockElement && document.exitPointerLock) {
@@ -5822,6 +6001,7 @@ document.getElementById('btnPreview').onclick = function() { previewOn ? exitPre
 document.getElementById('previewExit').onclick = exitPreview;
 
 function stepPreview(dt) {
+  dt = Math.min(dt, 0.05);
   var st = previewState;
   var fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
   fwd.y = 0;
@@ -5836,47 +6016,56 @@ function stepPreview(dt) {
   if (keys.has('KeyA') || moveState.left) wish.sub(rgt);
   if (keys.has('KeyD') || moveState.right) wish.add(rgt);
 
+  // 下蹲：松开后头顶有空间才站起
+  var wantCrouch = keys.has('KeyC') || keys.has('ControlLeft') || keys.has('ControlRight') || pvHold.crouch;
+  if (wantCrouch) st.crouch = true;
+  else if (st.crouch) {
+    pvResolve(st.pos, false, false);
+    if (_pvRes.depth < 0.03) st.crouch = false;
+  }
+
   var run = keys.has('ShiftLeft') || keys.has('ShiftRight');
-  var speed = run ? PREVIEW.run : PREVIEW.walk;
+  var speed = (run ? PREVIEW.run : PREVIEW.walk) * (st.crouch ? PREVIEW.crouchMul : 1);
 
   if (wish.lengthSq() > 1e-6) {
     wish.normalize();
-    var dist = speed * dt;
-    var axes = [
-      new THREE.Vector3(wish.x, 0, 0),
-      new THREE.Vector3(0, 0, wish.z)
-    ];
-    for (var i = 0; i < axes.length; i++) {
-      var axis = axes[i];
-      if (axis.lengthSq() < 1e-8) continue;
-      var dir = axis.clone().normalize();
-      var step = dist * axis.length();
-      if (blockedTowards(st.pos, dir, step)) continue;
-      var next = st.pos.clone().addScaledVector(dir, step);
-      var g = groundBelow(next.x, next.y + PREVIEW.half, next.z, PREVIEW.foot + PREVIEW.stepUp + 0.2);
-      if (g !== null && st.grounded && g > next.y - PREVIEW.foot + PREVIEW.stepUp) continue;
-      st.pos.copy(next);
+    var mv = speed * dt, sx = st.pos.x, sy0 = st.pos.y, sz = st.pos.z;
+    st.pos.x += wish.x * mv;
+    st.pos.z += wish.z * mv;
+    pvResolve(st.pos, st.crouch, true);
+    var got = Math.hypot(st.pos.x - sx, st.pos.z - sz);
+    if (st.grounded && got < mv * 0.5) {
+      // 被挡住：尝试迈上台阶
+      var saved = st.pos.clone();
+      st.pos.set(sx + wish.x * mv, sy0 + PREVIEW.stepUp, sz + wish.z * mv);
+      pvResolve(st.pos, st.crouch, false);
+      if (_pvRes.depth >= 0.02) st.pos.copy(saved);
     }
   }
 
-  var wantJump = keys.has('Space') || moveState.topBtn;
-  if (wantJump && st.grounded && !st.jumpHeld) {
+  var wantJump = keys.has('Space') || moveState.topBtn || pvHold.jump;
+  var jumped = false;
+  if (wantJump && st.grounded && !st.jumpHeld && !st.crouch) {
     st.vy = PREVIEW.jump;
     st.grounded = false;
+    jumped = true;
   }
   st.jumpHeld = wantJump;
 
+  var wasG = st.grounded;
   var g = st.vy > 0 ? (wantJump ? PREVIEW.gUp : PREVIEW.gUpCut) : PREVIEW.gFall;
   st.vy -= g * dt;
   st.pos.y += st.vy * dt;
+  pvResolve(st.pos, st.crouch, true);
+  if (_pvRes.ceil && st.vy > 0) st.vy = 0;
+  if (_pvRes.ground && st.vy <= 0) { st.grounded = true; st.vy = 0; } else st.grounded = false;
 
-  var floor = groundBelow(st.pos.x, st.pos.y + PREVIEW.half + 4, st.pos.z, PREVIEW.half + 4 + PREVIEW.foot + 0.1);
-  if (floor !== null && st.pos.y - PREVIEW.foot <= floor + 0.02 && st.vy <= 0) {
-    st.pos.y = floor + PREVIEW.foot;
-    st.vy = 0;
-    st.grounded = true;
-  } else {
-    st.grounded = false;
+  // 下台阶/下坡吸地
+  if (wasG && !st.grounded && !jumped && st.vy <= 0) {
+    var keep = st.pos.clone();
+    st.pos.y -= PREVIEW.snapDown;
+    pvResolve(st.pos, st.crouch, true);
+    if (_pvRes.ground) { st.grounded = true; st.vy = 0; } else st.pos.copy(keep);
   }
 
   if (st.pos.y < PROJECT.env.voidY) {
@@ -5886,8 +6075,137 @@ function stepPreview(dt) {
     st.vy = 0;
   }
 
-  camera.position.set(st.pos.x, st.pos.y + PREVIEW.eye, st.pos.z);
+  var half = st.crouch ? PREVIEW.crouchHalf : PREVIEW.half;
+  var eyeT = 2 * half + 2 * PREVIEW.radius - PREVIEW.eyeBelowTop;
+  st.eyeH += (eyeT - st.eyeH) * Math.min(1, dt * 14);
+  camera.position.set(st.pos.x, st.pos.y - PREVIEW.foot + st.eyeH, st.pos.z);
 }
+
+/* ===== 预览触屏按键：布局/自定义 ===== */
+var PV_UI = {
+  ids: { dpad: 'dpadMove', jump: 'pvJump', crouch: 'pvCrouch' },
+  names: { dpad: '十字键', jump: '跳跃', crouch: '下蹲' },
+  edit: false, sel: 'dpad', layout: null
+};
+function pvLayoutKey() { return 'rb_pv_layout_' + (innerWidth > innerHeight ? 'L' : 'P'); }
+function pvDefaultLayout() {
+  var w = innerWidth, h = innerHeight;
+  return {
+    dpad:   { l: 0.02,    b: 0.14,                s: 1 },
+    jump:   { l: (w - 72 - 24) / w, b: 36 / h,        s: 1 },   // 右下角
+    crouch: { l: (w - 72 - 24) / w, b: (36 + 86) / h, s: 1 }    // 跳跃正上方
+  };
+}
+function pvLoadLayout() {
+  var d = pvDefaultLayout(), sv = null;
+  try { sv = JSON.parse(localStorage.getItem(pvLayoutKey())); } catch (_e) {}
+  if (sv) for (var k in d) if (sv[k] && isFinite(sv[k].l) && isFinite(sv[k].b) && isFinite(sv[k].s)) d[k] = sv[k];
+  PV_UI.layout = d;
+}
+// 各控件可见区域(元素内像素，y 从底部算)，用来保证缩放后整体不出屏
+var PV_BOX = { dpad: { x0: 4, x1: 166, y0: 42, y1: 198 }, jump: { x0: 0, x1: 72, y0: 0, y1: 72 }, crouch: { x0: 0, x1: 72, y0: 0, y1: 72 } };
+function pvClampPos(k) {
+  var L = PV_UI.layout[k], B = PV_BOX[k], W0 = innerWidth, H0 = innerHeight;
+  L.l = pvClamp(L.l, -B.x0 * L.s / W0, (W0 - B.x1 * L.s) / W0);
+  L.b = pvClamp(L.b, -B.y0 * L.s / H0, (H0 - B.y1 * L.s) / H0);
+}
+function pvApplyLayout() {
+  if (!PV_UI.layout) pvLoadLayout();
+  for (var k in PV_UI.ids) {
+    pvClampPos(k);
+    var el = document.getElementById(PV_UI.ids[k]), L = PV_UI.layout[k];
+    el.style.left = (L.l * innerWidth) + 'px';
+    el.style.bottom = (L.b * innerHeight) + 'px';
+    el.style.transformOrigin = 'left bottom';
+    el.style.transform = 'scale(' + L.s + ')';
+    el.classList.toggle('pvSel', PV_UI.edit && k === PV_UI.sel);
+  }
+}
+function pvClearLayout() {
+  for (var k in PV_UI.ids) {
+    var el = document.getElementById(PV_UI.ids[k]);
+    el.style.left = el.style.bottom = el.style.transform = el.style.transformOrigin = '';
+    el.classList.remove('pvSel', 'on');
+  }
+}
+function pvSyncEdit() {
+  var L = PV_UI.layout[PV_UI.sel];
+  document.getElementById('pvSelName').textContent = t(PV_UI.names[PV_UI.sel]);
+  document.getElementById('pvScale').value = Math.round(L.s * 100);
+  pvApplyLayout();
+}
+function pvSave() { try { localStorage.setItem(pvLayoutKey(), JSON.stringify(PV_UI.layout)); } catch (_e) {} }
+function pvEndEdit() {
+  if (!PV_UI.edit) return;
+  pvSave();
+  PV_UI.edit = false;
+  document.body.classList.remove('pvEdit');
+}
+function pvClamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+(function() {
+  var cust = document.getElementById('pvCustomize');
+  if (!IS_TOUCH) cust.style.display = 'none';
+  cust.onclick = function() {
+    if (!IS_TOUCH) return;
+    pvApplyLayout();
+    PV_UI.edit = true;
+    pvHold.jump = pvHold.crouch = false;
+    for (var k in moveState) moveState[k] = false;
+    document.body.classList.add('pvEdit');
+    pvSyncEdit();
+  };
+  document.getElementById('pvDone').onclick = function() { pvEndEdit(); pvApplyLayout(); };
+  document.getElementById('pvReset').onclick = function() {
+    try { localStorage.removeItem(pvLayoutKey()); } catch (_e) {}
+    pvLoadLayout();
+    pvSyncEdit();
+  };
+  var sensEl = document.getElementById('pvSens'), sensVal = document.getElementById('pvSensVal');
+  sensEl.value = Math.round(PV_SENS * 100);
+  sensVal.textContent = PV_SENS.toFixed(1) + 'x';
+  sensEl.oninput = function() {
+    PV_SENS = this.value / 100;
+    sensVal.textContent = PV_SENS.toFixed(1) + 'x';
+    try { localStorage.setItem('rb_pv_sens', String(PV_SENS)); } catch (_e) {}
+  };
+  document.getElementById('pvScale').oninput = function() {
+    PV_UI.layout[PV_UI.sel].s = this.value / 100;
+    pvApplyLayout();
+  };
+  Object.keys(PV_UI.ids).forEach(function(k) {
+    var el = document.getElementById(PV_UI.ids[k]), drag = null;
+    el.addEventListener('pointerdown', function(e) {
+      if (!PV_UI.edit) return;
+      e.preventDefault(); e.stopPropagation();
+      PV_UI.sel = k;
+      var L = PV_UI.layout[k];
+      drag = { x: e.clientX, y: e.clientY, l: L.l, b: L.b };
+      try { el.setPointerCapture(e.pointerId); } catch (_e) {}
+      pvSyncEdit();
+    }, true);
+    el.addEventListener('pointermove', function(e) {
+      if (!PV_UI.edit || !drag) return;
+      var L = PV_UI.layout[k];
+      L.l = drag.l + (e.clientX - drag.x) / innerWidth;
+      L.b = drag.b - (e.clientY - drag.y) / innerHeight;
+      pvApplyLayout();
+    });
+    ['pointerup', 'pointercancel'].forEach(function(ev) {
+      el.addEventListener(ev, function() { if (drag) { drag = null; pvSave(); } });
+    });
+    if (k === 'dpad') return;
+    function down(e) {
+      if (PV_UI.edit) return;
+      e.preventDefault();
+      pvHold[k] = true; el.classList.add('on');
+      try { el.setPointerCapture(e.pointerId); } catch (_e) {}
+    }
+    function up() { pvHold[k] = false; el.classList.remove('on'); }
+    el.addEventListener('pointerdown', down);
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function(ev) { el.addEventListener(ev, up); });
+  });
+})();
 
 var ENV_DEFAULTS = {
   hemiSky: '#d8e8ff',
@@ -8206,7 +8524,7 @@ function buildPlacePanel() {
 
   var prim = host.querySelector('#tilesPrim');
   var prims = ['box', 'sphere', 'cylinder', 'cone', 'hex', 'ramp', 'triangle',
-    'torus', 'capsule', 'stairs', 'arch', 'tube', 'halfcyl', 'pyramid'];
+    'torus', 'capsule', 'stairs', 'arch', 'halfarch', 'tube', 'halfcyl', 'pyramid'];
   for (var i = 0; i < prims.length; i++) {
     (function(t) {
       prim.appendChild(tileButton(primitiveNames[t] || t, primitiveThumb(t), function() {
@@ -10372,6 +10690,21 @@ Object.assign(I18N_CFG.en, {
 Object.assign(I18N_CFG.en, {
   "如果遇到 bug，欢迎反馈！": "If you run into any bugs, please let us know!"
 });
+// ---- v7.2.0 ----
+Object.assign(I18N_CFG.en, {
+  "优化了预览模式：操作 UI 更接近游戏内（可自定义按键位置和大小），碰撞改为胶囊碰撞箱，现在可以进入室内": "Improved preview mode: game-style controls with customizable button position and size, and capsule collision so you can now enter indoor spaces",
+  "⚙ 按键": "⚙ Controls",
+  "跳跃": "Jump",
+  "下蹲": "Crouch",
+  "重置": "Reset",
+  "完成": "Done",
+  "十字键": "D-pad",
+  "大小": "Size",
+  "单指拖动＝转视角 · 十字键移动 · 跳跃/下蹲按钮": "One-finger drag = look · D-pad to move · Jump/Crouch buttons",
+  "WASD 移动 · 空格 跳 · C 下蹲 · Shift 跑": "WASD Move · Space Jump · C Crouch · Shift Run",
+  "灵敏度": "Sensitivity",
+  "增加了半拱": "Added Half Arch"
+});
 // ---- v7.0.1 ----
 Object.assign(I18N_CFG.en, {
   "修复了因上传文件时出错，导致物品栏中的游戏物品无法正常加载的问题": "Fixed an issue where in-game items in the inventory failed to load properly due to an error during file upload",
@@ -10451,6 +10784,7 @@ Object.assign(I18N_CFG.en, {
   "胶囊": "Capsule",
   "台阶": "Stairs",
   "拱": "Arch",
+  "半拱": "Half Arch",
   "空心管": "Tube",
   "半圆柱": "Half Cylinder",
   "棱锥": "Pyramid",
