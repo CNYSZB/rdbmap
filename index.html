@@ -879,7 +879,7 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 7.2.0</div>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 7.2.1</div>
   <button id="btnOpenMap">📂 打开地图文件</button>
   <button id="btnExportMap">📤 导出地图（JSON）</button>
   <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
@@ -1019,11 +1019,11 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">7.2.0</div>
+    <div class="version" id="updateVersion">7.2.1</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li>增加了半拱</li>
-      <li>优化了预览模式：操作 UI 更接近游戏内（可自定义按键位置和大小），碰撞改为胶囊碰撞箱，现在可以进入室内</li>
+      <li>修复了导出地图时无法下载等问题；导出后新增「没有下载下来？」提示，可重新下载或复制内容</li>
+      <li>若仍遇到无法下载或类似问题，请及时向我们反馈</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -1074,7 +1074,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
-const APP_VERSION = '7.2.0';
+const APP_VERSION = '7.2.1';
 
 // ╔══════════════════════════════════════════════════════════════╗
 // ║ 【水体放置开关】搜索关键字：WATER_PLACEMENT_ENABLED            ║
@@ -5013,13 +5013,65 @@ function serializeMap(opt) {
   return mapData;
 }
 
-function download(n, t) {
-  var b = new Blob([t], { type: 'application/json' });
-  var a = document.createElement('a');
-  a.href = URL.createObjectURL(b);
-  a.download = n;
-  a.click();
-  setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+// ===== 下载配置（想改时间/行为，改这里）=====
+var DL_CFG = {
+  revokeDelayMs: 10000,    // 下载链接保留多久后释放（毫秒）
+  hintMs: 8000             // 「没下载下来？」提示条停留时间（毫秒）
+};
+
+function safeFileName(n) {
+  n = String(n || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim();
+  return n || '未命名地图';
+}
+
+function download(n, t, mime) {
+  n = safeFileName(n);
+  var blob = (t instanceof Blob) ? t : new Blob([t], { type: mime || 'application/json' });
+  var url = URL.createObjectURL(blob);
+  try {
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = n;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() { if (a.parentNode) a.parentNode.removeChild(a); }, 1000);
+  } catch (err) {
+    console.error(err);
+    toast('❌ 下载失败：' + err.message);
+  }
+  setTimeout(function() { URL.revokeObjectURL(url); }, DL_CFG.revokeDelayMs);
+  showDownloadHint(n, blob);
+}
+
+function showDownloadHint(n, blob) {
+  var old = document.getElementById('dlHint');
+  if (old) old.remove();
+  var box = document.createElement('div');
+  box.id = 'dlHint';
+  box.style.cssText = 'position:fixed;left:50%;bottom:22%;transform:translateX(-50%);z-index:9998;' +
+    'background:rgba(18,30,43,.97);border:1px solid var(--accent);border-radius:12px;padding:10px 12px;' +
+    'display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;max-width:92vw;font-size:12px;color:var(--text);';
+  box.innerHTML = '<span style="flex-basis:100%;text-align:center;">没有下载下来？试试：</span>';
+  var mk = function(label, fn) {
+    var b = document.createElement('button');
+    b.textContent = label;
+    b.style.cssText = 'padding:6px 10px;font-size:12px;';
+    b.onclick = fn;
+    box.appendChild(b);
+  };
+  mk('再下载一次', function() { box.remove(); download(n, blob); });
+  if ((blob.type || '').indexOf('json') !== -1) {
+    mk('复制内容', function() {
+      blob.text().then(function(s) { return navigator.clipboard.writeText(s); })
+        .then(function() { toast('已复制，可粘贴到文本文件保存'); })
+        .catch(function(e) { toast('❌ 复制失败：' + e.message); });
+    });
+  }
+  mk('关闭', function() { box.remove(); });
+  document.body.appendChild(box);
+  clearTimeout(showDownloadHint._t);
+  showDownloadHint._t = setTimeout(function() { box.remove(); }, DL_CFG.hintMs);
 }
 
 function getCurrentSaveName() {
@@ -5045,7 +5097,9 @@ function exportMap() {
   toast('已导出 ' + d.objects.length + ' 个物体' + (propCount ? ' + ' + propCount + ' 个道具' : '') + (n ? ' · ' + n + ' 个出生点' : ' · 没有出生点'));
 }
 
-document.getElementById('btnExportMap').onclick = exportMap;
+document.getElementById('btnExportMap').onclick = function() {
+  try { exportMap(); } catch (err) { console.error(err); toast('❌ 导出失败：' + err.message); }
+};
 
 var RDB_RELAY = 'https://relay.riftcrown.com';
 
@@ -5403,12 +5457,7 @@ async function exportGltf() {
     });
     var saveName = getCurrentSaveName();
     var gltfString = typeof gltfData === 'string' ? gltfData : JSON.stringify(gltfData, null, 2);
-    var blob = new Blob([gltfString], { type: 'application/json' });
-    var link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = saveName + '.gltf';
-    link.click();
-    setTimeout(function() { URL.revokeObjectURL(link.href); }, 2000);
+    download(saveName + '.gltf', gltfString, 'model/gltf+json');
     toast('✅ GLTF 导出成功！' + exportables.length + ' 个物体');
   } catch (error) {
     console.error('GLTF 导出失败:', error);
@@ -9426,12 +9475,7 @@ async function exportProjectFolder() {
         exportedAt: new Date().toISOString()
       }, null, 1))
     });
-    var blob = zipCreate(entries);
-    var a2 = document.createElement('a');
-    a2.href = URL.createObjectURL(blob);
-    a2.download = getCurrentSaveName().replace(/[\\/:*?"<>|]/g, '_') + '.zip';
-    a2.click();
-    setTimeout(function() { URL.revokeObjectURL(a2.href); }, 1500);
+    download(getCurrentSaveName() + '.zip', zipCreate(entries));
     toast('项目文件夹已导出');
   } catch (err) {
     console.error(err);
@@ -10689,6 +10733,18 @@ Object.assign(I18N_CFG.en, {
 });
 Object.assign(I18N_CFG.en, {
   "如果遇到 bug，欢迎反馈！": "If you run into any bugs, please let us know!"
+});
+// ---- v7.2.1 ----
+Object.assign(I18N_CFG.en, {
+  "修复了导出地图时无法下载等问题；导出后新增「没有下载下来？」提示，可重新下载或复制内容": "Fixed an issue where exported maps could not be downloaded. A \"Didn't download?\" prompt now appears after export, letting you retry or copy the content",
+  "若仍遇到无法下载或类似问题，请及时向我们反馈": "If you still run into download problems or anything similar, please report it to us right away",
+  "没有下载下来？试试：": "Didn't download? Try:",
+  "再下载一次": "Download Again",
+  "复制内容": "Copy Content",
+  "已复制，可粘贴到文本文件保存": "Copied. Paste it into a text file to save",
+  "下载失败：": "Download failed: ",
+  "复制失败：": "Copy failed: ",
+  "导出失败：": "Export failed: "
 });
 // ---- v7.2.0 ----
 Object.assign(I18N_CFG.en, {
