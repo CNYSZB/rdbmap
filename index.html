@@ -5016,7 +5016,8 @@ function serializeMap(opt) {
 // ===== 下载配置（想改时间/行为，改这里）=====
 var DL_CFG = {
   revokeDelayMs: 10000,    // 下载链接保留多久后释放（毫秒）
-  hintMs: 8000             // 「没下载下来？」提示条停留时间（毫秒）
+  hintMs: 8000,            // 「没下载下来？」提示条停留时间（毫秒）
+  useSaveAs: true          // 是否提供「另存为」兜底按钮（仅桌面 Edge/Chrome 支持）
 };
 
 function safeFileName(n) {
@@ -5061,6 +5062,21 @@ function showDownloadHint(n, blob) {
     box.appendChild(b);
   };
   mk('再下载一次', function() { box.remove(); download(n, blob); });
+  if (DL_CFG.useSaveAs && window.showSaveFilePicker) {
+    mk('另存为…', async function() {
+      try {
+        var ext = (n.match(/\.[a-z0-9]{2,6}$/i) || [''])[0];
+        var opts = { suggestedName: n };
+        if (ext) opts.types = [{ description: ext.slice(1).toUpperCase() + ' 文件', accept: { [blob.type || 'application/octet-stream']: [ext] } }];
+        var h = await window.showSaveFilePicker(opts);
+        var w = await h.createWritable();
+        await w.write(blob);
+        await w.close();
+        toast('✅ 已保存：' + h.name);
+        box.remove();
+      } catch (e) { if (e.name !== 'AbortError') toast('❌ 另存为失败：' + e.message); }
+    });
+  }
   if ((blob.type || '').indexOf('json') !== -1) {
     mk('复制内容', function() {
       blob.text().then(function(s) { return navigator.clipboard.writeText(s); })
@@ -10743,6 +10759,10 @@ Object.assign(I18N_CFG.en, {
   "复制内容": "Copy Content",
   "已复制，可粘贴到文本文件保存": "Copied. Paste it into a text file to save",
   "下载失败：": "Download failed: ",
+  "另存为…": "Save As…",
+  "文件": "File",
+  "已保存：": "Saved: ",
+  "另存为失败：": "Save As failed: ",
   "复制失败：": "Copy failed: ",
   "导出失败：": "Export failed: "
 });
