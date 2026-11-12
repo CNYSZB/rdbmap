@@ -158,6 +158,34 @@
     .sheet .grid2 button { text-align: center; }
     .sheet .row { display: flex; gap: 8px; }
     .sheet .row button { flex: 1; text-align: center; }
+    /* 每个面板右上角都有关闭按钮，避免出现关不掉的残留面板 */
+    .sheetClose {
+      position: absolute; right: 12px; top: 10px; z-index: 3;
+      width: 30px !important; height: 30px !important; padding: 0 !important;
+      margin: 0 !important; border-radius: 50% !important; font-size: 14px !important;
+      display: flex !important; align-items: center; justify-content: center;
+      background: rgba(22,28,36,.92) !important; color: var(--text) !important;
+      border: 1px solid var(--line) !important; flex-shrink: 0;
+    }
+    .sheetClose:active { border-color: var(--accent) !important; }
+    #exportChoice, #dropOverlay {
+      display: none; position: fixed; inset: 0; z-index: 9997;
+      background: rgba(0,0,0,.72); backdrop-filter: blur(6px);
+      align-items: center; justify-content: center; padding: 18px;
+    }
+    #exportChoice.show, #dropOverlay.show { display: flex; }
+    #exportChoice .ecBox, #dropOverlay .dropBox {
+      background: var(--panel); border-radius: 18px;
+      padding: 22px 18px 18px; width: min(380px, 92vw);
+      box-shadow: 0 12px 60px rgba(0,0,0,.6);
+    }
+    #exportChoice .ecBox { border: 1px solid var(--accent); }
+    #exportChoice .ecTitle { font-size: 15px; font-weight: 700; text-align: center; margin-bottom: 6px; }
+    #exportChoice .ecSub { font-size: 11px; color: var(--muted); text-align: center; margin-bottom: 16px; line-height: 1.6; }
+    #exportChoice button { width: 100%; margin-bottom: 8px !important; text-align: center; padding: 12px !important; font-size: 14px !important; }
+    #exportChoice .ecCancel { background: transparent !important; color: var(--muted) !important; margin-bottom: 0 !important; }
+    #dropOverlay .dropBox { border: 2px dashed var(--accent); text-align: center; font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.9; }
+    #dropOverlay .dropSub { display: block; font-size: 11px; font-weight: 400; color: var(--muted); }
 
     .library-item {
       background: var(--panel2);
@@ -857,6 +885,18 @@
   </div>
 </div>
 
+<div id="exportChoice">
+  <div class="ecBox">
+    <div class="ecTitle" id="ecTitle">导出文件</div>
+    <div class="ecSub" id="ecSub"></div>
+    <button id="ecDownload" class="accent">⬇️ 直接下载</button>
+    <button id="ecSaveAs">💾 另存为…（可选文件名 / 位置）</button>
+    <button id="ecCancel" class="ecCancel">取消</button>
+  </div>
+</div>
+<div id="dropOverlay">
+  <div class="dropBox">📥 松开即可导入地图文件<span class="dropSub">支持 .rbmap / .json / .zip / .rdproj，也支持 gzip 压缩的地图</span></div>
+</div>
 <div id="toast"></div>
 <div id="overlay"></div>
 
@@ -879,13 +919,17 @@
 <div id="panelMenu" class="sheet">
   <div class="handle"></div>
   <div class="title">菜单</div>
-  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 7.2.1</div>
-  <button id="btnOpenMap">📂 打开地图文件</button>
-  <button id="btnExportMap">📤 导出地图（JSON）</button>
+  <div class="title" style="font-size:12px;color:var(--muted);margin-top:-8px;">当前版本 7.2.3</div>
+  <button id="btnOpenMap">📥 导入地图文件（.rbmap / .json / .zip）</button>
+  <button id="btnExportMap">📤 导出地图（.rbmap）</button>
+  <button id="btnExportMapAs">💾 地图另存为…</button>
+  <button id="btnExportProject">📁 导出项目文件夹（.zip）</button>
+  <button id="btnExportProjectAs">💾 项目文件另存为（.zip）</button>
   <button id="btnUploadMap" style="border-color:var(--accent);color:var(--accent);">☁️ 上传到游戏（生成分享码）</button>
   <button id="btnTransferMap" style="border-color:var(--accent);color:var(--accent);">📤 跨设备转移</button>
   <button id="btnFeaturedMaps" style="border-color:var(--accent);color:var(--accent);">⭐ 精选地图</button>
-  <button id="btnExportGltf">📤 导出 GLTF（含贴图 · ZIP）</button>
+  <button id="btnExportGltf">📤 导出 GLTF（.gltf）</button>
+  <button id="btnExportGltfAs">💾 GLTF 另存为…</button>
   <button id="btnImportTutorial" style="border-color:var(--accent);color:var(--accent);">📖 导入游戏教程</button>
   <button id="btnImportGltf">📥 导入 GLTF / GLB</button>
   <button id="btnImportFbx">📥 导入 FBX</button>
@@ -972,6 +1016,10 @@
     <div style="text-align:center;color:var(--muted);padding:20px;">暂无存档</div>
   </div>
   <button id="btnManualSave" class="accent">💾 立即存档</button>
+  <div class="row" style="margin-top:8px;">
+    <button id="btnSavesImport">📥 导入地图文件</button>
+    <button id="btnSavesClose">✕ 关闭</button>
+  </div>
 </div>
 
 <div id="transferOverlay" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);align-items:center;justify-content:center;">
@@ -1019,11 +1067,11 @@
 <div id="updateOverlay">
   <div id="updateBox">
     <div class="badge">🎉 新版本</div>
-    <div class="version" id="updateVersion">7.2.1</div>
+    <div class="version" id="updateVersion">7.2.3</div>
     <div class="sub">RagdollBox 地图编辑器</div>
     <ul class="changelog" id="updateChangelog">
-      <li>修复了导出地图时无法下载等问题；导出后新增「没有下载下来？」提示，可重新下载或复制内容</li>
-      <li>若仍遇到无法下载或类似问题，请及时向我们反馈</li>
+      <li>增加了吸附功能（Beta）</li>
+      <li>一开始导出的选择更加丰富</li>
     </ul>
     <button class="btn-ok" id="updateOkBtn">我知道了，开始编辑！</button>
   </div>
@@ -1046,7 +1094,7 @@
   </div>
 </div>
 
-<input id="mapInput" type="file" accept=".json,.rbmap" hidden />
+<input id="mapInput" type="file" accept=".rbmap,.json,.zip,.rdproj,.gz,.txt" hidden />
 <input id="gltfInput" type="file" accept=".gltf,.glb,.bin,image/*" multiple hidden />
 <input id="fbxInput" type="file" accept=".fbx" hidden />
 <input id="texInput" type="file" accept="image/*" hidden />
@@ -1074,7 +1122,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
-const APP_VERSION = '7.2.1';
+const APP_VERSION = '7.2.3';
 
 // ╔══════════════════════════════════════════════════════════════╗
 // ║ 【水体放置开关】搜索关键字：WATER_PLACEMENT_ENABLED            ║
@@ -1922,8 +1970,8 @@ function refreshSavesList() {
   }
   
   if (filteredSaves.length === 0) {
-    listEl.innerHTML = '<div style="text-align:center;color:var(--muted);padding:20px;">' +
-      (searchTerm ? '未找到匹配的存档' : '暂无存档') + '</div>';
+    listEl.innerHTML = '<div style="text-align:center;color:var(--muted);padding:18px;line-height:1.8;">' +
+      (searchTerm ? '未找到匹配的存档' : '还没有存档<br>点「💾 立即存档」保存当前地图，或「📥 导入地图文件」把地图加进来') + '</div>';
     return;
   }
   
@@ -3938,21 +3986,48 @@ var panelKeys = document.getElementById('panelKeys');
 var panelLibrary = document.getElementById('panelLibrary');
 var activeSheet = null;
 
+// 给所有面板补一个右上角「✕」，保证任何情况下都能关掉
+function ensureCloseButtons() {
+  var all = document.querySelectorAll('.sheet');
+  for (var i = 0; i < all.length; i++) {
+    var sh = all[i];
+    if (sh.querySelector('.sheetClose')) continue;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sheetClose';
+    b.textContent = '✕';
+    b.title = '关闭';
+    b.setAttribute('aria-label', '关闭');
+    b.onclick = function(e) { e.stopPropagation(); closeSheet(); };
+    sh.appendChild(b);
+  }
+}
+
 function openSheet(sheet) {
-  if (activeSheet) closeSheet();
+  // 先把所有面板收起，避免其它面板残留叠在上面 / 关不掉
+  closeSheet();
+  ensureCloseButtons();
   activeSheet = sheet;
   overlay.classList.add('show');
   sheet.classList.add('show');
-  if (sheet === panelSaves) { refreshSavesList(); }
-  if (sheet === panelLibrary) { refreshLibraryList(); }
-  if (sheet === panelProject) { refreshProjectPanel(); }
-  if (sheet === panelAssets) { refreshAssets(); }
-  if (sheet === panelGameProps) { refreshGameProps(); }
-  if (sheet === panelSound) { refreshSoundPanel(); }
+  try {
+    if (sheet === panelSaves) { refreshSavesList(); }
+    else if (sheet === panelLibrary) { refreshLibraryList(); }
+    else if (sheet === panelProject) { refreshProjectPanel(); }
+    else if (sheet === panelAssets) { refreshAssets(); }
+    else if (sheet === panelGameProps) { refreshGameProps(); }
+    else if (sheet === panelSound) { refreshSoundPanel(); }
+  } catch (err) {
+    console.error('面板刷新失败：', err);
+    toast('⚠️ 面板内容加载失败：' + err.message);
+  }
 }
 
 function closeSheet() {
-  if (activeSheet) { activeSheet.classList.remove('show'); activeSheet = null; }
+  // 不看 activeSheet，直接收起所有已经展开的面板
+  var opened = document.querySelectorAll('.sheet.show');
+  for (var i = 0; i < opened.length; i++) opened[i].classList.remove('show');
+  activeSheet = null;
   overlay.classList.remove('show');
 }
 overlay.onclick = closeSheet;
@@ -4167,10 +4242,12 @@ transform.addEventListener('objectChange', function() {
       }
     }
   }
+  snapOnChange(members, commonGroup);
   refreshProps();
 });
 
 transform.addEventListener('mouseUp', function() {
+  snapOnRelease();
   scaleStart = null;
   scaleBoxStart = null;
   perObjectStart.clear();
@@ -4595,7 +4672,7 @@ window.addEventListener('keydown', function(e) {
   if (e.code === 'KeyF' && !e.repeat) focusSelection();
   if (e.code === 'KeyP' && !e.repeat) { e.preventDefault(); enterPreview(); }
   if (e.code === 'F1') { e.preventDefault(); openSheet(panelKeys); }
-  if (e.code === 'Escape') { if (activeSheet) closeSheet(); else clearSelection(); }
+  if (e.code === 'Escape') { if (document.querySelector('.sheet.show')) closeSheet(); else clearSelection(); }
 });
 
 window.addEventListener('keyup', function(e) { keys.delete(e.code); });
@@ -5062,21 +5139,7 @@ function showDownloadHint(n, blob) {
     box.appendChild(b);
   };
   mk('再下载一次', function() { box.remove(); download(n, blob); });
-  if (DL_CFG.useSaveAs && window.showSaveFilePicker) {
-    mk('另存为…', async function() {
-      try {
-        var ext = (n.match(/\.[a-z0-9]{2,6}$/i) || [''])[0];
-        var opts = { suggestedName: n };
-        if (ext) opts.types = [{ description: ext.slice(1).toUpperCase() + ' 文件', accept: { [blob.type || 'application/octet-stream']: [ext] } }];
-        var h = await window.showSaveFilePicker(opts);
-        var w = await h.createWritable();
-        await w.write(blob);
-        await w.close();
-        toast('✅ 已保存：' + h.name);
-        box.remove();
-      } catch (e) { if (e.name !== 'AbortError') toast('❌ 另存为失败：' + e.message); }
-    });
-  }
+  mk('另存为…', async function() { box.remove(); await saveBlobAs(n, blob); });
   if ((blob.type || '').indexOf('json') !== -1) {
     mk('复制内容', function() {
       blob.text().then(function(s) { return navigator.clipboard.writeText(s); })
@@ -5090,6 +5153,78 @@ function showDownloadHint(n, blob) {
   showDownloadHint._t = setTimeout(function() { box.remove(); }, DL_CFG.hintMs);
 }
 
+// ===== 导出方式：每次都问「直接下载 / 另存为」；菜单也可直接另存为 =====
+async function saveBlobAs(n, blob) {
+  n = safeFileName(n);
+  var ext = (n.match(/\.[a-z0-9]{2,6}$/i) || [''])[0];
+  if (window.showSaveFilePicker) {
+    try {
+      var opts = { suggestedName: n };
+      if (ext) opts.types = [{ description: ext.slice(1).toUpperCase() + ' 文件', accept: { [blob.type || 'application/octet-stream']: [ext] } }];
+      var h = await window.showSaveFilePicker(opts);
+      var w = await h.createWritable();
+      await w.write(blob);
+      await w.close();
+      toast('✅ 已保存：' + h.name);
+      return true;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return false;
+      // 系统另存为不可用 → 退回「自定义文件名下载」
+    }
+  }
+  var nn = prompt('当前浏览器不支持选择保存位置，输入文件名后下载：', n);
+  if (!nn) return false;
+  nn = safeFileName(nn);
+  if (ext && nn.toLowerCase().slice(-ext.length) !== ext.toLowerCase()) nn += ext;
+  download(nn, blob);
+  toast('✅ 已按自定义文件名下载：' + nn);
+  return true;
+}
+
+function askExportMode(title, sub) {
+  return new Promise(function(resolve) {
+    var ov = document.getElementById('exportChoice');
+    var bD = document.getElementById('ecDownload');
+    var bS = document.getElementById('ecSaveAs');
+    var bC = document.getElementById('ecCancel');
+    document.getElementById('ecTitle').textContent = title;
+    document.getElementById('ecSub').textContent = sub || '文件已生成：直接下载用默认文件名，另存为可自己选文件名 / 位置。';
+    ov.classList.add('show');
+    var done = function(v) {
+      ov.classList.remove('show');
+      bD.onclick = bS.onclick = bC.onclick = null;
+      ov.onclick = null;
+      resolve(v);
+    };
+    bD.onclick = function() { done('download'); };
+    bS.onclick = function() { done('saveas'); };
+    bC.onclick = function() { done(null); };
+    ov.onclick = function(e) { if (e.target === ov) done(null); };
+  });
+}
+
+async function deliverExport(name, blob, mode, okMsg) {
+  if (mode === 'saveas') { await saveBlobAs(name, blob); if (okMsg) toast(okMsg); return; }
+  var choice = await askExportMode('📤 ' + name, '选择保存方式：直接下载，或另存为自己命名 / 选位置的文件。');
+  if (choice === 'saveas') await saveBlobAs(name, blob);
+  else if (choice === 'download') download(name, blob);
+  if (choice && okMsg) toast(okMsg);
+}
+
+// 菜单里新增的导出入口（函数声明会提升，这里统一绑定）
+(function bindExportEntries() {
+  var pairs = [
+    ['btnExportMapAs', function() { exportMap('saveas'); }],
+    ['btnExportProject', function() { exportProjectFolder(); }],
+    ['btnExportProjectAs', function() { exportProjectFolder('saveas'); }],
+    ['btnExportGltfAs', function() { exportGltf('saveas'); }]
+  ];
+  for (var i = 0; i < pairs.length; i++) {
+    var el = document.getElementById(pairs[i][0]);
+    if (el) el.onclick = pairs[i][1];
+  }
+})();
+
 function getCurrentSaveName() {
   if (!currentSaveId) return '未命名地图';
   var saves = getSaves();
@@ -5099,23 +5234,32 @@ function getCurrentSaveName() {
   return '未命名地图';
 }
 
-function exportMap() {
-  closeSheet();
+function buildMapExport() {
   var d = serializeMap();
   var saveName = getCurrentSaveName();
   d.name = saveName;
   var exportData = JSON.parse(JSON.stringify(d));
   delete exportData.groups;
   stripGroupTags(exportData);
-  download(saveName + '.rbmap', JSON.stringify(exportData));
-  var n = d.spawns ? d.spawns.length : 0;
-  var propCount = d.props ? d.props.length : 0;
-  toast('已导出 ' + d.objects.length + ' 个物体' + (propCount ? ' + ' + propCount + ' 个道具' : '') + (n ? ' · ' + n + ' 个出生点' : ' · 没有出生点'));
+  return {
+    name: saveName + '.rbmap',
+    blob: new Blob([JSON.stringify(exportData)], { type: 'application/json' }),
+    data: d
+  };
 }
 
-document.getElementById('btnExportMap').onclick = function() {
-  try { exportMap(); } catch (err) { console.error(err); toast('❌ 导出失败：' + err.message); }
-};
+async function exportMap(mode) {
+  closeSheet();
+  try {
+    var e = buildMapExport();
+    var n = e.data.spawns ? e.data.spawns.length : 0;
+    var propCount = e.data.props ? e.data.props.length : 0;
+    var msg = '✅ 已导出 ' + e.data.objects.length + ' 个物体' + (propCount ? ' + ' + propCount + ' 个道具' : '') + (n ? ' · ' + n + ' 个出生点' : ' · 没有出生点');
+    await deliverExport(e.name, e.blob, mode, msg);
+  } catch (err) { console.error(err); toast('❌ 导出失败：' + err.message); }
+}
+
+document.getElementById('btnExportMap').onclick = function() { exportMap(); };
 
 var RDB_RELAY = 'https://relay.riftcrown.com';
 
@@ -5447,9 +5591,9 @@ document.getElementById('transferCodeInput').addEventListener('input', function(
   this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
 });
 
-document.getElementById('btnExportGltf').onclick = exportGltf;
+document.getElementById('btnExportGltf').onclick = function() { exportGltf(); };
 
-async function exportGltf() {
+async function exportGltf(mode) {
   closeSheet();
   try {
     toast('正在导出 GLTF...');
@@ -5471,30 +5615,99 @@ async function exportGltf() {
     var gltfData = await new Promise(function(resolve, reject) {
       exporter.parse(exportScene, resolve, reject, { binary: false, embedImages: true, includeCustomExtensions: false });
     });
-    var saveName = getCurrentSaveName();
     var gltfString = typeof gltfData === 'string' ? gltfData : JSON.stringify(gltfData, null, 2);
-    download(saveName + '.gltf', gltfString, 'model/gltf+json');
-    toast('✅ GLTF 导出成功！' + exportables.length + ' 个物体');
+    var blob = new Blob([gltfString], { type: 'model/gltf+json' });
+    await deliverExport(getCurrentSaveName() + '.gltf', blob, mode, '✅ GLTF 导出成功！' + exportables.length + ' 个物体');
   } catch (error) {
     console.error('GLTF 导出失败:', error);
     toast('❌ GLTF 导出失败: ' + error.message);
   }
 }
 
-document.getElementById('btnOpenMap').onclick = function() { closeSheet(); document.getElementById('mapInput').click(); };
+// ===== 地图文件导入：.rbmap / .json / .zip / gzip / 拖拽 =====
+function openMapFilePicker() { closeSheet(); document.getElementById('mapInput').click(); }
+document.getElementById('btnOpenMap').onclick = openMapFilePicker;
+var _btnSavesImport = document.getElementById('btnSavesImport');
+if (_btnSavesImport) _btnSavesImport.onclick = openMapFilePicker;
+var _btnSavesClose = document.getElementById('btnSavesClose');
+if (_btnSavesClose) _btnSavesClose.onclick = closeSheet;
+
+function normalizeMapData(d, fallbackName) {
+  if (!d || typeof d !== 'object') throw new Error('地图文件无效');
+  if (!d.objects && d.map && typeof d.map === 'object') d = d.map;
+  else if (!d.objects && d.data && typeof d.data === 'object') d = d.data;
+  // 兼容老版本 / 游戏导出的无 format 字段地图
+  if (!d.format && (Array.isArray(d.objects) || Array.isArray(d.props))) d.format = 'RagdollBoxMap';
+  if (d.format !== 'RagdollBoxMap') throw new Error('不是 RagdollBoxMap 地图文件');
+  if (!d.name && fallbackName) d.name = fallbackName;
+  return d;
+}
+
+async function importMapFile(file) {
+  if (!file) return;
+  var base = String(file.name || '').replace(/\.(rbmap|json|zip|rdproj|gz|txt)$/i, '') || '导入地图';
+  try {
+    if (/\.(zip|rdproj)$/i.test(file.name)) {
+      await importProjectFolder(file);
+      return;
+    }
+    var buf = await file.arrayBuffer();
+    var text = null, d = null;
+    try { text = new TextDecoder().decode(buf); } catch (_e) {}
+    if (text) { try { d = JSON.parse(text.replace(/^\uFEFF/, '')); } catch (_e2) {} }
+    if (!d && typeof DecompressionStream === 'function') {
+      try {
+        var ds = new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'));
+        text = new TextDecoder().decode(await new Response(ds).arrayBuffer());
+        d = JSON.parse(text.replace(/^\uFEFF/, ''));
+      } catch (_e3) {}
+    }
+    if (!d) throw new Error('无法解析，请确认是 .rbmap / .json 地图文件');
+    d = normalizeMapData(d, base);
+    if (objectsRoot.children.length > 1 && !confirm('⚠️ 导入会清空当前舞台上的所有物体，确定继续吗？')) return;
+    currentSaveId = null;
+    loadMapData(d, true);
+    var save = persistMapData(serializeMap());
+    if (save) renameSaveDirect(save.id, base);
+    refreshSavesList();
+    closeSheet();
+    toast('✅ 已导入地图：' + base);
+  } catch (err) {
+    console.error(err);
+    alert('导入失败：' + err.message);
+  }
+}
+
 document.getElementById('mapInput').addEventListener('change', async function(e) {
   var f = e.target.files[0];
-  if (!f) return;
-  try {
-    var text = await f.text();
-    var d = JSON.parse(text);
-    loadMapData(d);
-    toast('地图已打开');
-  } catch (err) {
-    alert('地图文件无效：' + err.message);
-  }
   e.target.value = '';
+  if (f) await importMapFile(f);
 });
+
+// 直接把地图文件拖到页面上也能导入
+(function() {
+  var dz = document.getElementById('dropOverlay');
+  var depth = 0;
+  var hasFiles = function(e) {
+    return e.dataTransfer && e.dataTransfer.types &&
+      Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') !== -1;
+  };
+  window.addEventListener('dragenter', function(e) {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); depth++; if (dz) dz.classList.add('show');
+  });
+  window.addEventListener('dragover', function(e) { e.preventDefault(); });
+  window.addEventListener('dragleave', function(e) {
+    e.preventDefault(); depth = Math.max(0, depth - 1);
+    if (!depth && dz) dz.classList.remove('show');
+  });
+  window.addEventListener('drop', async function(e) {
+    e.preventDefault(); depth = 0; if (dz) dz.classList.remove('show');
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    // 只接管地图类文件，避免抢走贴图 / 音频等其它拖拽
+    if (f && /\.(rbmap|json|zip|rdproj|gz|txt)$/i.test(f.name)) await importMapFile(f);
+  });
+})();
 
 function clearObjects() {
   clearSelection();
@@ -7856,6 +8069,8 @@ function renderWaterReflection() {
   }
   if (transform.visible) { _reflHidden.push(transform); transform.visible = false; }
   if (grid.visible) { _reflHidden.push(grid); grid.visible = false; }
+  // 吸附面高亮只给主视角看，不进水面反射
+  if (snapFxGroup && snapFxGroup.visible) { _reflHidden.push(snapFxGroup); snapFxGroup.visible = false; }
 
   var prevTarget = renderer.getRenderTarget();
   var prevShadowAuto = renderer.shadowMap.autoUpdate;
@@ -9103,6 +9318,7 @@ function buildProjectPanel() {
     '<button id="pvThumbClear" class="btn-small danger">清除</button></div></div>' +
     '<div class="envSec">项目文件夹</div>' +
     '<button id="pvExportFolder" style="text-align:center">📁 导出项目文件夹（.zip）</button>' +
+    '<button id="pvExportFolderAs" style="text-align:center">💾 项目文件另存为…（.zip）</button>' +
     '<button id="pvImportFolder" style="text-align:center">📂 导入项目文件夹（.zip）</button>' +
     '<button id="pvReset" class="danger" style="text-align:center">↺ 环境恢复默认</button>';
   document.body.appendChild(panelProject);
@@ -9172,7 +9388,8 @@ function buildProjectPanel() {
     refreshProjectPanel();
     pushHistory();
   };
-  panelProject.querySelector('#pvExportFolder').onclick = exportProjectFolder;
+  panelProject.querySelector('#pvExportFolder').onclick = function() { exportProjectFolder(); };
+  panelProject.querySelector('#pvExportFolderAs').onclick = function() { exportProjectFolder('saveas'); };
   panelProject.querySelector('#pvImportFolder').onclick = function() { folderInput.click(); };
   panelProject.querySelector('#pvReset').onclick = function() {
     PROJECT.env = Object.assign({}, ENV_DEFAULTS, { sunDir: ENV_DEFAULTS.sunDir.slice(), rdb2: Object.assign({}, RDB2_ENV) });
@@ -9461,38 +9678,43 @@ function assetFileName(key, a) {
   return key + '_' + base + (ASSET_EXT[a.mime] || '.bin');
 }
 
-async function exportProjectFolder() {
+function buildProjectZip() {
+  var map = serializeMap({ allAssets: true });
+  var entries = [];
+  var manifest = {};
+  for (var key in PROJECT.assets) {
+    var a = PROJECT.assets[key];
+    if (!a || !a.url) continue;
+    var fn = 'assets/' + assetFileName(key, a);
+    entries.push({ name: fn, data: dataUrlToBytes(a.url) });
+    manifest[key] = { kind: a.kind, name: a.name, mime: a.mime, file: fn };
+  }
+  var slim = JSON.parse(JSON.stringify(map));
+  slim.assets = manifest;
+  if (slim.thumb) {
+    entries.push({ name: 'thumb.jpg', data: dataUrlToBytes(slim.thumb) });
+    slim.thumb = 'thumb.jpg';
+  }
+  var enc = new TextEncoder();
+  entries.unshift({ name: 'map.rbmap', data: enc.encode(JSON.stringify(slim, null, 1)) });
+  entries.push({
+    name: 'project.json',
+    data: enc.encode(JSON.stringify({
+      format: 'RagdollBoxProject',
+      version: 1,
+      name: getCurrentSaveName(),
+      editor: APP_VERSION,
+      exportedAt: new Date().toISOString()
+    }, null, 1))
+  });
+  return { name: getCurrentSaveName() + '.zip', blob: zipCreate(entries) };
+}
+
+async function exportProjectFolder(mode) {
   try {
-    var map = serializeMap({ allAssets: true });
-    var entries = [];
-    var manifest = {};
-    for (var key in PROJECT.assets) {
-      var a = PROJECT.assets[key];
-      if (!a || !a.url) continue;
-      var fn = 'assets/' + assetFileName(key, a);
-      entries.push({ name: fn, data: dataUrlToBytes(a.url) });
-      manifest[key] = { kind: a.kind, name: a.name, mime: a.mime, file: fn };
-    }
-    var slim = JSON.parse(JSON.stringify(map));
-    slim.assets = manifest;
-    if (slim.thumb) {
-      entries.push({ name: 'thumb.jpg', data: dataUrlToBytes(slim.thumb) });
-      slim.thumb = 'thumb.jpg';
-    }
-    var enc = new TextEncoder();
-    entries.unshift({ name: 'map.rbmap', data: enc.encode(JSON.stringify(slim, null, 1)) });
-    entries.push({
-      name: 'project.json',
-      data: enc.encode(JSON.stringify({
-        format: 'RagdollBoxProject',
-        version: 1,
-        name: getCurrentSaveName(),
-        editor: APP_VERSION,
-        exportedAt: new Date().toISOString()
-      }, null, 1))
-    });
-    download(getCurrentSaveName() + '.zip', zipCreate(entries));
-    toast('项目文件夹已导出');
+    closeSheet();
+    var z = buildProjectZip();
+    await deliverExport(z.name, z.blob, mode, '✅ 项目文件夹已导出');
   } catch (err) {
     console.error(err);
     alert('导出失败：' + err.message);
@@ -9869,11 +10091,391 @@ refreshProjectPanel();
   menu.insertBefore(folderBtn, document.getElementById('btnImportGltf'));
 })();
 
+/* ================= 吸附（Beta）v7.2.2 ================= */
+var SNAP_CFG = {
+  enabled: false,        // 总开关（每次开启都会弹 Beta 警告；刷新页面后恢复关闭）
+  useGroupShell: false,  // true = 组的整体外壳(紫色边框)也参与吸附；false = 只吸附组内的单个物体
+  fill: true,            // 缩放松手时：两侧都有物体且空隙够小 → 自动拉伸填满
+  dist: 0.25,            // 吸附距离(米)：面与面距离小于它就吸过去
+  fillGap: 1.0           // 填满触发的最大空隙(米)：每一侧空隙都小于它才填
+};
+var snapCache = null;    // 拖动开始时缓存的吸附目标包围盒
+var snapAxis = '';       // 本次拖动的手柄轴
+/* ---- 吸附面高亮：整个面 = 浅蓝，边缘 = 蓝色（所有吸附都走这套） ---- */
+var SNAP_FX = {
+  holdMs: 1500,          // 吸附成功后高亮停留时间
+  faceColor: 0xbfe3ff,   // 浅蓝色（整个面）
+  edgeColor: 0x2f8fff,   // 蓝色（边缘）
+  faceAlpha: 0.34,
+  edgeAlpha: 0.95
+};
+var snapFxGroup = null;
+var snapFxUntil = 0;
+var snapFxMats = [];
+
+function snapFxEnsure() {
+  if (snapFxGroup) return snapFxGroup;
+  snapFxGroup = new THREE.Group();
+  snapFxGroup.name = 'SnapFaceHighlight';
+  snapFxGroup.userData.mapFx = true;   // 纯特效，不当作地图物体
+  snapFxGroup.renderOrder = 9999;
+  scene.add(snapFxGroup);             // 挂在 scene 上，不进 objectsRoot：不会被存档/导出/清除
+  return snapFxGroup;
+}
+
+function snapFxClear() {
+  snapFxUntil = 0;
+  if (!snapFxGroup) return;
+  while (snapFxGroup.children.length) {
+    var c = snapFxGroup.children[0];
+    snapFxGroup.remove(c);
+    if (c.geometry) c.geometry.dispose();
+    if (c.material) c.material.dispose();
+  }
+  snapFxMats = [];
+}
+
+// 求「贴齐的那个面」：两个包围盒在另外两轴上的重叠矩形
+function snapFaceRect(srcBox, tgtBox, axis, coord) {
+  if (!srcBox || !tgtBox) return null;
+  var u = (axis + 1) % 3, v = (axis + 2) % 3;
+  var lo1 = Math.max(srcBox.min.getComponent(u), tgtBox.min.getComponent(u));
+  var hi1 = Math.min(srcBox.max.getComponent(u), tgtBox.max.getComponent(u));
+  var lo2 = Math.max(srcBox.min.getComponent(v), tgtBox.min.getComponent(v));
+  var hi2 = Math.min(srcBox.max.getComponent(v), tgtBox.max.getComponent(v));
+  if (hi1 - lo1 < 1e-4 || hi2 - lo2 < 1e-4) return null;
+  return { axis: axis, coord: coord, u: u, v: v, lo1: lo1, hi1: hi1, lo2: lo2, hi2: hi2 };
+}
+
+function snapFacePoint(fr, pu, pv) {
+  var p = [0, 0, 0];
+  p[fr.axis] = fr.coord;
+  p[fr.u] = pu;
+  p[fr.v] = pv;
+  return p;
+}
+
+// 把若干四边形（u/v 平面内的 4 个点）拼成一个 BufferGeometry
+function snapQuadGeometry(fr, quads) {
+  var pos = [];
+  for (var r = 0; r < quads.length; r++) {
+    var q = quads[r];
+    var A = snapFacePoint(fr, q[0][0], q[0][1]);
+    var B = snapFacePoint(fr, q[1][0], q[1][1]);
+    var C = snapFacePoint(fr, q[2][0], q[2][1]);
+    var D = snapFacePoint(fr, q[3][0], q[3][1]);
+    pos.push.apply(pos, A); pos.push.apply(pos, B); pos.push.apply(pos, C);
+    pos.push.apply(pos, A); pos.push.apply(pos, C); pos.push.apply(pos, D);
+  }
+  var g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  return g;
+}
+
+function snapAddMesh(geo, color, alpha) {
+  var m = new THREE.MeshBasicMaterial({
+    color: color, transparent: true, opacity: alpha,
+    side: THREE.DoubleSide, depthTest: false, depthWrite: false, toneMapped: false
+  });
+  m.userData.baseAlpha = alpha;
+  var mesh = new THREE.Mesh(geo, m);
+  mesh.renderOrder = 9999;
+  mesh.userData.mapFx = true;
+  snapFxMats.push(m);
+  snapFxEnsure().add(mesh);
+}
+
+// 每次吸附成功调用：faces = [snapFaceRect(...), ...]
+function snapSetFaces(faces) {
+  snapFxClear();
+  if (!faces || !faces.length) return;
+  for (var i = 0; i < faces.length; i++) {
+    var fr = faces[i];
+    var L1 = fr.lo1, H1 = fr.hi1, L2 = fr.lo2, H2 = fr.hi2;
+    var w = Math.max(0.004, Math.min(0.03, Math.min(H1 - L1, H2 - L2) * 0.055));
+    // 整个面：浅蓝
+    snapAddMesh(snapQuadGeometry(fr, [[[L1, L2], [H1, L2], [H1, H2], [L1, H2]]]),
+      SNAP_FX.faceColor, SNAP_FX.faceAlpha);
+    // 四条边：蓝色（做成有宽度的细带，手机上才看得清）
+    snapAddMesh(snapQuadGeometry(fr, [
+      [[L1, L2 - w], [H1, L2 - w], [H1, L2 + w], [L1, L2 + w]],
+      [[H1 - w, L2], [H1 + w, L2], [H1 + w, H2], [H1 - w, H2]],
+      [[L1, H2 - w], [H1, H2 - w], [H1, H2 + w], [L1, H2 + w]],
+      [[L1 - w, L2], [L1 + w, L2], [L1 + w, H2], [L1 - w, H2]]
+    ]), SNAP_FX.edgeColor, SNAP_FX.edgeAlpha);
+  }
+  snapFxUntil = performance.now() + SNAP_FX.holdMs;
+}
+
+function snapFxTick(now) {
+  if (!snapFxGroup || !snapFxGroup.children.length) return;
+  if (!snapFxUntil) { snapFxClear(); return; }
+  var left = snapFxUntil - now;
+  if (left <= 0) { snapFxClear(); return; }
+  var k = Math.min(1, left / 350);   // 最后 350ms 淡出
+  for (var i = 0; i < snapFxMats.length; i++) {
+    snapFxMats[i].opacity = snapFxMats[i].userData.baseAlpha * k;
+  }
+}
+
+
+function snapOverlap(a, b, w, tol) {
+  for (var k = 0; k < 3; k++) {
+    if (k === w) continue;
+    if (a.min.getComponent(k) > b.max.getComponent(k) + tol || a.max.getComponent(k) < b.min.getComponent(k) - tol) return false;
+  }
+  return true;
+}
+
+function snapCollect(members) {
+  var T = [], ch = objectsRoot.children;
+  for (var i = 0; i < ch.length; i++) {
+    var o = ch[i];
+    if (!o.userData.mapObject || members.indexOf(o) !== -1) continue;
+    var mt = o.userData.mapType;
+    if (mt === 'spawn' || mt === 'light') continue;
+    var b = new THREE.Box3().setFromObject(o);
+    if (!b.isEmpty()) T.push(b);
+  }
+  if (SNAP_CFG.useGroupShell) {
+    var gs = groupManager.getGroups();
+    for (var g = 0; g < gs.length; g++) {
+      var mine = false;
+      for (var m = 0; m < gs[g].members.length; m++) if (members.indexOf(gs[g].members[m]) !== -1) { mine = true; break; }
+      if (mine) continue; // 自己所在的组不当目标
+      var gb = groupManager._updateBounds(gs[g]);
+      if (gb && !gb.isEmpty()) T.push(gb.clone());
+    }
+  }
+  return T;
+}
+
+// 本地轴 i 对应的世界轴(0/1/2)；旋转不是90°倍数时返回 -1
+function snapAxisWorld(o, i) {
+  var v = new THREE.Vector3(i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0).applyQuaternion(o.quaternion);
+  var a = [Math.abs(v.x), Math.abs(v.y), Math.abs(v.z)];
+  var w = a.indexOf(Math.max(a[0], a[1], a[2]));
+  return a[w] > 0.999 ? w : -1;
+}
+
+transform.addEventListener('mouseDown', function() {
+  snapCache = null;
+  snapSetFaces([]);            // 新一次拖动，先清掉上一次的高亮
+  snapAxis = transform.axis || '';
+  if (!SNAP_CFG.enabled || !selection.length) return;
+  var cg = getCommonGroup();
+  snapCache = { targets: snapCollect(cg ? cg.members : selection) };
+});
+
+function snapOnChange(members, cg) {
+  if (!SNAP_CFG.enabled || !snapCache || !members.length) return;
+  if (currentTool === 'translate') snapMoveStep(members, !!cg);
+  else if (currentTool === 'scale') snapScaleStep(members);
+}
+
+function snapMoveStep(members, isGroup) {
+  var T = snapCache.targets, srcs = [], i, j, a;
+  for (i = 0; i < members.length; i++) {
+    var b = new THREE.Box3().setFromObject(members[i]);
+    if (!b.isEmpty()) srcs.push(b);
+  }
+  if (members.length > 1 && (!isGroup || SNAP_CFG.useGroupShell)) {
+    var u = new THREE.Box3();
+    for (i = 0; i < srcs.length; i++) u.union(srcs[i]);
+    srcs.push(u);
+  }
+  var off = [0, 0, 0], best = [SNAP_CFG.dist, SNAP_CFG.dist, SNAP_CFG.dist];
+  var hit = [null, null, null];   // 每个轴上「贴到哪个目标面」
+  for (i = 0; i < srcs.length; i++) {
+    for (j = 0; j < T.length; j++) {
+      for (a = 0; a < 3; a++) {
+        if (!snapOverlap(srcs[i], T[j], a, SNAP_CFG.dist)) continue;
+        var smin = srcs[i].min.getComponent(a), smax = srcs[i].max.getComponent(a);
+        var tmin = T[j].min.getComponent(a), tmax = T[j].max.getComponent(a);
+        var c = [tmax - smin, tmin - smax, tmin - smin, tmax - smax];
+        for (var k = 0; k < 4; k++) {
+          if (Math.abs(c[k]) < best[a]) {
+            best[a] = Math.abs(c[k]); off[a] = c[k];
+            hit[a] = { s: srcs[i], t: T[j], k: k };
+          }
+        }
+      }
+    }
+  }
+  var anyHit = !!(hit[0] || hit[1] || hit[2]);
+  if (!anyHit) { snapSetFaces([]); return; }
+  for (i = 0; i < members.length; i++) {
+    members[i].position.x += off[0];
+    members[i].position.y += off[1];
+    members[i].position.z += off[2];
+  }
+  // 把本次所有贴齐的面标出来（浅蓝面 + 蓝边）
+  var faces = [];
+  for (a = 0; a < 3; a++) {
+    if (!hit[a]) continue;
+    var h = hit[a], tb = h.t;
+    var coord = (h.k === 0 || h.k === 3) ? tb.max.getComponent(a) : tb.min.getComponent(a);
+    var moved = h.s.clone().translate(new THREE.Vector3(off[0], off[1], off[2]));
+    var fr = snapFaceRect(moved, tb, a, coord);
+    if (fr) faces.push(fr);
+  }
+  snapSetFaces(faces);
+  var g = getCommonGroup();
+  if (g) { groupManager._updateBounds(g); groupManager._hideBounds(g); groupManager._showBounds(g); }
+}
+
+// 缩放吸附：只支持单选 + 单轴手柄 + 未旋转(或90°倍数)的物体
+function snapScaleStep(members) {
+  if (members.length !== 1) return;
+  var o = members[0];
+  if (fixedSize(o)) return;
+  if (!snapAxis || snapAxis.length !== 1) return;
+  var i = 'XYZ'.indexOf(snapAxis);
+  if (i < 0) return;
+  var w = snapAxisWorld(o, i);
+  if (w < 0) return;
+  var st = perObjectStart.get(o);
+  if (!st) return;
+  o.position.copy(st.pos); // 缩放路径不改位置，这里先还原再算，避免累积
+  var b = new THREE.Box3().setFromObject(o);
+  if (b.isEmpty()) return;
+  var lo = b.min.getComponent(w), hi = b.max.getComponent(w);
+  var bestD = SNAP_CFG.dist, face = 0, tgt = 0, hitBox = null, T = snapCache.targets;
+  for (var j = 0; j < T.length; j++) {
+    if (!snapOverlap(b, T[j], w, SNAP_CFG.dist)) continue;
+    var cs = [T[j].min.getComponent(w), T[j].max.getComponent(w)];
+    for (var k = 0; k < 2; k++) {
+      if (Math.abs(cs[k] - lo) < bestD) { bestD = Math.abs(cs[k] - lo); face = -1; tgt = cs[k]; hitBox = T[j]; }
+      if (Math.abs(cs[k] - hi) < bestD) { bestD = Math.abs(cs[k] - hi); face = 1; tgt = cs[k]; hitBox = T[j]; }
+    }
+  }
+  if (!face || hi - lo < 1e-6) { snapSetFaces([]); return; }
+  var f = face < 0 ? (hi - tgt) / (hi - lo) : (tgt - lo) / (hi - lo);
+  if (!(f > 0)) { snapSetFaces([]); return; }
+  var cur = o.scale.getComponent(i);
+  var ns = Math.max(SCALE_MIN, cur * f);
+  f = ns / cur;
+  var pw = o.position.getComponent(w);
+  var lo2 = pw + (lo - pw) * f, hi2 = pw + (hi - pw) * f;
+  var d = face < 0 ? hi - hi2 : lo - lo2; // 对面保持不动
+  o.scale.setComponent(i, ns);
+  o.position.setComponent(w, pw + d);
+  var nb = new THREE.Box3().setFromObject(o);
+  var fr = snapFaceRect(nb, hitBox, w, tgt);
+  snapSetFaces(fr ? [fr] : []);
+}
+
+// 松手：两侧都有物体且空隙够小 → 填满
+function snapFill(o) {
+  if (fixedSize(o) || !snapAxis || snapAxis.length !== 1) return false;
+  var i = 'XYZ'.indexOf(snapAxis);
+  if (i < 0) return false;
+  var w = snapAxisWorld(o, i);
+  if (w < 0) return false;
+  var b = new THREE.Box3().setFromObject(o);
+  if (b.isEmpty()) return false;
+  var lo = b.min.getComponent(w), hi = b.max.getComponent(w), mid = (lo + hi) / 2;
+  var lowT = null, lowD = Infinity, upT = null, upD = Infinity, T = snapCache.targets;
+  var lowBox = null, upBox = null;
+  for (var j = 0; j < T.length; j++) {
+    if (!snapOverlap(b, T[j], w, 0.05)) continue;
+    var tmax = T[j].max.getComponent(w), tmin = T[j].min.getComponent(w);
+    if (tmax <= mid) { var g1 = Math.abs(lo - tmax); if (g1 <= SNAP_CFG.fillGap && g1 < lowD) { lowD = g1; lowT = tmax; lowBox = T[j]; } }
+    if (tmin >= mid) { var g2 = Math.abs(tmin - hi); if (g2 <= SNAP_CFG.fillGap && g2 < upD) { upD = g2; upT = tmin; upBox = T[j]; } }
+  }
+  if (lowT === null || upT === null || upT - lowT < 0.01 || hi - lo < 1e-6) return false;
+  var f = (upT - lowT) / (hi - lo);
+  var cur = o.scale.getComponent(i);
+  var ns = Math.max(SCALE_MIN, cur * f);
+  f = ns / cur;
+  var pw = o.position.getComponent(w);
+  var lo2 = pw + (lo - pw) * f;
+  o.scale.setComponent(i, ns);
+  o.position.setComponent(w, pw + (lowT - lo2));
+  // 填满会同时贴住上下两个面，两个都标出来
+  var nb = new THREE.Box3().setFromObject(o);
+  var faces = [];
+  var f1 = snapFaceRect(nb, lowBox, w, lowT); if (f1) faces.push(f1);
+  var f2 = snapFaceRect(nb, upBox, w, upT); if (f2) faces.push(f2);
+  snapSetFaces(faces);
+  return true;
+}
+
+function snapOnRelease() {
+  try {
+    if (!SNAP_CFG.enabled || !SNAP_CFG.fill || !snapCache) return;
+    if (currentTool !== 'scale' || selection.length !== 1) return;
+    var o = selection[0];
+    if (snapFill(o)) {
+      var g = groupManager.getGroupOfObject(o);
+      if (g) { groupManager._updateBounds(g); groupManager._hideBounds(g); groupManager._showBounds(g); }
+      refreshProps();
+      toast('🧲 已自动填满空隙');
+    }
+  } finally { snapCache = null; }
+}
+
+// ---- 吸附二级菜单 ----
+var panelSnap = document.createElement('div');
+panelSnap.id = 'panelSnap';
+panelSnap.className = 'sheet';
+panelSnap.innerHTML =
+  '<div class="handle"></div>' +
+  '<div class="sheetTop"><button id="snBack" class="btn-small">← 返回</button>' +
+  '<div class="title" style="flex:1;margin:0">🧲 吸附（Beta）</div></div>' +
+  '<button id="snOn" style="text-align:center"></button>' +
+  '<button id="snShell" style="text-align:center"></button>' +
+  '<button id="snFill" style="text-align:center"></button>' +
+  '<div style="font-size:11px;color:var(--muted);line-height:1.6;margin-top:6px">说明：移动时，物体的面会自动贴齐其他物体的面（不改变旋转）。单选物体缩放时，被拉的面会吸附到附近物体的面上；松手时若物体两侧都有物体且空隙较小，会自动拉伸填满。组外壳关闭时，只吸附组内的单个物体；开启后，组的整体外壳（紫色边框）也会参与吸附。旋转过的物体按其世界包围盒计算，斜面不会精确贴合。吸附生效时，被贴齐的那个面会用浅蓝色整面 + 蓝色边缘标出来。</div>';
+document.body.appendChild(panelSnap);
+
+function refreshSnapPanel() {
+  var put = function(id, on, onTxt, offTxt) {
+    var b = panelSnap.querySelector('#' + id);
+    b.textContent = on ? onTxt : offTxt;
+    b.classList.toggle('active', on);
+  };
+  put('snOn', SNAP_CFG.enabled, '🧲 吸附：已开启（点击关闭）', '🧲 吸附：已关闭（点击开启）');
+  put('snShell', SNAP_CFG.useGroupShell, '📦 组外壳参与吸附：已开启', '📦 组外壳参与吸附：已关闭');
+  put('snFill', SNAP_CFG.fill, '📐 松手自动填满：已开启', '📐 松手自动填满：已关闭');
+}
+
+panelSnap.querySelector('#snBack').onclick = function() { openSheet(panelMenu); };
+panelSnap.querySelector('#snOn').onclick = function() {
+  if (!SNAP_CFG.enabled) {
+    if (!confirm('⚠️ 吸附功能为 Beta 测试版，可能出现意料之外的问题。建议先保存或导出备份再使用。确定开启吗？')) return;
+    SNAP_CFG.enabled = true;
+    toast('🧲 吸附已开启（Beta）');
+  } else {
+    SNAP_CFG.enabled = false;
+    snapCache = null;
+    snapSetFaces([]);
+    toast('🧲 吸附已关闭');
+  }
+  refreshSnapPanel();
+};
+panelSnap.querySelector('#snShell').onclick = function() { SNAP_CFG.useGroupShell = !SNAP_CFG.useGroupShell; refreshSnapPanel(); };
+panelSnap.querySelector('#snFill').onclick = function() { SNAP_CFG.fill = !SNAP_CFG.fill; refreshSnapPanel(); };
+
+(function() {
+  var menu = document.getElementById('panelMenu');
+  var b = document.createElement('button');
+  b.id = 'btnSnap';
+  b.textContent = '🧲 吸附（Beta）';
+  b.style.borderColor = 'var(--accent)';
+  b.style.color = 'var(--accent)';
+  b.onclick = function() { refreshSnapPanel(); openSheet(panelSnap); };
+  menu.insertBefore(b, document.getElementById('btnOpenMap'));
+})();
+refreshSnapPanel();
+/* ================= 吸附（Beta）结束 ================= */
+
 var last = performance.now();
 var _lastSelectedGroup = null;
 
 function frame(now) {
   requestAnimationFrame(frame);
+  snapFxTick(now);            // 吸附面高亮的停留 / 淡出
   var dt = Math.min(0.05, (now - last) / 1000);
   last = now;
 
@@ -9972,7 +10574,15 @@ window.RDPMAP = {
   bytesToDataUrl: bytesToDataUrl,
   objectsRoot: objectsRoot,
   waterList: waterList,
-  lightList: lightList
+  lightList: lightList,
+  THREE: THREE,
+  snapFx: {
+    show: snapSetFaces,
+    clear: snapFxClear,
+    group: function() { return snapFxGroup; },
+    run: snapOnChange,
+    cache: function(v) { if (v !== undefined) snapCache = v; return snapCache; }
+  }
 };
 
 console.log('🎮 RagdollBox 地图编辑器 v' + APP_VERSION + ' · 组功能已加载！');
@@ -10358,6 +10968,15 @@ Object.assign(I18N_CFG.en, {
   "当前版本": "Current version",
   "打开地图文件": "Open Map File",
   "导出地图（JSON）": "Export Map (JSON)",
+  "导入地图文件（.rbmap / .json / .zip）": "Import Map File (.rbmap / .json / .zip)",
+  "导出地图（.rbmap）": "Export Map (.rbmap)",
+  "地图另存为": "Save Map As",
+  "导出项目文件夹（.zip）": "Export Project Folder (.zip)",
+  "项目文件另存为（.zip）": "Save Project As (.zip)",
+  "导出 GLTF（.gltf）": "Export GLTF (.gltf)",
+  "GLTF 另存为": "Save GLTF As",
+  "导入地图文件": "Import Map File",
+  "关闭": "Close",
   "上传到游戏（生成分享码）": "Upload to Game (get share code)",
   "跨设备转移": "Cross-Device Transfer",
   "精选地图": "Featured Maps",
@@ -10747,13 +11366,8 @@ Object.assign(I18N_CFG.en, {
   "到「组库」里点放置即可": "Open the Library and tap Place to use them",
   "拖动调整高度": "Drag to resize height"
 });
-Object.assign(I18N_CFG.en, {
-  "如果遇到 bug，欢迎反馈！": "If you run into any bugs, please let us know!"
-});
 // ---- v7.2.1 ----
 Object.assign(I18N_CFG.en, {
-  "修复了导出地图时无法下载等问题；导出后新增「没有下载下来？」提示，可重新下载或复制内容": "Fixed an issue where exported maps could not be downloaded. A \"Didn't download?\" prompt now appears after export, letting you retry or copy the content",
-  "若仍遇到无法下载或类似问题，请及时向我们反馈": "If you still run into download problems or anything similar, please report it to us right away",
   "没有下载下来？试试：": "Didn't download? Try:",
   "再下载一次": "Download Again",
   "复制内容": "Copy Content",
@@ -10768,7 +11382,6 @@ Object.assign(I18N_CFG.en, {
 });
 // ---- v7.2.0 ----
 Object.assign(I18N_CFG.en, {
-  "优化了预览模式：操作 UI 更接近游戏内（可自定义按键位置和大小），碰撞改为胶囊碰撞箱，现在可以进入室内": "Improved preview mode: game-style controls with customizable button position and size, and capsule collision so you can now enter indoor spaces",
   "⚙ 按键": "⚙ Controls",
   "跳跃": "Jump",
   "下蹲": "Crouch",
@@ -10778,13 +11391,7 @@ Object.assign(I18N_CFG.en, {
   "大小": "Size",
   "单指拖动＝转视角 · 十字键移动 · 跳跃/下蹲按钮": "One-finger drag = look · D-pad to move · Jump/Crouch buttons",
   "WASD 移动 · 空格 跳 · C 下蹲 · Shift 跑": "WASD Move · Space Jump · C Crouch · Shift Run",
-  "灵敏度": "Sensitivity",
-  "增加了半拱": "Added Half Arch"
-});
-// ---- v7.0.1 ----
-Object.assign(I18N_CFG.en, {
-  "修复了因上传文件时出错，导致物品栏中的游戏物品无法正常加载的问题": "Fixed an issue where in-game items in the inventory failed to load properly due to an error during file upload",
-  "重新将水加入至地图编辑器": "Water has been added back to the map editor"
+  "灵敏度": "Sensitivity"
 });
 // ---- RagdollBox 2 物品 ----
 Object.assign(I18N_CFG.en, KIT_EN);
@@ -10878,6 +11485,23 @@ Object.assign(I18N_CFG.en, {
   "顶部大小": "Top Size",
   "游戏预制": "Game Presets",
   "项目资源": "Project Assets"
+});
+// ---- v7.2.2 ----
+Object.assign(I18N_CFG.en, {
+  "增加了吸附功能（Beta）": "Added snapping (Beta)",
+  "一开始导出的选择更加丰富": "More export options right from the start",
+  "🧲 吸附（Beta）": "🧲 Snapping (Beta)",
+  "🧲 吸附：已开启（点击关闭）": "🧲 Snapping: ON (tap to turn off)",
+  "🧲 吸附：已关闭（点击开启）": "🧲 Snapping: OFF (tap to turn on)",
+  "📦 组外壳参与吸附：已开启": "📦 Group shell snapping: ON",
+  "📦 组外壳参与吸附：已关闭": "📦 Group shell snapping: OFF",
+  "📐 松手自动填满：已开启": "📐 Auto-fill on release: ON",
+  "📐 松手自动填满：已关闭": "📐 Auto-fill on release: OFF",
+  "⚠️ 吸附功能为 Beta 测试版，可能出现意料之外的问题。建议先保存或导出备份再使用。确定开启吗？": "⚠️ Snapping is a Beta feature and may cause unexpected problems. Please save or export a backup first. Enable it?",
+  "🧲 吸附已开启（Beta）": "🧲 Snapping enabled (Beta)",
+  "🧲 吸附已关闭": "🧲 Snapping disabled",
+  "🧲 已自动填满空隙": "🧲 Gap filled automatically",
+  "说明：移动时，物体的面会自动贴齐其他物体的面（不改变旋转）。单选物体缩放时，被拉的面会吸附到附近物体的面上；松手时若物体两侧都有物体且空隙较小，会自动拉伸填满。组外壳关闭时，只吸附组内的单个物体；开启后，组的整体外壳（紫色边框）也会参与吸附。旋转过的物体按其世界包围盒计算，斜面不会精确贴合。": "Notes: When moving, an object's faces snap flush to other objects' faces (rotation is never changed). When scaling a single object, the face you pull snaps to nearby faces; on release, if there are objects on both sides with a small gap, it stretches to fill it. With group shell off, only individual objects inside groups are snapped to; when on, the group's overall shell (purple frame) is also a snap target. Rotated objects use their world bounding box, so slanted faces won't fit exactly. When snapping happens, the aligned face is marked with a light blue fill and blue edges."
 });
 // ---- 英文表结束（后续批次插在此行之前）----
 </script>
